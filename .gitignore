@@ -1,1 +1,9 @@
 CLAUDE.local.md
+.env
+
+# Worker
+worker/.dev.vars
+worker/.wrangler/
+
+# Dependencies
+node_modules/

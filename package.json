@@ -1,0 +1,7 @@
+{
+  "name": "pixiedust",
+  "type": "module",
+  "scripts": {
+    "proxy": "node server.js"
+  }
+}
