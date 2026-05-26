@@ -88,11 +88,83 @@
 
     .status.error { color: #f87171; }
 
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: #1e1e30;
+      border: 1px solid #2d2d4a;
+      border-radius: 12px;
+      padding: 0.25rem;
+    }
+
+    .tab {
+      flex: 1;
+      background: transparent;
+      color: #64748b;
+      font-size: 0.95rem;
+      padding: 0.6rem 1rem;
+      border-radius: 9px;
+    }
+
+    .tab:hover:not(.active) { color: #c084fc; transform: none; }
+    .tab.active {
+      background: linear-gradient(135deg, #c084fc, #818cf8);
+      color: #fff;
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .controls select {
+      background: #1e1e30;
+      border: 1px solid #2d2d4a;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.9rem;
+      padding: 0.6rem 0.8rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .controls select:focus { border-color: #818cf8; }
+    .controls.hidden { display: none; }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 1rem;
     }
+
+    .grid.hidden { display: none; }
+
+    .video-frame {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #1e1e30;
+      border: 1px solid #2d2d4a;
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: border-color 0.3s;
+    }
+
+    .video-frame.hidden { display: none; }
+    .video-frame.done { border-color: #818cf8; }
+
+    .video-frame video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .video-frame video.visible { display: block; }
 
     .image-frame {
       width: 100%;
@@ -143,27 +215,108 @@
 <body>
   <div class="sparkle">✨</div>
   <h1>Pixiedust</h1>
-  <p class="tagline">Type a prompt. Get 4 variations.</p>
+  <p class="tagline" id="tagline">Type a prompt. Get 4 variations.</p>
 
   <div class="generator">
+    <div class="tabs">
+      <button class="tab active" data-mode="images">Images</button>
+      <button class="tab" data-mode="video">Video</button>
+    </div>
+
     <div class="input-row">
       <input type="text" id="prompt"
         value="a magical fairy kitten with glowing wings, fantasy art, soft pastel colors, detailed illustration, cute"
         placeholder="a glowing fairy kitten…" />
       <button id="generateBtn">Generate</button>
     </div>
+
+    <div class="controls hidden" id="videoControls">
+      <select id="duration">
+        <option value="5">5 seconds</option>
+        <option value="10">10 seconds</option>
+      </select>
+      <select id="resolution">
+        <option value="480p">480p</option>
+        <option value="720p" selected>720p</option>
+        <option value="1080p">1080p</option>
+      </select>
+      <select id="aspectRatio">
+        <option value="16:9" selected>16:9</option>
+        <option value="9:16">9:16</option>
+        <option value="1:1">1:1</option>
+      </select>
+    </div>
+
     <div class="status" id="status"></div>
     <div class="grid" id="grid"></div>
+    <div class="video-frame hidden" id="videoFrame">
+      <div class="placeholder-text" id="videoPlaceholder">Generating…</div>
+      <div class="spinner" id="videoSpinner"></div>
+      <video id="videoEl" controls playsinline></video>
+    </div>
   </div>
 
   <script>
     const PROXY_URL = "http://localhost:3001";
-    const MODEL = "black-forest-labs/flux-schnell";
+    const IMAGE_MODEL = "black-forest-labs/flux-schnell";
+    const VIDEO_MODEL = "bytedance/seedance-1-lite";
 
     const btn = document.getElementById("generateBtn");
     const promptEl = document.getElementById("prompt");
     const statusEl = document.getElementById("status");
     const grid = document.getElementById("grid");
+    const tagline = document.getElementById("tagline");
+    const videoControls = document.getElementById("videoControls");
+    const videoFrame = document.getElementById("videoFrame");
+    const videoEl = document.getElementById("videoEl");
+    const videoPlaceholder = document.getElementById("videoPlaceholder");
+    const videoSpinner = document.getElementById("videoSpinner");
+    const durationEl = document.getElementById("duration");
+    const resolutionEl = document.getElementById("resolution");
+    const aspectRatioEl = document.getElementById("aspectRatio");
+    const tabs = document.querySelectorAll(".tab");
+
+    let mode = "images";
+
+    const VIDEO_PROMPT_DEFAULT =
+      "a magical fairy kitten flying through a glowing forest, fantasy, soft pastel colors, cinematic";
+    const IMAGE_PROMPT_DEFAULT =
+      "a magical fairy kitten with glowing wings, fantasy art, soft pastel colors, detailed illustration, cute";
+
+    function setMode(next) {
+      if (mode === next) return;
+      mode = next;
+      tabs.forEach(t => t.classList.toggle("active", t.dataset.mode === mode));
+
+      if (mode === "video") {
+        tagline.textContent = "Type a prompt. Get a video.";
+        videoControls.classList.remove("hidden");
+        grid.classList.add("hidden");
+        videoFrame.classList.add("hidden");
+        resetVideoFrame();
+        if (promptEl.value === IMAGE_PROMPT_DEFAULT) promptEl.value = VIDEO_PROMPT_DEFAULT;
+      } else {
+        tagline.textContent = "Type a prompt. Get 4 variations.";
+        videoControls.classList.add("hidden");
+        videoFrame.classList.add("hidden");
+        grid.classList.remove("hidden");
+        if (promptEl.value === VIDEO_PROMPT_DEFAULT) promptEl.value = IMAGE_PROMPT_DEFAULT;
+      }
+      statusEl.textContent = "";
+      statusEl.className = "status";
+    }
+
+    tabs.forEach(t => t.addEventListener("click", () => setMode(t.dataset.mode)));
+
+    function resetVideoFrame() {
+      videoEl.classList.remove("visible");
+      videoEl.removeAttribute("src");
+      videoSpinner.classList.remove("visible");
+      videoFrame.classList.remove("done");
+      videoPlaceholder.style.display = "";
+      videoPlaceholder.style.color = "";
+      videoPlaceholder.textContent = "Generating…";
+    }
 
     function makeFrame() {
       const frame = document.createElement("div");
@@ -188,8 +341,25 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: MODEL,
+          model: IMAGE_MODEL,
           input: { prompt, width: 512, height: 512, num_outputs: 1 },
+        }),
+      });
+      return res.json();
+    }
+
+    async function submitVideoJob(prompt) {
+      const res = await fetch(`${PROXY_URL}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: VIDEO_MODEL,
+          input: {
+            prompt,
+            duration: parseInt(durationEl.value, 10),
+            resolution: resolutionEl.value,
+            aspect_ratio: aspectRatioEl.value,
+          },
         }),
       });
       return res.json();
@@ -240,7 +410,7 @@
       }
     }
 
-    async function run() {
+    async function runImages() {
       const prompt = promptEl.value.trim();
       if (!prompt) return;
 
@@ -266,6 +436,47 @@
       );
 
       btn.disabled = false;
+    }
+
+    async function runVideo() {
+      const prompt = promptEl.value.trim();
+      if (!prompt) return;
+
+      btn.disabled = true;
+      resetVideoFrame();
+      videoFrame.classList.remove("hidden");
+      videoSpinner.classList.add("visible");
+      videoFrame.style.aspectRatio = aspectRatioEl.value.replace(":", " / ");
+      statusEl.className = "status";
+      statusEl.textContent = "Submitting video job…";
+
+      try {
+        const job = await submitVideoJob(prompt);
+        if (!job.job_id) throw new Error(job.error || "no job_id");
+        statusEl.textContent = "Generating video… (this can take 1–2 minutes)";
+        const url = await pollUntilDone(job.job_id);
+        videoEl.src = url;
+        videoEl.onloadeddata = () => {
+          videoSpinner.classList.remove("visible");
+          videoPlaceholder.style.display = "none";
+          videoEl.classList.add("visible");
+          videoFrame.classList.add("done");
+        };
+        videoEl.load();
+        statusEl.textContent = "Video ready! ✨";
+      } catch (err) {
+        videoSpinner.classList.remove("visible");
+        videoPlaceholder.textContent = "Failed";
+        videoPlaceholder.style.color = "#f87171";
+        statusEl.className = "status error";
+        statusEl.textContent = `Error: ${err.message || err}`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function run() {
+      return mode === "video" ? runVideo() : runImages();
     }
 
     btn.addEventListener("click", run);
