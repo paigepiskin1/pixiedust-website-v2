@@ -124,16 +124,14 @@ const config = {
               </div>
             )}
 
-            {template.quantities && template.quantities.length > 1 && (
-              <div>
-                <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Outputs</span>
-                <div class="flex flex-wrap gap-1.5" data-controls="quantity">
-                  {template.quantities.map((n, i) => (
-                    <button type="button" class="pd-seg rounded-lg font-semibold" data-val={n} data-active={i === 0 ? "true" : "false"} style="padding:7px 14px;font-size:12px;cursor:pointer;">{n}</button>
-                  ))}
-                </div>
+            <div>
+              <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Outputs <span class="text-ink-3" style="font-weight:400;">· generated in parallel</span></span>
+              <div class="flex flex-wrap gap-1.5" data-controls="quantity">
+                {(template.quantities && template.quantities.length > 1 ? template.quantities : template.type === "video" ? [1, 2] : [1, 2, 3, 4]).map((n, i) => (
+                  <button type="button" class="pd-seg rounded-lg font-semibold" data-val={n} data-active={i === 0 ? "true" : "false"} style="padding:7px 14px;font-size:12px;cursor:pointer;">{n}</button>
+                ))}
               </div>
-            )}
+            </div>
           </div>
 
           <div id="pd-gen-error" class="mt-3 hidden rounded-lg" style="padding:9px 12px;background:color-mix(in srgb, var(--pd-pink) 12%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-pink) 40%, transparent);color:var(--pd-pink);font-size:12.5px;"></div>
@@ -195,9 +193,13 @@ const config = {
     function duration(): number {
       return Number(controlValue("duration")) || (cfg.durations && cfg.durations[0]) || 0;
     }
-    function cost(): number {
+    function unitCost(): number {
       const base = cfg.pricePerSecond && duration() ? Number(cfg.pricePerSecond) * duration() : Number(cfg.creditCost);
-      return Math.ceil(base * quantity() * qualityMult());
+      return Math.ceil(base * qualityMult());
+    }
+    function cost(): number {
+      // Total for the button: one charge per parallel output.
+      return unitCost() * quantity();
     }
 
     const genBtn = $("#pd-generate") as HTMLButtonElement;
@@ -376,23 +378,11 @@ const config = {
       }
     }
 
-    async function generate() {
-      if (!cfg.signedIn) {
-        window.location.href = "/auth/sign-in?redirect=" + encodeURIComponent(location.pathname);
-        return;
-      }
-      if (uploading > 0) {
-        showError("Hang on — a file is still uploading.");
-        return;
-      }
-      const c = cost();
-      if (credits < c) {
-        window.location.href = "/credits";
-        return;
-      }
-      errEl.classList.add("hidden");
+    // One independent job per output (each charged the unit cost), so any
+    // template can produce several in parallel.
+    async function launchJob(inputs: Record<string, unknown>, per: number) {
       const tile = createTile();
-      credits -= c; // optimistic debit so the balance reflects the queued job
+      credits -= per; // optimistic debit
       refreshButton();
       try {
         const res = await fetch("/api/generate", {
@@ -400,16 +390,16 @@ const config = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             templateId: cfg.id,
-            inputs: collectInputs(),
+            inputs,
             quality: controlValue("quality") || undefined,
-            quantity: quantity(),
+            quantity: 1,
             aspect: controlValue("aspect") || undefined,
             duration: duration() || undefined,
           }),
         });
         const data = await res.json();
         if (!res.ok) {
-          credits += c; // refund optimistic debit
+          credits += per;
           refreshButton();
           if (data.needCredits) {
             tileFail(tile, "Not enough credits.");
@@ -421,10 +411,30 @@ const config = {
         }
         await poll(data.id, tile);
       } catch (err) {
-        credits += c;
+        credits += per;
         refreshButton();
         tileFail(tile, "Network error — try again.");
       }
+    }
+
+    function generate() {
+      if (!cfg.signedIn) {
+        window.location.href = "/auth/sign-in?redirect=" + encodeURIComponent(location.pathname);
+        return;
+      }
+      if (uploading > 0) {
+        showError("Hang on — a file is still uploading.");
+        return;
+      }
+      if (credits < cost()) {
+        window.location.href = "/credits";
+        return;
+      }
+      errEl.classList.add("hidden");
+      const n = quantity();
+      const per = unitCost();
+      const inputs = collectInputs(); // snapshot once for all parallel jobs
+      for (let i = 0; i < n; i++) launchJob(inputs, per);
     }
 
     genBtn.addEventListener("click", generate);
