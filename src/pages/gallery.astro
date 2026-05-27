@@ -70,7 +70,7 @@ const tabs = ["All", "Images", "Video"];
                 style="aspect-ratio:1/1.2;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);cursor:pointer;"
               >
                 {it.type === "video" ? (
-                  <video src={it.output_url} muted loop playsinline preload="metadata" class="pd-gvid h-full w-full object-cover" />
+                  <video src={it.output_url} muted loop playsinline autoplay preload="metadata" class="pd-gvid pd-autoplay h-full w-full object-cover" />
                 ) : (
                   <img src={it.output_url} loading="lazy" alt={it.template_title ?? "creation"} class="h-full w-full object-cover" />
                 )}
@@ -172,13 +172,10 @@ const tabs = ["All", "Images", "Video"];
         media.innerHTML = "";
       }
 
+      // Videos autoplay via the shared in-view observer (AppShell); cards just
+      // open the lightbox on click.
       document.querySelectorAll<HTMLElement>(".pd-gcard").forEach((card) => {
         card.addEventListener("click", () => open(Number(card.dataset.idx)));
-        const vid = card.querySelector<HTMLVideoElement>(".pd-gvid");
-        if (vid) {
-          card.addEventListener("mouseenter", () => vid.play().catch(() => {}));
-          card.addEventListener("mouseleave", () => { vid.pause(); vid.currentTime = 0; });
-        }
       });
       document.getElementById("pd-lb-close")!.addEventListener("click", close);
       lb.addEventListener("click", (e) => { if (e.target === lb) close(); });

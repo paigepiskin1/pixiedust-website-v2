@@ -7,7 +7,8 @@ export interface Tier {
   concurrency: number;
 }
 
-const FREE_FALLBACK: Tier = { id: "free", rate_limit_per_min: 6, concurrency: 3 };
+// Generous defaults so users can queue several generations at once (async).
+const FREE_FALLBACK: Tier = { id: "free", rate_limit_per_min: 30, concurrency: 10 };
 
 export async function getUserTier(db: D1Database, userId: number): Promise<Tier> {
   const active = await db

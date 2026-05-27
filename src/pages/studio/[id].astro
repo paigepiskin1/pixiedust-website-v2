@@ -147,32 +147,17 @@ const config = {
         </div>
       </section>
 
-      <!-- RIGHT: output canvas -->
+      <!-- RIGHT: output canvas — async jobs feed (each Generate adds a tile) -->
       <section>
-        <div id="pd-output" class="relative flex items-center justify-center overflow-hidden rounded-[20px]" style="min-height:420px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
-          <div id="pd-out-empty" class="px-8 text-center">
+        <div id="pd-output" class="relative overflow-hidden rounded-[20px]" style="min-height:420px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div id="pd-out-empty" class="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
             <div class="mx-auto mb-3 flex size-12 items-center justify-center rounded-full" style="background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 3v3M10 14v3M3 10h3M14 10h3M5 5l2 2M13 13l2 2M15 5l-2 2M5 15l2-2" /></svg>
             </div>
-            <div class="text-ink-3" style="font-size:13px;">Your result appears here.</div>
+            <div class="text-ink-3" style="font-size:13px;">Your results appear here. Run as many as you like — they generate in parallel.</div>
           </div>
-
-          <div id="pd-out-running" class="absolute inset-0 hidden">
-            <div class="absolute inset-0" style="filter:blur(2px);opacity:0.5;"><Media tone={template.tone} /></div>
-            <div class="absolute inset-0 flex flex-col items-center justify-center gap-3" style="background:color-mix(in srgb, var(--pd-bg) 50%, transparent);">
-              <div class="size-9 rounded-full" style="border:3px solid var(--pd-hairline2);border-top-color:var(--pd-lilac);animation:pd-spin 0.8s linear infinite;"></div>
-              <div id="pd-out-stage" class="font-mono uppercase text-ink-2" style="font-size:10.5px;letter-spacing:0.8px;">Submitting…</div>
-              <div class="h-1 w-40 overflow-hidden rounded-full" style="background:var(--pd-hairline2);">
-                <div id="pd-out-bar" class="h-full rounded-full" style="width:8%;background:var(--pd-lilac);transition:width 600ms;"></div>
-              </div>
-            </div>
-          </div>
-
-          <div id="pd-out-result" class="hidden h-full w-full"></div>
-        </div>
-        <div id="pd-out-actions" class="mt-3 hidden gap-2">
-          <a id="pd-download" href="#" download class="rounded-xl font-semibold text-ink" style="padding:9px 16px;border:0.5px solid var(--pd-hairline2);font-size:12.5px;">Download</a>
-          <button type="button" id="pd-again" class="rounded-xl font-semibold text-ink" style="padding:9px 16px;border:0.5px solid var(--pd-hairline2);background:transparent;font-size:12.5px;cursor:pointer;">Generate again</button>
+          <!-- Job tiles get prepended here; newest first. -->
+          <div id="pd-jobs" class="grid gap-3" style="padding:14px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));"></div>
         </div>
       </section>
     </div>
@@ -295,70 +280,100 @@ const config = {
     }
 
     const errEl = $("#pd-gen-error");
-    const empty = $("#pd-out-empty");
-    const running = $("#pd-out-running");
-    const result = $("#pd-out-result");
-    const actions = $("#pd-out-actions");
-    const stage = $("#pd-out-stage");
-    const bar = $("#pd-out-bar");
+    const emptyEl = $("#pd-out-empty");
+    const jobsEl = $("#pd-jobs");
+    const isVideo = cfg.type === "video";
 
     function showError(msg: string) {
       errEl.textContent = msg;
       errEl.classList.remove("hidden");
     }
 
-    function setStage(text: string, pct: number) {
-      stage.textContent = text;
-      bar.style.width = pct + "%";
+    // Each Generate click spawns an independent job tile that polls on its own,
+    // so users can queue many generations in parallel (async). The button is
+    // never disabled.
+    function createTile(): HTMLElement {
+      emptyEl.classList.add("hidden");
+      const tile = document.createElement("div");
+      tile.className = "pd-job";
+      tile.style.cssText = "position:relative;aspect-ratio:1/1.1;border-radius:14px;overflow:hidden;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);";
+      tile.innerHTML =
+        '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px;text-align:center;">' +
+        '<div style="width:30px;height:30px;border-radius:50%;border:3px solid var(--pd-hairline2);border-top-color:var(--pd-lilac);animation:pd-spin .8s linear infinite;"></div>' +
+        '<div class="pd-job-stage font-mono uppercase" style="font-size:9.5px;letter-spacing:.7px;color:var(--pd-ink2);">Submitting…</div>' +
+        '<div style="height:4px;width:80%;background:var(--pd-hairline2);border-radius:999px;overflow:hidden;"><div class="pd-job-bar" style="height:100%;width:8%;background:var(--pd-lilac);transition:width .5s;"></div></div>' +
+        "</div>";
+      jobsEl.prepend(tile);
+      return tile;
     }
 
-    async function poll(id: string): Promise<void> {
+    function tileStage(tile: HTMLElement, text: string, pct: number) {
+      const s = tile.querySelector<HTMLElement>(".pd-job-stage");
+      if (s) s.textContent = text;
+      const b = tile.querySelector<HTMLElement>(".pd-job-bar");
+      if (b) b.style.width = pct + "%";
+    }
+
+    function tileFail(tile: HTMLElement, msg: string) {
+      tile.innerHTML =
+        '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;text-align:center;color:var(--pd-pink);font-size:11.5px;line-height:1.4;"></div>';
+      (tile.firstElementChild as HTMLElement).textContent = msg;
+    }
+
+    function tileResult(tile: HTMLElement, outputs: string[]) {
+      tile.innerHTML = "";
+      const wrap = document.createElement("div");
+      wrap.style.cssText = `display:grid;gap:4px;width:100%;height:100%;grid-template-columns:repeat(${outputs.length > 1 ? 2 : 1},1fr);`;
+      outputs.forEach((url) => {
+        const el = isVideo ? document.createElement("video") : document.createElement("img");
+        el.src = url;
+        if (isVideo) {
+          const v = el as HTMLVideoElement;
+          v.controls = true;
+          v.playsInline = true;
+          v.muted = true;
+          v.loop = true;
+          v.autoplay = true;
+        }
+        el.style.cssText = "width:100%;height:100%;object-fit:cover;";
+        wrap.appendChild(el);
+      });
+      tile.appendChild(wrap);
+      if (outputs[0]) {
+        const dl = document.createElement("a");
+        dl.href = outputs[0];
+        dl.setAttribute("download", "");
+        dl.textContent = "Download";
+        dl.style.cssText = "position:absolute;right:8px;bottom:8px;padding:5px 10px;border-radius:8px;background:rgba(10,10,11,.72);backdrop-filter:blur(8px);color:#fff;font-size:10.5px;text-decoration:none;";
+        tile.appendChild(dl);
+      }
+    }
+
+    async function poll(id: string, tile: HTMLElement): Promise<void> {
       const stages = ["Reading your inputs", "Running the model", "Refining", "Almost there"];
       let tick = 0;
       while (true) {
         await new Promise((r) => setTimeout(r, 2000));
         tick++;
-        const res = await fetch(`/api/generate/status?id=${id}`);
-        const data = await res.json();
-        if (data.steps > 1 && data.step) setStage(`Step ${data.step} of ${data.steps}…`, Math.min(12 + tick * 10, 92));
-        else setStage(stages[Math.min(tick, stages.length - 1)] + "…", Math.min(12 + tick * 14, 92));
-        if (data.status === "completed") return renderResult(data.outputs || []);
+        let data: any;
+        try {
+          data = await (await fetch(`/api/generate/status?id=${id}`)).json();
+        } catch {
+          continue; // transient; keep polling
+        }
+        if (data.steps > 1 && data.step) tileStage(tile, `Step ${data.step}/${data.steps}…`, Math.min(12 + tick * 10, 92));
+        else tileStage(tile, stages[Math.min(tick, stages.length - 1)] + "…", Math.min(12 + tick * 14, 92));
+        if (data.status === "completed") {
+          tileResult(tile, data.outputs || []);
+          return;
+        }
         if (data.status === "failed") {
-          running.classList.add("hidden");
-          empty.classList.remove("hidden");
           credits += cost(); // refunded
           refreshButton();
-          showError(data.error ? `Generation failed: ${data.error} (credits refunded)` : "Generation failed — credits refunded.");
-          genBtn.disabled = false;
+          tileFail(tile, data.error ? `Failed: ${data.error} (refunded)` : "Failed — credits refunded.");
           return;
         }
       }
-    }
-
-    function renderResult(outputs: string[]) {
-      running.classList.add("hidden");
-      empty.classList.add("hidden");
-      result.classList.remove("hidden");
-      const isVideo = cfg.type === "video";
-      result.innerHTML = "";
-      const grid = document.createElement("div");
-      grid.style.cssText = `display:grid;gap:8px;height:100%;padding:8px;grid-template-columns:repeat(${outputs.length > 1 ? 2 : 1}, 1fr);`;
-      outputs.forEach((url) => {
-        const el = isVideo ? document.createElement("video") : document.createElement("img");
-        el.src = url;
-        if (isVideo) {
-          (el as HTMLVideoElement).controls = true;
-          (el as HTMLVideoElement).playsInline = true;
-        }
-        el.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:12px;";
-        grid.appendChild(el);
-      });
-      result.appendChild(grid);
-      const dl = $("#pd-download") as HTMLAnchorElement;
-      if (outputs[0]) dl.href = outputs[0];
-      actions.classList.remove("hidden");
-      actions.style.display = "flex";
-      genBtn.disabled = false;
     }
 
     async function generate() {
@@ -376,13 +391,9 @@ const config = {
         return;
       }
       errEl.classList.add("hidden");
-      genBtn.disabled = true;
-      empty.classList.add("hidden");
-      result.classList.add("hidden");
-      actions.classList.add("hidden");
-      running.classList.remove("hidden");
-      setStage("Submitting…", 8);
-
+      const tile = createTile();
+      credits -= c; // optimistic debit so the balance reflects the queued job
+      refreshButton();
       try {
         const res = await fetch("/api/generate", {
           method: "POST",
@@ -398,34 +409,25 @@ const config = {
         });
         const data = await res.json();
         if (!res.ok) {
-          running.classList.add("hidden");
-          empty.classList.remove("hidden");
-          genBtn.disabled = false;
+          credits += c; // refund optimistic debit
+          refreshButton();
           if (data.needCredits) {
-            showError("Not enough credits.");
-            setTimeout(() => (window.location.href = "/credits"), 800);
+            tileFail(tile, "Not enough credits.");
+            setTimeout(() => (window.location.href = "/credits"), 900);
           } else {
-            showError(data.error || "Could not start generation.");
+            tileFail(tile, data.error || "Could not start generation.");
           }
           return;
         }
-        credits -= c; // optimistic debit
-        refreshButton();
-        await poll(data.id);
+        await poll(data.id, tile);
       } catch (err) {
-        running.classList.add("hidden");
-        empty.classList.remove("hidden");
-        showError("Network error — try again.");
-        genBtn.disabled = false;
+        credits += c;
+        refreshButton();
+        tileFail(tile, "Network error — try again.");
       }
     }
 
     genBtn.addEventListener("click", generate);
-    $("#pd-again")?.addEventListener("click", () => {
-      result.classList.add("hidden");
-      actions.classList.add("hidden");
-      empty.classList.remove("hidden");
-    });
     refreshButton();
   </script>
 </AppShell>

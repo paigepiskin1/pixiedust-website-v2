@@ -111,8 +111,8 @@ INSERT OR REPLACE INTO templates (id,title,kind,type,category,provider,model,inp
 DELETE FROM subscription_tiers;
 INSERT OR REPLACE INTO subscription_tiers
  (id,name,price_cents,annual_price_cents,monthly_credits,pack_discount_pct,rate_limit_per_min,concurrency,features_json,sort_order,is_active) VALUES
- ('free','Free',0,0,5,0,6,3,'["5 credits / mo","Watermarked","Standard queue"]',0,1),
- ('plus','Plus',1500,15000,500,40,20,8,'["500 credits / mo","No watermark","Priority queue","HD output"]',1,1),
+ ('free','Free',0,0,5,0,30,10,'["5 credits / mo","Watermarked","Generate in parallel"]',0,1),
+ ('plus','Plus',1500,15000,500,40,60,20,'["500 credits / mo","No watermark","Priority queue","HD output"]',1,1),
  ('studio','Studio',4500,45000,2000,60,60,20,'["2000 credits / mo","Commercial license","4K output","Custom workflows"]',2,1);
 
 DELETE FROM credit_packs;

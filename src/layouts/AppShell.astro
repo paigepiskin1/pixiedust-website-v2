@@ -80,6 +80,18 @@ const credits = user?.credits ?? Astro.props.credits ?? 47;
         vids.forEach(function (v) {
           v.setAttribute("data-pd-bound", "1");
           v.muted = true; // required for autoplay in most browsers
+          // Show a frame a few seconds in (not the often-blank first frame) as
+          // the thumbnail/starting point.
+          var seek = function () {
+            if (v.dataset.pdSeeked) return;
+            var off = Math.min(3, (v.duration || 0) * 0.25);
+            if (off > 0) {
+              try { v.currentTime = off; } catch (e) {}
+              v.dataset.pdSeeked = "1";
+            }
+          };
+          if (v.readyState >= 1) seek();
+          else v.addEventListener("loadedmetadata", seek, { once: true });
           if (io) io.observe(v);
           else {
             var p = v.play();
