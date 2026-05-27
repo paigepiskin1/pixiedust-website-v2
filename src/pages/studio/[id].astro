@@ -83,7 +83,20 @@ const config = {
                 ) : f.type === "number" ? (
                   <input data-field={f.key} type="number" min={f.min} max={f.max} step={f.step} value={f.default as number | undefined} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;" />
                 ) : f.type === "file" ? (
-                  <input data-field={f.key} type="file" accept={f.accept} class="w-full rounded-xl text-ink-2 outline-none" style="padding:10px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:12.5px;" />
+                  <div class="pd-file-wrap" data-fieldkey={f.key}>
+                    <label class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1.5 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s;">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
+                      <span style="font-size:12px;color:var(--pd-ink3);">Click to upload</span>
+                      <input data-field={f.key} type="file" accept={f.accept} class="absolute inset-0 cursor-pointer opacity-0" style="z-index:1;" />
+                    </label>
+                    <div class="pd-file-preview hidden overflow-hidden rounded-xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+                      <img class="pd-preview-img block w-full" style="max-height:160px;object-fit:cover;" alt="" />
+                      <div class="flex items-center justify-between gap-2" style="padding:7px 10px;border-top:0.5px solid var(--pd-hairline);">
+                        <span class="pd-preview-status truncate" style="font-size:11px;color:var(--pd-ink3);"></span>
+                        <button type="button" class="pd-file-clear flex shrink-0 size-5 items-center justify-center rounded-full" style="background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink3);font-size:10px;cursor:pointer;" aria-label="Remove">✕</button>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <input data-field={f.key} type={f.type === "url" ? "url" : f.type === "email" ? "email" : "text"} placeholder={f.placeholder} value={String(f.default ?? "")} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;" />
                 )}
@@ -239,33 +252,53 @@ const config = {
     // Upload file fields to Bunny on selection; store the public URL.
     root.querySelectorAll<HTMLInputElement>('input[type="file"][data-field]').forEach((el) => {
       const key = el.dataset.field!;
-      const note = document.createElement("div");
-      note.style.cssText = "margin-top:5px;font-size:11px;color:var(--pd-ink3);";
-      el.insertAdjacentElement("afterend", note);
+      const wrap = el.closest(".pd-file-wrap") as HTMLElement | null;
+      const zone = wrap?.querySelector(".pd-upload-zone") as HTMLElement | null;
+      const preview = wrap?.querySelector(".pd-file-preview") as HTMLElement | null;
+      const previewImg = wrap?.querySelector(".pd-preview-img") as HTMLImageElement | null;
+      const status = wrap?.querySelector(".pd-preview-status") as HTMLElement | null;
+      const clearBtn = wrap?.querySelector(".pd-file-clear") as HTMLElement | null;
+
       el.addEventListener("change", async () => {
-        const f = el.files && el.files[0];
-        if (!f) return;
+        const file = el.files?.[0];
+        if (!file) return;
+
+        // Show immediate local preview
+        const localUrl = URL.createObjectURL(file);
+        if (previewImg) previewImg.src = localUrl;
+        zone?.classList.add("hidden");
+        preview?.classList.remove("hidden");
+        if (status) { status.textContent = "Uploading…"; status.style.color = "var(--pd-ink3)"; }
+
         uploading++;
-        note.textContent = "Uploading…";
         const fd = new FormData();
-        fd.append("file", f);
+        fd.append("file", file);
         try {
           const r = await fetch("/api/upload", { method: "POST", body: fd });
           const d = await r.json();
           if (r.ok) {
             fileUrls[key] = d.url;
-            note.textContent = "✓ uploaded";
-            note.style.color = "var(--pd-mint)";
+            if (previewImg) previewImg.src = d.url;
+            URL.revokeObjectURL(localUrl);
+            if (status) { status.textContent = "✓ Uploaded"; status.style.color = "var(--pd-mint)"; }
           } else {
-            note.textContent = d.error || "Upload failed";
-            note.style.color = "var(--pd-pink)";
+            if (status) { status.textContent = d.error || "Upload failed"; status.style.color = "var(--pd-pink)"; }
+            delete fileUrls[key];
           }
         } catch {
-          note.textContent = "Upload failed";
-          note.style.color = "var(--pd-pink)";
+          if (status) { status.textContent = "Upload failed"; status.style.color = "var(--pd-pink)"; }
+          delete fileUrls[key];
         } finally {
           uploading--;
         }
+      });
+
+      clearBtn?.addEventListener("click", () => {
+        delete fileUrls[key];
+        el.value = "";
+        if (previewImg) previewImg.src = "";
+        preview?.classList.add("hidden");
+        zone?.classList.remove("hidden");
       });
     });
 
