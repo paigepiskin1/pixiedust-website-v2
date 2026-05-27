@@ -6,6 +6,7 @@
 import { writeFileSync } from "node:fs";
 
 const KEY = process.env.SYNCNODE_API_KEY || "";
+if (!KEY) { console.error("Required: SYNCNODE_API_KEY env var.  SYNCNODE_API_KEY=... node scripts/gen-subjects.mjs"); process.exit(1); }
 const MODEL = "openai/gpt-image-2";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

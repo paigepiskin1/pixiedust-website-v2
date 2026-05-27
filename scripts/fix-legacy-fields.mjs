@@ -8,6 +8,7 @@
 //   node scripts/fix-legacy-fields.mjs
 const BASE = process.env.BASE || "http://localhost:4321";
 const TOKEN = process.env.ADMIN_API_TOKEN || "";
+if (!TOKEN) { console.error("Required: ADMIN_API_TOKEN env var.  ADMIN_API_TOKEN=... node scripts/fix-legacy-fields.mjs"); process.exit(1); }
 const H = { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" };
 const FIELD_TYPES = ["select", "text", "textarea", "number", "toggle", "file"];
 

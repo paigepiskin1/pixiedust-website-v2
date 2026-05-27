@@ -6,9 +6,13 @@
 // Default filterPrefix = "old-" (the migrated legacy templates).
 const BASE = process.env.BASE || "http://localhost:4321";
 const TOKEN = process.env.ADMIN_API_TOKEN || "";
-const FIREBASE_KEY = "AIzaSyDd_K8qbm6MOiTlXpFiH4OwqTnUNoKIjrA";
-const EMAIL = "claude.admin@pixiedust.dev";
-const PASS = "";
+const FIREBASE_KEY = process.env.FIREBASE_API_KEY || "";
+const EMAIL = process.env.ADMIN_EMAIL || "";
+const PASS = process.env.ADMIN_PASS || "";
+if (!FIREBASE_KEY || !EMAIL || !PASS) {
+  console.error("Required: FIREBASE_API_KEY, ADMIN_EMAIL, ADMIN_PASS env vars.");
+  process.exit(1);
+}
 const PREFIX = process.argv[2] || "old-";
 
 import { readFileSync, existsSync } from "node:fs";
