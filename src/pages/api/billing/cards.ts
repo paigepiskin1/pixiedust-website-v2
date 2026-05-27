@@ -23,8 +23,8 @@ export async function GET({ locals }: APIContext) {
       cards = cards.map((c, i) => ({ ...c, isDefault: i === 0 }));
     }
     return json({ cards });
-  } catch (err) {
-    return json({ error: String((err as Error).message || err) }, 502);
+  } catch {
+    return json({ error: "Could not load your saved cards. Please try again." }, 502);
   }
 }
 
@@ -50,7 +50,7 @@ export async function POST({ locals, url }: APIContext) {
       setup_intent_data: { metadata: { user_id: dbUser.id, set_default: "1" } },
     });
     return json({ url: session.url });
-  } catch (err) {
-    return json({ error: String((err as Error).message || err) }, 502);
+  } catch {
+    return json({ error: "Could not start card setup. Please try again." }, 502);
   }
 }

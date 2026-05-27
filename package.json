@@ -8,7 +8,11 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "astro": "astro"
+    "astro": "astro",
+    "db:migrate": "wrangler d1 migrations apply pixiedust --local",
+    "db:seed": "wrangler d1 execute pixiedust --local --file=seed/seed.sql && wrangler d1 execute pixiedust --local --file=seed/migrate-templates.sql && wrangler d1 execute pixiedust --local --command=\"INSERT OR REPLACE INTO users (uid,email,name,balance,is_admin,is_adult) VALUES ('2P84xTEyuXQoPUIknbZkDS40JdB2','claude.tester@pixiedust.dev','Claude Tester',1000,0,1),('7RkzBfyW7pW0cGhTV8exuhCXI6I3','claude.admin@pixiedust.dev','Claude Admin',1000,1,1);\"",
+    "db:reset": "npm run db:migrate && npm run db:seed",
+    "deploy": "astro build && wrangler pages deploy dist --project-name=pixiedust-sys --commit-dirty=true"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.13",

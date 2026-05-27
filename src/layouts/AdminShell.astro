@@ -1,5 +1,6 @@
 ---
 import Base from "./Base.astro";
+import Toast from "../components/ui/Toast.astro";
 import { ADMIN_NAV } from "../lib/admin";
 
 interface Props {
@@ -46,4 +47,65 @@ const user = Astro.locals.user;
       <slot />
     </main>
   </div>
+
+  <Toast />
+
+  <!-- Confirm modal — replaces browser confirm(). Use: await window.pdConfirm("message") -->
+  <div
+    id="pd-confirm-host"
+    style="position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.72);backdrop-filter:blur(10px);"
+  >
+    <div
+      id="pd-confirm-box"
+      style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);border-radius:24px;padding:28px 28px 22px;max-width:360px;width:100%;box-shadow:0 32px 80px rgba(0,0,0,0.55);transform:scale(1);animation:pd-modal-in 180ms cubic-bezier(.4,0,.2,1);"
+    >
+      <p id="pd-confirm-msg" style="font-size:14.5px;color:var(--pd-ink);font-weight:500;line-height:1.55;letter-spacing:-0.15px;margin:0 0 22px;"></p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="pd-confirm-cancel" style="padding:9px 20px;border-radius:12px;border:0.5px solid var(--pd-hairline2);background:transparent;color:var(--pd-ink2);font-size:13px;font-weight:500;cursor:pointer;letter-spacing:-0.1px;">Cancel</button>
+        <button id="pd-confirm-ok" style="padding:9px 20px;border-radius:12px;border:none;background:var(--pd-pink);color:#fff;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:-0.1px;">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes pd-modal-in {
+      from { opacity: 0; transform: scale(0.94) translateY(8px); }
+      to   { opacity: 1; transform: scale(1)   translateY(0); }
+    }
+  </style>
+
+  <script is:inline>
+    (function () {
+      const host = document.getElementById("pd-confirm-host");
+      const box  = document.getElementById("pd-confirm-box");
+      const msg  = document.getElementById("pd-confirm-msg");
+      const ok   = document.getElementById("pd-confirm-ok");
+      const can  = document.getElementById("pd-confirm-cancel");
+      if (!host) return;
+
+      window.pdConfirm = function (text) {
+        return new Promise(function (resolve) {
+          msg.textContent = text;
+          host.style.display = "flex";
+          box.style.animation = "none";
+          void box.offsetWidth; // reflow to restart animation
+          box.style.animation = "pd-modal-in 180ms cubic-bezier(.4,0,.2,1)";
+
+          function done(val) {
+            host.style.display = "none";
+            ok.removeEventListener("click", onOk);
+            can.removeEventListener("click", onCan);
+            resolve(val);
+          }
+          function onOk()  { done(true);  }
+          function onCan() { done(false); }
+          ok.addEventListener("click", onOk);
+          can.addEventListener("click", onCan);
+          host.addEventListener("click", function (e) {
+            if (e.target === host) done(false);
+          }, { once: true });
+        });
+      };
+    })();
+  </script>
 </Base>

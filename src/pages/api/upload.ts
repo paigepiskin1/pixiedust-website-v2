@@ -35,7 +35,7 @@ export async function POST({ request, locals }: APIContext) {
   try {
     const url = await uploadToBunny(env, path, await file.arrayBuffer(), file.type);
     return json({ url, kind: file.type.startsWith("video") ? "video" : "image" });
-  } catch (err) {
-    return json({ error: String((err as Error).message || err) }, 502);
+  } catch {
+    return json({ error: "Upload failed. Please try again." }, 502);
   }
 }

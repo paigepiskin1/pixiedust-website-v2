@@ -93,6 +93,6 @@ export async function POST({ request, locals, url }: APIContext) {
     const session = await createCheckoutSession(env.STRIPE_SECRET_KEY, params);
     return json({ url: session.url });
   } catch (err) {
-    return json({ error: String((err as Error).message || err) }, 502);
+    return json({ error: "Could not create checkout session. Please try again." }, 502);
   }
 }

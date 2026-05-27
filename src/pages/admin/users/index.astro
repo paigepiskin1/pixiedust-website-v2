@@ -64,7 +64,7 @@ const mini = "padding:6px 9px;border-radius:8px;background:var(--pd-bg);border:0
         const tr = btn.closest("tr") as HTMLElement;
         const delta = Number((tr.querySelector(".pd-delta") as HTMLInputElement).value);
         const reason = (tr.querySelector(".pd-reason") as HTMLInputElement).value.trim();
-        if (!delta) return alert("Enter a non-zero delta.");
+        if (!delta) { (window as any).pdToast?.("Enter a non-zero delta.", { accent: "var(--pd-pink)" }); return; }
         const res = await fetch("/api/admin/users/balance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid: tr.dataset.uid, delta, reason }) });
         const out = await res.json();
         if (res.ok) {
@@ -72,16 +72,16 @@ const mini = "padding:6px 9px;border-radius:8px;background:var(--pd-bg);border:0
           (tr.querySelector(".pd-delta") as HTMLInputElement).value = "";
           (tr.querySelector(".pd-reason") as HTMLInputElement).value = "";
           (window as any).pdToast?.(`Balance → ${out.balance} cr`, { accent: "var(--pd-amber)" });
-        } else alert(out.error || "Failed");
+        } else (window as any).pdToast?.(out.error || "Failed.", { accent: "var(--pd-pink)" });
       });
     });
     document.querySelectorAll<HTMLElement>(".pd-role").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const next = btn.dataset.on === "1" ? 0 : 1;
-        if (!confirm(`Set this user to ${next ? "admin" : "user"}?`)) return;
+        if (!await (window as any).pdConfirm(`Set this user to ${next ? "admin" : "user"}?`)) return;
         const res = await fetch("/api/admin/users/role", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid: rowUid(btn), is_admin: next }) });
         if (res.ok) location.reload();
-        else alert("Failed");
+        else (window as any).pdToast?.("Failed.", { accent: "var(--pd-pink)" });
       });
     });
   </script>

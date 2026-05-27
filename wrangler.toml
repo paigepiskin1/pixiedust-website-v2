@@ -3,28 +3,16 @@ compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
 
-# ------------------------------------------------------------------
-# Bindings are STUBBED for Phase 1. Replace the placeholder ids with
-# real ones once the resources are created:
-#   wrangler d1 create pixiedust
-#   wrangler kv namespace create SESSIONS
-#   wrangler r2 bucket create pixiedust-assets
-# Secrets (SYNCNODE_API_KEY, BUNNY_*, Firebase, Stripe) are NEVER set
-# here — use `wrangler secret put <NAME>` / Pages env vars.
-# ------------------------------------------------------------------
+# Secrets (SYNCNODE_API_KEY, BUNNY_*, Stripe, etc.) are NEVER set
+# here — use `wrangler pages secret put <NAME>` / Pages env vars.
 
 # D1 — primary database (users, templates, generations, credit ledger, ...)
 [[d1_databases]]
 binding = "DB"
 database_name = "pixiedust"
-database_id = "PLACEHOLDER-run-wrangler-d1-create"
+database_id = "105e2276-0d51-430a-8c6f-b4f7ee699aaf"
 
 # KV — sessions, cache, rate limits
 [[kv_namespaces]]
 binding = "SESSIONS"
-id = "PLACEHOLDER-run-wrangler-kv-namespace-create"
-
-# R2 — system assets (not user media; user media goes to Bunny via SyncNode)
-[[r2_buckets]]
-binding = "ASSETS_BUCKET"
-bucket_name = "pixiedust-assets"
+id = "9df6495725ab49d481572c05b089e13c"

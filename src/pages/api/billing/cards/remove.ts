@@ -29,7 +29,7 @@ export async function POST({ request, locals }: APIContext) {
     }
     await detachPaymentMethod(env.STRIPE_SECRET_KEY, body.id);
     return json({ ok: true });
-  } catch (err) {
-    return json({ error: String((err as Error).message || err) }, 502);
+  } catch {
+    return json({ error: "Could not remove card. Please try again." }, 502);
   }
 }

@@ -59,7 +59,7 @@ export async function POST({ request, locals }: APIContext) {
       .prepare("UPDATE generations SET status='failed', error=?, credits_refunded=?, updated_at=datetime('now') WHERE id=?")
       .bind(String((err as Error).message || err), cost, genId)
       .run();
-    return json({ error: "Could not start generation — credits refunded.", detail: String((err as Error).message || err) }, 502);
+    return json({ error: "Could not start generation — credits refunded." }, 502);
   };
 
   // ─── Multi-step chain ───
