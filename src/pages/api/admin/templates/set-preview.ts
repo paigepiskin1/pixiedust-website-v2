@@ -1,14 +1,15 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { isAdmin, auditAdmin } from "../../../../lib/admin";
+import { adminActor, auditAdmin } from "../../../../lib/admin";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
 
 export async function POST({ request, locals }: APIContext) {
-  if (!isAdmin(locals)) return json({ error: "Forbidden" }, 403);
   const env = locals.runtime.env;
+  const actor = adminActor(request, locals, env.ADMIN_API_TOKEN);
+  if (!actor) return json({ error: "Forbidden" }, 403);
   let body: { id?: string; url?: string; type?: string };
   try {
     body = (await request.json()) as typeof body;
@@ -23,6 +24,6 @@ export async function POST({ request, locals }: APIContext) {
     .bind(body.url, body.id)
     .run();
   if (!res.meta.changes) return json({ error: "Template not found" }, 404);
-  await auditAdmin(env.DB, locals.user!.uid, "template.set_preview", "template", body.id, { col, url: body.url });
+  await auditAdmin(env.DB, actor, "template.set_preview", "template", body.id, { col, url: body.url });
   return json({ ok: true, field: col });
 }

@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { isAdmin } from "../../../lib/admin";
+import { adminActor } from "../../../lib/admin";
 import { fetchModelSchema } from "../../../lib/replicate-schema";
 
 function json(data: unknown, status = 200) {
@@ -8,8 +8,8 @@ function json(data: unknown, status = 200) {
 }
 
 export async function POST({ request, locals }: APIContext) {
-  if (!isAdmin(locals)) return json({ error: "Forbidden" }, 403);
   const env = locals.runtime.env;
+  if (!adminActor(request, locals, env.ADMIN_API_TOKEN)) return json({ error: "Forbidden" }, 403);
   let model: string | undefined;
   try {
     ({ model } = (await request.json()) as { model?: string });

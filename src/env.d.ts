@@ -17,6 +17,7 @@ interface Env {
   STRIPE_WEBHOOK_SECRET: string;
   REPLICATE_API_TOKEN: string;
   OPENROUTER_API_KEY: string;
+  ADMIN_API_TOKEN: string;
 }
 
 declare namespace App {

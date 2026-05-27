@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { isAdmin } from "../../../lib/admin";
+import { adminActor } from "../../../lib/admin";
 import { aiConvert } from "../../../lib/ai";
 
 function json(data: unknown, status = 200) {
@@ -8,8 +8,8 @@ function json(data: unknown, status = 200) {
 }
 
 export async function POST({ request, locals }: APIContext) {
-  if (!isAdmin(locals)) return json({ error: "Forbidden" }, 403);
   const env = locals.runtime.env;
+  if (!adminActor(request, locals, env.ADMIN_API_TOKEN)) return json({ error: "Forbidden" }, 403);
   let raw: string | undefined;
   try {
     ({ raw } = (await request.json()) as { raw?: string });
