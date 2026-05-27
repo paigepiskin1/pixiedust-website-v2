@@ -55,7 +55,7 @@ Carry over the old dynamic-placeholder template model, improved:
 |---|---|---|
 | 0 | Discovery + plan | ✅ Done |
 | 1 | Scaffold (Astro/Tailwind/CF, bindings stub, archive demo) | ✅ Done |
-| 2 | Design system + app shell | ⬜ |
+| 2 | Design system + app shell | ✅ Done |
 | 3 | Public/static pages | ⬜ |
 | 4 | Auth (Firebase: Google/email+password/Apple) | ⬜ |
 | 5 | Data model + template system (D1) | ⬜ |
@@ -124,3 +124,8 @@ The full old-site functional inventory and the design audit were produced during
   auth, migration, and template-system decisions.
 - **2026-05-26** — Phase 1 done. Astro 5 + Tailwind v4 + CF adapter scaffolded; design tokens
   wired and verified in dark+light; wrangler bindings stubbed; demo archived; build + type-check green.
+- **2026-05-26** — Phase 2 done. App shell ported to Astro: `Sidebar`/`Topbar`/`MobileDrawer`
+  (in `src/components/shell/`), `AppShell.astro` layout, UI atoms `Media`/`Pill`/`CreditChip`/`Dot`/
+  `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
+  `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
+  localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.

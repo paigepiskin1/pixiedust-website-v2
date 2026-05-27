@@ -1,0 +1,31 @@
+---
+import NavIcon from "./NavIcon.astro";
+import type { NavItem } from "../../lib/nav";
+
+interface Props {
+  item: NavItem;
+  active: boolean;
+}
+const { item, active } = Astro.props;
+const accent = item.accent ? `var(${item.accent})` : "var(--pd-lilac)";
+---
+
+<a
+  href={item.href}
+  class:list={["pd-nav-item relative flex w-full items-center gap-2.5 rounded-[9px] px-[11px] py-2 mb-px text-left transition-colors", { "is-active": active }]}
+  style={`font-size:13px;letter-spacing:-0.1px;font-weight:${active ? 600 : 500};color:var(${active ? "--pd-ink" : "--pd-ink2"});`}
+  aria-current={active ? "page" : undefined}
+>
+  {
+    active && (
+      <span
+        class="pd-active-bar absolute left-0 top-2 bottom-2 w-[2.5px] rounded-[2px]"
+        style={`background:${accent};`}
+      />
+    )
+  }
+  <span class="inline-flex shrink-0" style={`color:${active ? accent : "var(--pd-ink2)"};`}>
+    <NavIcon name={item.icon} />
+  </span>
+  <span class="pd-hide-collapsed">{item.name}</span>
+</a>

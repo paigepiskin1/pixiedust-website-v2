@@ -21,13 +21,13 @@ const {
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <!-- Restore persisted theme before paint to avoid a flash. Dark is default. -->
+    <!-- Restore persisted theme + sidebar state before paint to avoid a flash. -->
     <script is:inline>
       (function () {
         try {
-          if (localStorage.getItem("pd-web-theme") === "light") {
-            document.documentElement.setAttribute("data-theme", "light");
-          }
+          var el = document.documentElement;
+          if (localStorage.getItem("pd-web-theme") === "light") el.setAttribute("data-theme", "light");
+          if (localStorage.getItem("pd-web-sidebar") === "collapsed") el.setAttribute("data-sidebar", "collapsed");
         } catch (e) {}
       })();
     </script>

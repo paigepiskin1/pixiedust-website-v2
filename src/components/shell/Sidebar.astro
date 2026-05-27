@@ -1,0 +1,128 @@
+---
+import { NAV_SECTIONS, isActive } from "../../lib/nav";
+import Logo from "./Logo.astro";
+import NavItem from "./NavItem.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+
+interface Props {
+  credits?: number;
+}
+const { credits = 47 } = Astro.props;
+const pathname = Astro.url.pathname;
+const toggleBtn =
+  "pd-collapse-toggle flex items-center justify-center rounded-lg transition-colors";
+---
+
+<nav
+  class="pd-side sticky top-0 hidden h-screen shrink-0 flex-col md:flex"
+  style="width:var(--pd-side-w);background:var(--pd-bg);border-right:0.5px solid var(--pd-hairline);transition:width 200ms cubic-bezier(.4,0,.2,1);padding:20px 14px 16px;"
+>
+  <!-- header -->
+  <div class="flex items-center justify-between gap-1" style="padding:4px 4px 18px;">
+    <Logo />
+    <button
+      type="button"
+      class={`${toggleBtn} pd-hide-collapsed`}
+      style="width:28px;height:28px;color:var(--pd-ink2);background:transparent;border:0.5px solid transparent;cursor:pointer;"
+      aria-label="Collapse sidebar"
+    >
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1.5" y="2.5" width="10" height="8" rx="1.2"></rect>
+        <path d="M5 2.5 V10.5"></path>
+        <path d="M3.5 5 L2 6.5 L3.5 8"></path>
+      </svg>
+    </button>
+  </div>
+  <div class="pd-only-collapsed justify-center" style="margin-bottom:8px;">
+    <button
+      type="button"
+      class={toggleBtn}
+      style="width:28px;height:28px;color:var(--pd-ink2);background:transparent;border:0.5px solid transparent;cursor:pointer;"
+      aria-label="Expand sidebar"
+    >
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1.5" y="2.5" width="10" height="8" rx="1.2"></rect>
+        <path d="M5 2.5 V10.5"></path>
+        <path d="M7 5 L8.5 6.5 L7 8"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- sections -->
+  <div class="flex-1 overflow-y-auto overflow-x-hidden" style="padding-right:4px;">
+    {
+      NAV_SECTIONS.map((s) => (
+        <div style="margin-bottom:18px;">
+          <div
+            class="pd-hide-collapsed font-mono uppercase"
+            style="padding:8px 10px 6px;font-size:9.5px;color:var(--pd-ink4);letter-spacing:1px;"
+          >
+            {s.label}
+          </div>
+          <div class="pd-only-collapsed" style="height:0.5px;background:var(--pd-hairline);margin:8px 6px;" />
+          {s.items.map((it) => (
+            <NavItem item={it} active={isActive(it.href, pathname)} />
+          ))}
+        </div>
+      ))
+    }
+  </div>
+
+  <!-- footer -->
+  <div class="flex flex-col gap-1.5" style="border-top:0.5px solid var(--pd-hairline);padding-top:12px;margin-top:8px;">
+    <a
+      href="/credits"
+      class="pd-credits-btn flex items-center justify-between rounded-[10px]"
+      style="padding:9px 11px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+    >
+      <span class="flex items-center gap-[7px]">
+        <span class="size-[7px] rounded-full" style="background:var(--pd-amber);box-shadow:0 0 8px var(--pd-amber);"></span>
+        <span class="pd-hide-collapsed font-semibold text-ink" style="font-size:12.5px;letter-spacing:-0.1px;">{credits} credits</span>
+      </span>
+      <span class="pd-hide-collapsed font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">Top up</span>
+    </a>
+
+    <div class="pd-hide-collapsed">
+      <ThemeToggle />
+    </div>
+
+    <a
+      href="/account"
+      class="flex items-center gap-[9px] rounded-[10px]"
+      style="padding:7px 8px;margin-top:2px;"
+    >
+      <div
+        class="flex size-7 shrink-0 items-center justify-center rounded-full font-semibold text-white"
+        style="background:linear-gradient(135deg, var(--pd-lilac), var(--pd-pink));font-size:12px;"
+      >
+        K
+      </div>
+      <div class="pd-hide-collapsed flex min-w-0 flex-col">
+        <span class="font-semibold text-ink" style="font-size:12.5px;letter-spacing:-0.1px;">kavi.studio</span>
+        <span class="font-mono" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">Free plan</span>
+      </div>
+    </a>
+  </div>
+</nav>
+
+<style>
+  .pd-collapse-toggle:hover {
+    background: var(--pd-bg2) !important;
+    border-color: var(--pd-hairline2) !important;
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    function toggle() {
+      const el = document.documentElement;
+      const collapsed = el.getAttribute("data-sidebar") === "collapsed";
+      if (collapsed) el.removeAttribute("data-sidebar");
+      else el.setAttribute("data-sidebar", "collapsed");
+      try {
+        localStorage.setItem("pd-web-sidebar", collapsed ? "expanded" : "collapsed");
+      } catch (e) {}
+    }
+    document.querySelectorAll(".pd-collapse-toggle").forEach((b) => b.addEventListener("click", toggle));
+  })();
+</script>

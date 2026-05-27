@@ -1,0 +1,36 @@
+---
+// Gradient media placeholder (ported from PDMedia in web-tokens.jsx).
+// Re-themes automatically via the --pd-media-*-{a,b,c} CSS vars.
+type Tone = "teal" | "lilac" | "mint" | "pink" | "noir" | "dusk" | "ice" | "amber";
+
+interface Props {
+  tone?: Tone;
+  label?: string;
+  sub?: string;
+  angle?: number;
+  class?: string;
+}
+
+const { tone = "teal", label, sub, angle = 140, class: className = "" } = Astro.props;
+const a = `var(--pd-media-${tone}-a)`;
+const b = `var(--pd-media-${tone}-b)`;
+const c = `var(--pd-media-${tone}-c)`;
+const base = `linear-gradient(${angle}deg, ${a} 0%, ${b} 55%, color-mix(in srgb, ${c} 20%, transparent) 100%)`;
+const overlay = `radial-gradient(120% 80% at 80% 10%, color-mix(in srgb, ${c} 13%, transparent), transparent 60%), radial-gradient(80% 60% at 10% 90%, color-mix(in srgb, ${c} 9%, transparent), transparent 60%)`;
+---
+
+<div class={`relative h-full w-full overflow-hidden ${className}`} style={`background:${base};`}>
+  <div class="absolute inset-0" style={`background:${overlay};`}></div>
+  {
+    label && (
+      <div
+        class="absolute inset-x-3 bottom-3 flex flex-col gap-0.5 font-mono uppercase leading-tight"
+        style="font-size:10px;letter-spacing:0.5px;color:color-mix(in srgb, var(--pd-ink) 62%, transparent);"
+      >
+        <span>◐ {label}</span>
+        {sub && <span class="opacity-55">{sub}</span>}
+      </div>
+    )
+  }
+  <slot />
+</div>

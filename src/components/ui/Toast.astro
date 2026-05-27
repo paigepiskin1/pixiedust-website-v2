@@ -1,0 +1,38 @@
+---
+// Toast host. Fire from anywhere with:
+//   window.dispatchEvent(new CustomEvent("pd-toast", { detail: { text, accent } }))
+// or the global helper window.pdToast(text, { accent }).
+---
+
+<div
+  id="pd-toast-host"
+  class="pointer-events-none fixed inset-x-0 bottom-7 z-[1000] flex flex-col items-center gap-2"
+>
+</div>
+
+<script is:inline>
+  (function () {
+    const host = document.getElementById("pd-toast-host");
+    if (!host) return;
+    window.pdToast = function (text, opts) {
+      window.dispatchEvent(new CustomEvent("pd-toast", { detail: { text, ...(opts || {}) } }));
+    };
+    window.addEventListener("pd-toast", function (e) {
+      const accent = (e.detail && e.detail.accent) || "var(--pd-lilac)";
+      const el = document.createElement("div");
+      el.style.cssText =
+        "padding:10px 18px;border-radius:999px;background:rgba(20,20,22,0.92);" +
+        "backdrop-filter:blur(20px);border:0.5px solid var(--pd-hairline2);" +
+        "font-size:13px;color:#fff;font-weight:500;letter-spacing:-0.1px;" +
+        "display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);" +
+        "animation:pd-toast-in 200ms cubic-bezier(.4,0,.2,1);";
+      const dot = document.createElement("span");
+      dot.style.cssText =
+        "width:6px;height:6px;border-radius:6px;background:" + accent + ";box-shadow:0 0 10px " + accent + ";";
+      el.appendChild(dot);
+      el.appendChild(document.createTextNode((e.detail && e.detail.text) || ""));
+      host.appendChild(el);
+      setTimeout(() => el.remove(), 2400);
+    });
+  })();
+</script>

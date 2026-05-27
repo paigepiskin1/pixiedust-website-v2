@@ -1,50 +1,45 @@
 ---
-import Base from "../layouts/Base.astro";
+import AppShell from "../layouts/AppShell.astro";
+import Media from "../components/ui/Media.astro";
+import Pill from "../components/ui/Pill.astro";
+import CreditChip from "../components/ui/CreditChip.astro";
+
+const tiles = [
+  { tone: "lilac", label: "Presets", sub: "120+ looks" },
+  { tone: "teal", label: "Photoshoots", sub: "Editorial packs" },
+  { tone: "pink", label: "Video", sub: "Cinematic" },
+  { tone: "mint", label: "Beauty", sub: "Hair · makeup" },
+  { tone: "amber", label: "Ad Studio", sub: "Commercial" },
+  { tone: "dusk", label: "Avatar", sub: "Build a base" },
+] as const;
 ---
 
-<Base title="PixieDust">
-  <main class="min-h-screen flex flex-col items-center justify-center gap-6 px-6 text-center">
-    <span
-      class="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-3 border border-hairline-2 rounded-full px-3 py-1"
-    >
-      Rebuild · Phase 1
-    </span>
+<AppShell title="PixieDust — Home">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <div class="mb-2 flex items-center gap-3">
+      <Pill color="var(--pd-lilac)" label="Phase 2 · Shell" />
+      <CreditChip cr={47} />
+    </div>
 
-    <h1
-      class="font-display text-6xl font-medium tracking-tight bg-gradient-to-br from-teal via-lilac to-pink bg-clip-text text-transparent"
-    >
-      PixieDust
+    <h1 class="font-display font-medium tracking-tight text-ink" style="font-size:38px;line-height:1.05;letter-spacing:-1px;">
+      Welcome back
     </h1>
-
-    <p class="text-ink-2 max-w-md text-balance">
-      Astro + Tailwind + Cloudflare scaffold is live. Design tokens are wired —
-      the studio gets built on top of this.
+    <p class="mt-1 text-ink-2" style="font-size:14.5px;">
+      The app shell is live — sidebar, topbar, mobile drawer, and theme switching.
+      Real pages land in Phase 3.
     </p>
 
-    <div class="flex items-center gap-3 text-ink-3 font-mono text-xs">
-      <span class="inline-flex items-center gap-1.5">
-        <span class="size-1.5 rounded-full bg-amber shadow-[0_0_8px_var(--pd-amber)]"></span>
-        47 cr
-      </span>
-      <span class="text-ink-4">·</span>
-      <button
-        id="theme-toggle"
-        class="border border-hairline-2 rounded-full px-3 py-1 hover:border-hairline-3 transition-colors"
-      >
-        Toggle theme
-      </button>
+    <div class="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      {
+        tiles.map((t) => (
+          <div
+            class="aspect-[4/3] overflow-hidden rounded-[18px]"
+            style="border:0.5px solid var(--pd-hairline);"
+          >
+            <Media tone={t.tone} label={t.label} sub={t.sub} />
+          </div>
+        ))
+      }
     </div>
-  </main>
-
-  <script is:inline>
-    document.getElementById("theme-toggle")?.addEventListener("click", () => {
-      const el = document.documentElement;
-      const next = el.getAttribute("data-theme") === "light" ? "dark" : "light";
-      if (next === "light") el.setAttribute("data-theme", "light");
-      else el.removeAttribute("data-theme");
-      try {
-        localStorage.setItem("pd-web-theme", next);
-      } catch (e) {}
-    });
-  </script>
-</Base>
+  </div>
+</AppShell>

@@ -1,0 +1,18 @@
+---
+interface Props {
+  size?: number;
+  href?: string;
+}
+const { size = 22, href = "/" } = Astro.props;
+---
+
+<a href={href} class="flex items-center gap-[9px]" aria-label="PixieDust home">
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" class="shrink-0">
+    <circle cx="12" cy="12" r="11" stroke="var(--pd-lilac)" stroke-width="1.4"></circle>
+    <circle cx="12" cy="12" r="5.5" fill="var(--pd-lilac)"></circle>
+    <circle cx="12" cy="12" r="2" fill="var(--pd-bg)"></circle>
+  </svg>
+  <span
+    class="font-display font-semibold text-ink pd-hide-collapsed"
+    style="font-size:18px;letter-spacing:-0.5px;">PixieDust</span>
+</a>

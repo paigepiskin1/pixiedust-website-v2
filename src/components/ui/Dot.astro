@@ -1,0 +1,12 @@
+---
+interface Props {
+  color?: string; // CSS color or var() — defaults to teal token
+  size?: number;
+}
+const { color = "var(--pd-teal)", size = 6 } = Astro.props;
+---
+
+<span
+  class="inline-block shrink-0 rounded-full"
+  style={`width:${size}px;height:${size}px;background:${color};box-shadow:0 0 ${size * 2}px ${color}80;`}
+></span>

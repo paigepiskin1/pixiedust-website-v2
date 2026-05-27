@@ -1,0 +1,28 @@
+---
+import Base from "./Base.astro";
+import Sidebar from "../components/shell/Sidebar.astro";
+import Topbar from "../components/shell/Topbar.astro";
+import MobileDrawer from "../components/shell/MobileDrawer.astro";
+import Toast from "../components/ui/Toast.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+  credits?: number;
+}
+const { title, description, credits = 47 } = Astro.props;
+---
+
+<Base title={title} description={description}>
+  <div class="flex min-h-screen">
+    <Sidebar credits={credits} />
+    <div class="flex min-w-0 flex-1 flex-col">
+      <Topbar />
+      <main class="flex-1">
+        <slot />
+      </main>
+    </div>
+  </div>
+  <MobileDrawer credits={credits} />
+  <Toast />
+</Base>

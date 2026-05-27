@@ -1,0 +1,21 @@
+---
+interface Props {
+  cr: number | string;
+  size?: "sm" | "md";
+}
+const { cr, size = "sm" } = Astro.props;
+const fs = size === "sm" ? "10px" : "11.5px";
+const pad = size === "sm" ? "3px 8px" : "5px 11px";
+---
+
+<span
+  class="inline-flex items-center gap-[5px] rounded-full"
+  style={`padding:${pad};background:rgba(245,201,139,0.16);border:0.5px solid color-mix(in srgb, var(--pd-amber) 33%, transparent);`}
+>
+  <span
+    class="inline-block size-[5px] rounded-full"
+    style="background:var(--pd-amber);box-shadow:0 0 8px var(--pd-amber);"></span>
+  <span
+    class="font-mono font-semibold text-amber"
+    style={`font-size:${fs};letter-spacing:0.4px;`}>{cr} cr</span>
+</span>

@@ -1,0 +1,101 @@
+---
+import { NAV_SECTIONS, isActive } from "../../lib/nav";
+import Logo from "./Logo.astro";
+import NavItem from "./NavItem.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+
+interface Props {
+  credits?: number;
+}
+const { credits = 47 } = Astro.props;
+const pathname = Astro.url.pathname;
+---
+
+<div id="pd-drawer" class="fixed inset-0 z-[300] hidden md:hidden">
+  <div
+    id="pd-drawer-overlay"
+    class="absolute inset-0"
+    style="background:rgba(5,5,8,0.65);backdrop-filter:blur(8px);animation:pd-fade-in 180ms ease-out;"
+  >
+  </div>
+  <div
+    class="absolute inset-y-0 left-0 flex flex-col"
+    style="width:min(86vw,320px);background:var(--pd-bg);border-right:0.5px solid var(--pd-hairline);padding:18px 14px;animation:pd-slide-in-l 220ms cubic-bezier(.4,0,.2,1);"
+  >
+    <div class="flex items-center justify-between" style="padding:4px 8px 18px;">
+      <Logo size={20} />
+      <button
+        type="button"
+        id="pd-drawer-close"
+        class="flex size-8 items-center justify-center rounded-full"
+        style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);cursor:pointer;"
+        aria-label="Close menu"
+      >
+        <svg width="11" height="11" viewBox="0 0 11 11" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2 L9 9 M9 2 L2 9"></path></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto" style="padding-right:4px;">
+      {
+        NAV_SECTIONS.map((s) => (
+          <div style="margin-bottom:18px;">
+            <div class="font-mono uppercase" style="padding:8px 10px 6px;font-size:9.5px;color:var(--pd-ink4);letter-spacing:1px;">
+              {s.label}
+            </div>
+            {s.items.map((it) => (
+              <NavItem item={it} active={isActive(it.href, pathname)} />
+            ))}
+          </div>
+        ))
+      }
+    </div>
+
+    <div class="flex flex-col gap-1.5" style="border-top:0.5px solid var(--pd-hairline);padding-top:12px;margin-top:8px;">
+      <a
+        href="/credits"
+        class="flex items-center justify-between rounded-[10px]"
+        style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+      >
+        <span class="flex items-center gap-[7px]">
+          <span class="size-[7px] rounded-full" style="background:var(--pd-amber);box-shadow:0 0 8px var(--pd-amber);"></span>
+          <span class="font-semibold text-ink" style="font-size:13px;letter-spacing:-0.1px;">{credits} credits</span>
+        </span>
+        <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">Top up</span>
+      </a>
+      <ThemeToggle />
+      <a href="/account" class="flex items-center gap-[9px] rounded-[10px]" style="padding:8px;margin-top:2px;">
+        <div
+          class="flex size-[30px] shrink-0 items-center justify-center rounded-full font-semibold text-white"
+          style="background:linear-gradient(135deg, var(--pd-lilac), var(--pd-pink));font-size:13px;"
+        >
+          K
+        </div>
+        <div class="flex flex-col">
+          <span class="font-semibold text-ink" style="font-size:13px;letter-spacing:-0.1px;">kavi.studio</span>
+          <span class="font-mono" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">Free plan</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    const drawer = document.getElementById("pd-drawer");
+    if (!drawer) return;
+    function open() {
+      drawer.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+    function close() {
+      drawer.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+    window.addEventListener("pd-open-drawer", open);
+    document.getElementById("pd-drawer-close")?.addEventListener("click", close);
+    document.getElementById("pd-drawer-overlay")?.addEventListener("click", close);
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !drawer.classList.contains("hidden")) close();
+    });
+  })();
+</script>

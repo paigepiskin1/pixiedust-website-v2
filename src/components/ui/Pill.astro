@@ -1,0 +1,19 @@
+---
+interface Props {
+  color?: string; // CSS color or var()
+  label: string;
+}
+const { color = "var(--pd-teal)", label } = Astro.props;
+---
+
+<span
+  class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+  style={`background:color-mix(in srgb, ${color} 13%, transparent);border:0.5px solid color-mix(in srgb, ${color} 27%, transparent);`}
+>
+  <span
+    class="inline-block size-[5px] shrink-0 rounded-full"
+    style={`background:${color};box-shadow:0 0 10px ${color}80;`}></span>
+  <span
+    class="font-mono uppercase font-medium"
+    style={`font-size:9.5px;letter-spacing:0.7px;color:${color};`}>{label}</span>
+</span>
