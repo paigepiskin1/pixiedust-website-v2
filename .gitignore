@@ -7,7 +7,6 @@ sandbox/.env
 
 # Migration exports (generated from the legacy DB; reproducible via scripts/)
 seed/migrate-users.sql
-seed/migrate-templates.sql
 
 # Dependencies
 node_modules/

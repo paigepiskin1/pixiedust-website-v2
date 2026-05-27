@@ -3,7 +3,7 @@
 
 UPDATE templates SET preview_image="https://pixiecdn.b-cdn.net/media/templates/thumbnails/6893e897ef4d1.webp", preview_video=NULL WHERE id='old-80s-cyberpunk';
 UPDATE templates SET preview_image="https://pixiecdn.b-cdn.net/media/templates/thumbnails/68dc32db129cb.jpg", preview_video=NULL WHERE id='old-90-s-pulp-vibe';
-UPDATE templates SET preview_image=NULL, preview_video="https://pixiecdn.b-cdn.net/media/templates/videos/6883b0c2eb629.mov" WHERE id='old-alien-abduction';
+UPDATE templates SET preview_image=NULL, preview_video="https://pixiecdn.b-cdn.net/media/templates/videos/6883b0c2eb629.mp4" WHERE id='old-alien-abduction';
 UPDATE templates SET preview_image="https://pixiecdn.b-cdn.net/media/templates/thumbnails/6a0266c9ea342.png", preview_video=NULL WHERE id='old-basketball-courtside-trend';
 UPDATE templates SET preview_image=NULL, preview_video="https://pixiecdn.b-cdn.net/media/templates/videos/6883b1f5599a0.mp4" WHERE id='old-black-panther';
 UPDATE templates SET preview_image=NULL, preview_video="https://pixiecdn.b-cdn.net/media/templates/videos/6883b4c604d27.mp4" WHERE id='old-boyfriend-pose';
