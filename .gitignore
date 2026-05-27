@@ -21,3 +21,5 @@ dist/
 
 # Claude Code local settings (contains allowed-command history which can leak secrets)
 .claude/
+
+.dev.vars
