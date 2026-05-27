@@ -5,6 +5,9 @@ CLAUDE.local.md
 .dev.vars
 sandbox/.env
 
+# Migration export (real user PII — never commit)
+seed/migrate-users.sql
+
 # Dependencies
 node_modules/
 

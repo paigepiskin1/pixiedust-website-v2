@@ -63,7 +63,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | 7 | User features (gallery, account) | ✅ Done |
 | 8 | Admin backend (templates, users, content, moderation) | ✅ Done |
 | 9 | Monetization (Stripe subs + credit packs, ledger, audit) | ✅ Done |
-| 10 | Migration (user accounts + balances) | ⬜ |
+| 10 | Migration (user accounts + balances) | ✅ Done |
 | 11 | Deploy + hardening | ⬜ |
 
 ---
@@ -136,6 +136,15 @@ The full old-site functional inventory and the design audit were produced during
   `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
   `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
   localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.
+- **2026-05-27** — Phase 10 done. User migration. `scripts/migrate-users.ts` (run via tsx) connects
+  to the legacy RDS MySQL (creds via env, never committed), selects users **with balance > 0**
+  (per decision — skip zero-balance accounts), maps old→new schema, and emits idempotent upsert SQL
+  keyed by **Firebase uid** so identity + balance carry over. Generated `seed/migrate-users.sql`
+  (**gitignored — contains PII**). Applied to local D1: **18 users migrated** with real balances
+  preserved (e.g. 52,772 cr). Returning users sign in via Firebase → same uid → the login upsert
+  preserves their migrated balance (doesn't reset to the 5-credit default). To migrate prod, run the
+  same script then `wrangler d1 execute pixiedust --remote --file=seed/migrate-users.sql` (one-time,
+  pre-launch). Added `mysql2` devDep. Committed the script only — no creds, no PII.
 - **2026-05-27** — Phase 9 done. Monetization via Stripe. `src/lib/stripe.ts` (REST checkout with
   dynamic price_data — no pre-created products; Web Crypto webhook signature verify). `POST /api/
   billing/checkout` (pack=payment, sub=subscription; subscriber pack pricing if active sub).
