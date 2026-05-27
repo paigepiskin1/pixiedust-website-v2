@@ -1,0 +1,50 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="PixieDust">
+  <main class="min-h-screen flex flex-col items-center justify-center gap-6 px-6 text-center">
+    <span
+      class="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-3 border border-hairline-2 rounded-full px-3 py-1"
+    >
+      Rebuild · Phase 1
+    </span>
+
+    <h1
+      class="font-display text-6xl font-medium tracking-tight bg-gradient-to-br from-teal via-lilac to-pink bg-clip-text text-transparent"
+    >
+      PixieDust
+    </h1>
+
+    <p class="text-ink-2 max-w-md text-balance">
+      Astro + Tailwind + Cloudflare scaffold is live. Design tokens are wired —
+      the studio gets built on top of this.
+    </p>
+
+    <div class="flex items-center gap-3 text-ink-3 font-mono text-xs">
+      <span class="inline-flex items-center gap-1.5">
+        <span class="size-1.5 rounded-full bg-amber shadow-[0_0_8px_var(--pd-amber)]"></span>
+        47 cr
+      </span>
+      <span class="text-ink-4">·</span>
+      <button
+        id="theme-toggle"
+        class="border border-hairline-2 rounded-full px-3 py-1 hover:border-hairline-3 transition-colors"
+      >
+        Toggle theme
+      </button>
+    </div>
+  </main>
+
+  <script is:inline>
+    document.getElementById("theme-toggle")?.addEventListener("click", () => {
+      const el = document.documentElement;
+      const next = el.getAttribute("data-theme") === "light" ? "dark" : "light";
+      if (next === "light") el.setAttribute("data-theme", "light");
+      else el.removeAttribute("data-theme");
+      try {
+        localStorage.setItem("pd-web-theme", next);
+      } catch (e) {}
+    });
+  </script>
+</Base>

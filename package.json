@@ -1,7 +1,24 @@
 {
-  "name": "pixiedust",
+  "name": "pixiedust-web",
+  "version": "0.1.0",
   "type": "module",
+  "private": true,
   "scripts": {
-    "proxy": "node server.js"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.6.13",
+    "astro": "^5.18.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@tailwindcss/vite": "^4.3.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.95.0"
   }
 }

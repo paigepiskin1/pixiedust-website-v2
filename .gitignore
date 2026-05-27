@@ -1,9 +1,20 @@
 CLAUDE.local.md
 .env
 
-# Worker
-worker/.dev.vars
-worker/.wrangler/
+# Secrets / local vars
+.dev.vars
+sandbox/.env
 
 # Dependencies
 node_modules/
+
+# Astro
+dist/
+.astro/
+
+# Cloudflare / Wrangler
+.wrangler/
+
+# OS / editor
+.DS_Store
+*.log

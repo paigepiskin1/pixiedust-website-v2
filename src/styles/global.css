@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/* ============================================================
+   PixieDust design tokens — ported from web-tokens.jsx
+   Dark is the default; light theme via [data-theme="light"]
+   on <html>. Theme switch only swaps the --pd-* vars below,
+   so every Tailwind utility re-themes automatically.
+   ============================================================ */
+
+:root {
+  /* surfaces */
+  --pd-bg: #0a0a0b;
+  --pd-bg2: #111113;
+  --pd-bg3: #17171a;
+  --pd-raised: #1b1b1f;
+
+  /* hairlines (borders) */
+  --pd-hairline: rgba(255, 255, 255, 0.06);
+  --pd-hairline2: rgba(255, 255, 255, 0.1);
+  --pd-hairline3: rgba(255, 255, 255, 0.18);
+
+  /* ink (text) */
+  --pd-ink: #ffffff;
+  --pd-ink2: rgba(255, 255, 255, 0.72);
+  --pd-ink3: rgba(255, 255, 255, 0.52);
+  --pd-ink4: rgba(255, 255, 255, 0.34);
+
+  /* accents */
+  --pd-teal: #5ed5d4;
+  --pd-lilac: #c9a3fa;
+  --pd-mint: #a3fadc;
+  --pd-pink: #fcb3e0;
+  --pd-amber: #f5c98b;
+  --pd-accent: #c9a3fa;
+
+  /* shadows */
+  --pd-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.8), 0 8px 16px -4px rgba(0, 0, 0, 0.4);
+  --pd-shadow-sm: 0 4px 12px -2px rgba(0, 0, 0, 0.5);
+
+  /* layout (theme-independent) */
+  --pd-nav-w: 232px;
+  --pd-nav-w-min: 72px;
+  --pd-topbar-h: 64px;
+}
+
+:root[data-theme="light"] {
+  --pd-bg: #f5f3ef;
+  --pd-bg2: #fbfaf7;
+  --pd-bg3: #e9e6e0;
+  --pd-raised: #ffffff;
+
+  --pd-hairline: rgba(10, 10, 11, 0.08);
+  --pd-hairline2: rgba(10, 10, 11, 0.14);
+  --pd-hairline3: rgba(10, 10, 11, 0.22);
+
+  --pd-ink: #0a0a0b;
+  --pd-ink2: rgba(10, 10, 11, 0.72);
+  --pd-ink3: rgba(10, 10, 11, 0.52);
+  --pd-ink4: rgba(10, 10, 11, 0.34);
+
+  --pd-teal: #2bb5b4;
+  --pd-lilac: #8b5fd4;
+  --pd-mint: #4bc9a0;
+  --pd-pink: #e082c3;
+  --pd-amber: #c89550;
+  --pd-accent: #8b5fd4;
+
+  --pd-shadow: 0 16px 32px -10px rgba(20, 15, 30, 0.18), 0 4px 8px -2px rgba(20, 15, 30, 0.06);
+  --pd-shadow-sm: 0 2px 8px -2px rgba(20, 15, 30, 0.1);
+}
+
+/* Expose tokens to Tailwind v4 as theme values -> utility classes
+   (bg-surface, text-ink-2, border-hairline, text-accent, font-display, etc.) */
+@theme {
+  --font-display: "Space Grotesk", "SF Pro Display", -apple-system, system-ui, sans-serif;
+  --font-sans: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-surface: var(--pd-bg);
+  --color-surface-2: var(--pd-bg2);
+  --color-surface-3: var(--pd-bg3);
+  --color-raised: var(--pd-raised);
+
+  --color-hairline: var(--pd-hairline);
+  --color-hairline-2: var(--pd-hairline2);
+  --color-hairline-3: var(--pd-hairline3);
+
+  --color-ink: var(--pd-ink);
+  --color-ink-2: var(--pd-ink2);
+  --color-ink-3: var(--pd-ink3);
+  --color-ink-4: var(--pd-ink4);
+
+  --color-teal: var(--pd-teal);
+  --color-lilac: var(--pd-lilac);
+  --color-mint: var(--pd-mint);
+  --color-pink: var(--pd-pink);
+  --color-amber: var(--pd-amber);
+  --color-accent: var(--pd-accent);
+
+  --radius-sm: 10px;
+  --radius: 18px;
+  --radius-lg: 24px;
+
+  --shadow-pd: var(--pd-shadow);
+  --shadow-pd-sm: var(--pd-shadow-sm);
+}
+
+html {
+  background: var(--pd-bg);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  background: var(--pd-bg);
+  color: var(--pd-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}

@@ -54,7 +54,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | # | Phase | Status |
 |---|---|---|
 | 0 | Discovery + plan | ✅ Done |
-| 1 | Scaffold (Astro/Tailwind/CF, bindings stub, archive demo) | 🚧 In progress |
+| 1 | Scaffold (Astro/Tailwind/CF, bindings stub, archive demo) | ✅ Done |
 | 2 | Design system + app shell | ⬜ |
 | 3 | Public/static pages | ⬜ |
 | 4 | Auth (Firebase: Google/email+password/Apple) | ⬜ |
@@ -101,7 +101,26 @@ The full old-site functional inventory and the design audit were produced during
 
 ---
 
+## Phase notes / gotchas
+
+- **Astro pinned to v5** (5.18.2), not v6 — local Node is v20.10.0 and Astro 6 needs a newer
+  Node. Cloudflare adapter pinned to v12. Tailwind **v4** via `@tailwindcss/vite`.
+- **Design tokens** live in `src/styles/global.css` as `--pd-*` CSS vars (dark default +
+  `[data-theme="light"]`), exposed to Tailwind via `@theme` → utilities like `bg-surface`,
+  `text-ink-2`, `text-accent`, `font-display`, `border-hairline`. Theme persists to
+  `localStorage['pd-web-theme']`; restored before paint by an inline script in `Base.astro`.
+- **astro check** had a false-positive Vite duplicate-type error on the Tailwind plugin;
+  resolved with a `/** @type {any} */` cast in `astro.config.mjs`. Runtime is unaffected.
+- **Sessions binding:** the CF adapter expects a KV binding named `SESSION` for Astro's built-in
+  sessions. Our wrangler binding is `SESSIONS` (for our own logic). Reconcile in Phase 4 — either
+  rename or add a dedicated `SESSION` binding.
+- **wrangler.toml** bindings (DB/SESSIONS/ASSETS_BUCKET) have PLACEHOLDER ids — create real
+  resources before remote deploy. Dev uses local miniflare stand-ins via `platformProxy`.
+- Demo (fairy-kitty) archived under `/sandbox` (its own package.json + .env, gitignored).
+
 ## Changelog
 
 - **2026-05-26** — Discovery complete. Audited old site, new design, SyncNode docs. Locked stack,
-  auth, migration, and template-system decisions. Started Phase 1 scaffold.
+  auth, migration, and template-system decisions.
+- **2026-05-26** — Phase 1 done. Astro 5 + Tailwind v4 + CF adapter scaffolded; design tokens
+  wired and verified in dark+light; wrangler bindings stubbed; demo archived; build + type-check green.
