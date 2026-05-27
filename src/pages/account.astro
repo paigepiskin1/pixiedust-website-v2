@@ -2,74 +2,251 @@
 export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
-import Pill from "../components/ui/Pill.astro";
-import CreditChip from "../components/ui/CreditChip.astro";
+import Dot from "../components/ui/Dot.astro";
+import { getUserByUid } from "../lib/users";
+import { getUserTier } from "../lib/limits";
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect("/auth/sign-in?redirect=/account");
 
+const db = Astro.locals.runtime.env.DB;
+const dbUser = await getUserByUid(db, user.uid);
+const tier = await getUserTier(db, dbUser!.id);
+const counts = await db
+  .prepare(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(CASE WHEN type='video' THEN 1 ELSE 0 END) AS videos,
+       SUM(CASE WHEN type!='video' THEN 1 ELSE 0 END) AS images
+     FROM generations WHERE user_id = ? AND status='completed'`
+  )
+  .bind(dbUser!.id)
+  .first<{ total: number; videos: number; images: number }>();
+
 const displayName = user.name || (user.email ? user.email.split("@")[0] : "You");
 const initial = (displayName[0] || "U").toUpperCase();
+const tierName = tier.id.charAt(0).toUpperCase() + tier.id.slice(1);
+
+const sections = [
+  { k: "profile", name: "Profile", desc: "Handle · avatar · name" },
+  { k: "plan", name: "Plan & billing", desc: "Subscription · credits" },
+  { k: "creations", name: "My creations", desc: "Storage · exports" },
+  { k: "notifs", name: "Notifications", desc: "Email · in-app" },
+  { k: "privacy", name: "Privacy & data", desc: "Sharing · downloads" },
+  { k: "help", name: "Help & support", desc: "Docs · contact" },
+];
+
+const cardStyle = "background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;padding:22px;margin-bottom:16px;";
+const inputStyle = "width:100%;padding:11px 14px;border-radius:10px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:13.5px;outline:none;";
+const labelStyle = "display:block;margin-bottom:6px;font-family:var(--font-mono);font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;";
 ---
 
 <AppShell title="Account — PixieDust" credits={user.credits}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
-    <PageHeader kicker="Your account" title={displayName} sub={user.email ?? undefined} />
+    <PageHeader kicker={`Account · ${displayName}`} title="Account" sub="Everything about you, your plan, and how PixieDust talks to you.">
+      <button slot="right" type="button" id="pd-signout" class="shrink-0 rounded-xl font-semibold text-ink-2" style="padding:10px 16px;background:transparent;border:0.5px solid var(--pd-hairline2);font-size:12.5px;cursor:pointer;">Sign out</button>
+    </PageHeader>
 
-    <div class="grid max-w-3xl gap-4">
-      <div class="flex items-center gap-4 rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
-        <div
-          class="flex size-14 shrink-0 items-center justify-center rounded-full font-display font-semibold text-white"
-          style="background:linear-gradient(135deg, var(--pd-lilac), var(--pd-pink));font-size:22px;"
-        >
-          {initial}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.3px;">{displayName}</div>
-          <div class="text-ink-3" style="font-size:13px;">{user.email}</div>
-        </div>
-        <div class="flex items-center gap-2">
-          {user.isAdmin && <Pill color="var(--pd-lilac)" label="Admin" />}
-          <CreditChip cr={user.credits} size="md" />
-        </div>
-      </div>
+    <div class="grid items-start gap-7 lg:grid-cols-[240px_1fr]">
+      <!-- left nav -->
+      <aside class="pd-acct-nav flex gap-2 overflow-x-auto lg:sticky lg:top-[88px] lg:flex-col lg:gap-0.5 lg:overflow-visible">
+        {
+          sections.map((s, i) => (
+            <button type="button" class="pd-acct-tab relative flex shrink-0 items-center gap-2.5 rounded-[10px] text-left" data-tab={s.k} data-active={i === 0 ? "true" : "false"} style="padding:10px 12px;cursor:pointer;">
+              <span class="pd-acct-bar absolute left-0 top-2 bottom-2 w-[2.5px] rounded-[2px] opacity-0" style="background:var(--pd-lilac);" />
+              <span class="flex flex-col">
+                <span class="font-semibold" style="font-size:13px;">{s.name}</span>
+                <span class="font-mono" style="font-size:9px;color:var(--pd-ink3);letter-spacing:0.4px;margin-top:1px;">{s.desc}</span>
+              </span>
+            </button>
+          ))
+        }
+      </aside>
 
-      <div class="rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
-        <div class="mb-2 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Plan</div>
-        <div class="flex items-center justify-between gap-4">
-          <div>
-            <div class="font-semibold text-ink" style="font-size:14.5px;">Free</div>
-            <div class="text-ink-3" style="font-size:12.5px;">Buy credit packs anytime. Subscriptions land in a later phase.</div>
+      <!-- panels -->
+      <div class="min-w-0">
+        <!-- PROFILE -->
+        <div class="pd-panel" data-panel="profile">
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Identity</h3>
+            <p class="mb-4 text-ink-3" style="font-size:12.5px;">How you appear across the gallery and shared links.</p>
+            <div class="grid gap-5 sm:grid-cols-[120px_1fr]">
+              <div class="flex flex-col items-center gap-2.5">
+                <div class="flex size-24 items-center justify-center rounded-full font-display font-bold text-white" style="background:linear-gradient(135deg, var(--pd-lilac), var(--pd-pink));font-size:36px;">{initial}</div>
+              </div>
+              <div class="flex flex-col gap-3.5">
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <label><span style={labelStyle}>Display name</span><input id="pd-name" type="text" value={user.name ?? ""} style={inputStyle} /></label>
+                  <label><span style={labelStyle}>Handle</span><input id="pd-handle" type="text" value={user.username ?? ""} placeholder="yourhandle" style={inputStyle} /></label>
+                </div>
+                <div id="pd-profile-msg" class="hidden" style="font-size:12px;"></div>
+                <div><button type="button" id="pd-save-profile" class="rounded-xl font-bold" style="padding:10px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;cursor:pointer;">Save changes</button></div>
+              </div>
+            </div>
           </div>
-          <a href="/credits" class="shrink-0 rounded-xl font-bold" style="padding:10px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">Get credits</a>
-        </div>
-      </div>
 
-      <div class="rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
-        <div class="mb-1 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Session</div>
-        <p class="mb-3 text-ink-3" style="font-size:12.5px;line-height:1.5;">
-          The full account experience (profile, billing, notifications, privacy) arrives in Phase 7.
-        </p>
-        <button
-          type="button"
-          id="pd-signout"
-          class="rounded-xl font-semibold text-ink"
-          style="padding:10px 18px;background:transparent;border:0.5px solid var(--pd-hairline2);font-size:13px;cursor:pointer;"
-        >
-          Sign out
-        </button>
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Account email</h3>
+            <div class="mt-3 flex items-center justify-between gap-3" style="padding:12px 0;border-bottom:0.5px solid var(--pd-hairline);">
+              <div><div class="text-ink" style="font-size:13.5px;font-weight:500;">{user.email}</div><div class="text-ink-3" style="font-size:12px;">Primary · sign-in</div></div>
+            </div>
+          </div>
+
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold" style="font-size:17px;letter-spacing:-0.3px;color:var(--pd-ink);">Danger zone</h3>
+            <p class="mb-3 text-ink-3" style="font-size:12.5px;">Permanent and immediate. There is no undo.</p>
+            <button type="button" id="pd-delete-account" class="rounded-xl font-semibold" style="padding:9px 16px;background:transparent;border:0.5px solid color-mix(in srgb, var(--pd-pink) 40%, transparent);color:var(--pd-pink);font-size:12.5px;cursor:pointer;">Delete account</button>
+          </div>
+        </div>
+
+        <!-- PLAN -->
+        <div class="pd-panel hidden" data-panel="plan">
+          <div style={`${cardStyle}position:relative;overflow:hidden;`}>
+            <div class="mb-2 flex items-center gap-2"><Dot color="var(--pd-lilac)" size={5} /><span class="font-mono uppercase" style="font-size:10px;color:var(--pd-lilac);letter-spacing:1px;">Current plan</span></div>
+            <h3 class="font-display font-semibold text-ink" style="font-size:28px;letter-spacing:-0.6px;">{tierName}</h3>
+            <div class="mt-1.5 text-ink-3" style="font-size:13px;">Monthly credits, rate limits, and exports scale with your plan.</div>
+            <div class="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3" style="border-top:0.5px solid var(--pd-hairline);padding-top:18px;">
+              {[["Credit balance", `${user.credits} cr`], ["Concurrent gens", String(tier.concurrency)], ["Rate limit", `${tier.rate_limit_per_min}/min`]].map(([k, v]) => (
+                <div><div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;">{k}</div><div class="mt-1 font-display font-semibold text-ink" style="font-size:20px;letter-spacing:-0.4px;">{v}</div></div>
+              ))}
+            </div>
+            <div class="mt-4 flex gap-2"><a href="/credits" class="rounded-xl font-bold" style="padding:10px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">Get credits</a></div>
+          </div>
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Billing</h3>
+            <p class="mt-2 text-ink-3" style="font-size:12.5px;line-height:1.5;">Subscriptions, payment methods, and invoices arrive in Phase 9 (Stripe). Credit packs are available now on the credits page.</p>
+          </div>
+        </div>
+
+        <!-- CREATIONS -->
+        <div class="pd-panel hidden" data-panel="creations">
+          <div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {[["Total", counts?.total ?? 0], ["Images", counts?.images ?? 0], ["Videos", counts?.videos ?? 0]].map(([k, v]) => (
+              <div style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:14px;padding:18px;">
+                <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;">{k}</div>
+                <div class="mt-1.5 font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.5px;">{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Your gallery</h3>
+            <p class="mb-3 mt-1 text-ink-3" style="font-size:12.5px;">Every completed generation is saved automatically.</p>
+            <a href="/gallery" class="inline-block rounded-xl font-semibold text-ink" style="padding:9px 16px;border:0.5px solid var(--pd-hairline2);font-size:12.5px;">Open gallery →</a>
+          </div>
+        </div>
+
+        <!-- NOTIFICATIONS -->
+        <div class="pd-panel hidden" data-panel="notifs">
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Email</h3>
+            <p class="mb-3 mt-1 text-ink-3" style="font-size:12.5px;">Preferences are saved per session for now (wired to the backend in a later phase).</p>
+            <div data-rows>
+              <div class="pd-prow" data-label="Generation complete" data-hint="When a long job finishes" data-on="true"></div>
+              <div class="pd-prow" data-label="Receipts & invoices" data-hint="One email per charge" data-on="true"></div>
+              <div class="pd-prow" data-label="Weekly digest" data-hint="Trending tools · your top creations" data-on="false"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PRIVACY -->
+        <div class="pd-panel hidden" data-panel="privacy">
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Sharing</h3>
+            <div data-rows>
+              <div class="pd-prow" data-label="Shareable links by default" data-hint="Per-item override always available" data-on="true"></div>
+              <div class="pd-prow" data-label="Anonymous usage analytics" data-hint="Helps us improve · no creations sent" data-on="true"></div>
+            </div>
+          </div>
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Download your data</h3>
+            <button type="button" class="pd-toast-btn mt-3 rounded-xl font-semibold text-ink" data-toast="Preparing export — we'll email when ready" style="padding:9px 16px;border:0.5px solid var(--pd-hairline2);font-size:12.5px;cursor:pointer;">Request full export</button>
+          </div>
+        </div>
+
+        <!-- HELP -->
+        <div class="pd-panel hidden" data-panel="help">
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Read the docs</h3>
+            <div class="mt-2 flex flex-col">
+              {[["Acceptable use", "/legal/acceptable-use"], ["Privacy policy", "/legal/privacy"], ["Terms of service", "/legal/terms"]].map(([k, href]) => (
+                <a href={href} class="flex items-center justify-between" style="padding:12px 0;border-bottom:0.5px solid var(--pd-hairline);">
+                  <span class="text-ink" style="font-size:13.5px;font-weight:500;">{k}</span>
+                  <span class="font-mono uppercase text-ink-3" style="font-size:10px;letter-spacing:0.5px;">Open →</span>
+                </a>
+              ))}
+            </div>
+          </div>
+          <div style={cardStyle}>
+            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Talk to someone</h3>
+            <button type="button" class="pd-toast-btn mt-3 rounded-xl font-semibold text-ink" data-toast="Mail: hi@pixiedust.app" style="padding:9px 16px;border:0.5px solid var(--pd-hairline2);font-size:12.5px;cursor:pointer;">Email support</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
+  <style>
+    .pd-acct-tab { background: transparent; color: var(--pd-ink-2, var(--pd-ink2)); border: none; }
+    .pd-acct-tab[data-active="true"] { background: var(--pd-bg2); color: var(--pd-ink); font-weight: 600; }
+    .pd-acct-tab[data-active="true"] .pd-acct-bar { opacity: 1; }
+  </style>
+
   <script>
     import { firebaseSignOut } from "../lib/firebase-client";
+
+    // tab switching
+    const tabs = Array.from(document.querySelectorAll<HTMLElement>(".pd-acct-tab"));
+    const panels = Array.from(document.querySelectorAll<HTMLElement>(".pd-panel"));
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((t) => t.setAttribute("data-active", String(t === tab)));
+        panels.forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab.dataset.tab));
+      });
+    });
+
+    // build toggle rows
+    document.querySelectorAll<HTMLElement>("[data-rows] .pd-prow").forEach((row) => {
+      let on = row.dataset.on === "true";
+      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:0.5px solid var(--pd-hairline);";
+      row.innerHTML = `<div><div style="font-size:13.5px;color:var(--pd-ink);font-weight:500;">${row.dataset.label}</div><div style="font-size:12px;color:var(--pd-ink3);margin-top:2px;">${row.dataset.hint || ""}</div></div>`;
+      const sw = document.createElement("button");
+      const paint = () => { sw.style.cssText = `width:36px;height:22px;border-radius:999px;border:0.5px solid ${on ? "transparent" : "var(--pd-hairline2)"};background:${on ? "var(--pd-lilac)" : "var(--pd-bg3)"};cursor:pointer;position:relative;`; sw.innerHTML = `<span style="position:absolute;top:2px;left:${on ? 16 : 2}px;width:16px;height:16px;border-radius:999px;background:#fff;transition:left 160ms;"></span>`; };
+      paint();
+      sw.addEventListener("click", () => { on = !on; paint(); });
+      row.appendChild(sw);
+    });
+
+    // toast buttons
+    document.querySelectorAll<HTMLElement>(".pd-toast-btn").forEach((b) =>
+      b.addEventListener("click", () => (window as any).pdToast?.(b.dataset.toast))
+    );
+
+    // save profile
+    document.getElementById("pd-save-profile")?.addEventListener("click", async () => {
+      const name = (document.getElementById("pd-name") as HTMLInputElement).value;
+      const username = (document.getElementById("pd-handle") as HTMLInputElement).value;
+      const msg = document.getElementById("pd-profile-msg")!;
+      const res = await fetch("/api/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, username }) });
+      const data = await res.json();
+      msg.classList.remove("hidden");
+      if (res.ok) {
+        msg.style.color = "var(--pd-mint)";
+        msg.textContent = "Saved.";
+        (window as any).pdToast?.("Profile saved", { accent: "var(--pd-mint)" });
+      } else {
+        msg.style.color = "var(--pd-pink)";
+        msg.textContent = data.error || "Could not save.";
+      }
+    });
+
+    // sign out
     document.getElementById("pd-signout")?.addEventListener("click", async () => {
-      try {
-        await fetch("/api/auth/signout", { method: "POST" });
-        await firebaseSignOut();
-      } catch {}
+      try { await fetch("/api/auth/signout", { method: "POST" }); await firebaseSignOut(); } catch {}
       window.location.href = "/";
+    });
+
+    document.getElementById("pd-delete-account")?.addEventListener("click", () => {
+      (window as any).pdToast?.("Account deletion lands with billing (Phase 9).");
     });
   </script>
 </AppShell>

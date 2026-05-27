@@ -60,7 +60,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | 4 | Auth (Firebase: Google/email+password/Apple) | ✅ Done |
 | 5 | Data model + template system (D1) | ✅ Done |
 | 6 | Generation pipeline (Worker → SyncNode → Bunny) | ✅ Done |
-| 7 | User features (gallery, account, explore feed) | ⬜ |
+| 7 | User features (gallery, account) | ✅ Done |
 | 8 | Admin backend (templates, users, content, moderation) | ⬜ |
 | 9 | Monetization (Stripe subs + credit packs, ledger, audit) | ⬜ |
 | 10 | Migration (user accounts + balances) | ⬜ |
@@ -136,6 +136,17 @@ The full old-site functional inventory and the design audit were produced during
   `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
   `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
   localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.
+- **2026-05-27** — Phase 7 done. Real **Gallery** (`/gallery`, SSR gated): reads the user's
+  completed generations from D1 (joined to templates for titles), renders the actual image/video
+  grid with tabs (All/Images/Video) and a full **lightbox** (big media, prev/next, download via
+  Bunny URL, copy-share, remix → `/studio/[template]`, delete). **Account** (`/account`) rebuilt as
+  the tabbed page (Profile/Plan/Creations/Notifications/Privacy/Help): editable name+handle saved
+  via `POST /api/profile` (unique-handle guarded), real credits/tier/concurrency/rate-limit, real
+  generation counts; invoices/payment are placeholders (Phase 9), notif/privacy toggles are
+  client-only. Endpoints `POST /api/generations/delete` (ownership-scoped) + `POST /api/profile`.
+  Verified as claude.tester: gallery shows the 4 real kitten generations, lightbox works, profile
+  save persists (`username=claude-tester`). **Adult gating dropped** per user (no adult content).
+  Public "explore" feed skipped (PRD scopes public profiles/feed out of v1).
 - **2026-05-27** — Phase 6 done. Generation pipeline VERIFIED end-to-end with a real flux-schnell
   run (claude.tester): debit → SyncNode → poll → output rendered → output auto-hosted to Bunny
   (`pixiecdn.b-cdn.net/gen_...`). `src/lib/syncnode.ts` (submit/poll, provider routing, status

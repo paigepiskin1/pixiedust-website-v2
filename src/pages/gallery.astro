@@ -1,50 +1,214 @@
 ---
+export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
-import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
-import type { CatalogItem } from "../lib/catalog";
-import type { Tone } from "../lib/content";
-import { workspaceHref } from "../lib/workspace";
+import { getUserByUid } from "../lib/users";
 
-// Placeholder "creations" — real user gallery + lightbox land in Phase 7.
-const raw: { name: string; sub: string; tag: string; meta: string; tone: Tone; accent: string }[] = [
-  { name: "Editorial Noir · 12", sub: "24 frames · 2d ago", tag: "Photoshoot", meta: "24", tone: "noir", accent: "var(--pd-teal)" },
-  { name: "Snakes wrap · v3", sub: "0:08 · today", tag: "Motion", meta: "0:08", tone: "lilac", accent: "var(--pd-lilac)" },
-  { name: "Glazed glow", sub: "1 frame · 5h ago", tag: "Beauty", meta: "1", tone: "pink", accent: "var(--pd-mint)" },
-  { name: "Café main char", sub: "0:10 · 3d ago", tag: "Cinematic", meta: "0:10", tone: "amber", accent: "var(--pd-mint)" },
-  { name: "Wes Anderson · 4", sub: "4 frames · 1w ago", tag: "Preset", meta: "4", tone: "pink", accent: "var(--pd-amber)" },
-  { name: "Cyber goddess", sub: "24 frames · 1w ago", tag: "Photoshoot", meta: "24", tone: "lilac", accent: "var(--pd-teal)" },
-  { name: "Anime self", sub: "8 frames · 1w ago", tag: "Avatar", meta: "8", tone: "lilac", accent: "var(--pd-lilac)" },
-  { name: "Y2K runway · v2", sub: "0:10 · 2w ago", tag: "Motion", meta: "0:10", tone: "pink", accent: "var(--pd-lilac)" },
-  { name: "Polaroid 600", sub: "1 frame · 2w ago", tag: "Preset", meta: "1", tone: "amber", accent: "var(--pd-amber)" },
-  { name: "Noir chase", sub: "0:12 · 3w ago", tag: "Cinematic", meta: "0:12", tone: "dusk", accent: "var(--pd-mint)" },
-  { name: "LinkedIn pack", sub: "12 frames · 3w ago", tag: "Photoshoot", meta: "12", tone: "ice", accent: "var(--pd-teal)" },
-  { name: "Cinestill 800T", sub: "1 frame · 1mo ago", tag: "Preset", meta: "1", tone: "pink", accent: "var(--pd-amber)" },
-];
+const user = Astro.locals.user;
+if (!user) return Astro.redirect("/auth/sign-in?redirect=/gallery");
 
-const items: CatalogItem[] = raw.map((r) => ({
-  ...r,
-  c: /^\d+:\d+/.test(r.meta) ? "Video" : "Images",
-  href: workspaceHref("remix", r.name),
-}));
-const tabs = ["All", "Images", "Video", "Drafts"];
+const db = Astro.locals.runtime.env.DB;
+const dbUser = await getUserByUid(db, user.uid);
+
+interface Row {
+  id: string;
+  type: string;
+  kind: string;
+  output_url: string;
+  template_id: string | null;
+  created: string;
+  template_title: string | null;
+}
+const { results } = await db
+  .prepare(
+    `SELECT g.id, g.type, g.kind, g.output_url, g.template_id, datetime(g.created_at) AS created, t.title AS template_title
+     FROM generations g LEFT JOIN templates t ON t.id = g.template_id
+     WHERE g.user_id = ? AND g.status = 'completed' AND g.output_url IS NOT NULL
+     ORDER BY g.created_at DESC`
+  )
+  .bind(dbUser!.id)
+  .all<Row>();
+const items = results ?? [];
+const tabs = ["All", "Images", "Video"];
 ---
 
-<AppShell title="My creations — PixieDust">
+<AppShell title="My creations — PixieDust" credits={user.credits}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <PageHeader
-      kicker={`${items.length} creations · 14 GB`}
+      kicker={`${items.length} creation${items.length === 1 ? "" : "s"}`}
       title="My creations"
-      sub="Everything you've made. Click any to pop it out — download, share, or delete."
+      sub="Everything you've made. Click any to pop it out — download, share, remix, or delete."
     >
-      <a
-        slot="right"
-        href="/"
-        class="shrink-0 rounded-xl font-bold"
-        style="padding:10px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;letter-spacing:-0.1px;"
-        >+ New project</a
-      >
+      <a slot="right" href="/" class="shrink-0 rounded-xl font-bold" style="padding:10px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">+ New project</a>
     </PageHeader>
-    <FilterableCatalog items={items} categories={tabs} aspect="1 / 1.25" />
+
+    {
+      items.length === 0 ? (
+        <div class="flex flex-col items-center justify-center rounded-2xl text-center" style="padding:64px 24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div class="mb-3 flex size-12 items-center justify-center rounded-full" style="background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4"><rect x="3" y="3" width="6" height="6" rx="1" /><rect x="11" y="3" width="6" height="6" rx="1" /><rect x="3" y="11" width="6" height="6" rx="1" /><rect x="11" y="11" width="6" height="6" rx="1" /></svg>
+          </div>
+          <div class="font-display font-medium text-ink" style="font-size:20px;letter-spacing:-0.4px;">Nothing here yet.</div>
+          <p class="mx-auto mt-1.5 text-ink-3" style="font-size:13px;max-width:320px;">Pick a tool and make something — your creations land here automatically.</p>
+          <a href="/presets" class="mt-5 rounded-xl font-bold" style="padding:11px 20px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">Browse presets</a>
+        </div>
+      ) : (
+        <div class="pd-gallery">
+          <div class="mb-6 flex flex-wrap gap-2">
+            {tabs.map((t, i) => (
+              <button type="button" class="pd-gtab rounded-full font-semibold" data-tab={t} data-active={i === 0 ? "true" : "false"} style="padding:8px 16px;font-size:12.5px;cursor:pointer;">{t}</button>
+            ))}
+          </div>
+
+          <div class="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
+            {items.map((it, idx) => (
+              <button
+                type="button"
+                class="pd-gcard pd-lift group relative block overflow-hidden rounded-[18px]"
+                data-idx={idx}
+                data-type={it.type}
+                style="aspect-ratio:1/1.2;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);cursor:pointer;"
+              >
+                {it.type === "video" ? (
+                  <video src={it.output_url} muted playsinline preload="metadata" class="h-full w-full object-cover" />
+                ) : (
+                  <img src={it.output_url} loading="lazy" alt={it.template_title ?? "creation"} class="h-full w-full object-cover" />
+                )}
+                <div class="absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100" style="background:linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.7) 100%);" />
+                <div class="absolute inset-x-3 bottom-2.5 truncate text-left font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100" style="font-size:12.5px;">
+                  {it.template_title ?? it.kind}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )
+    }
   </div>
+
+  <!-- Lightbox -->
+  <div id="pd-lb" class="fixed inset-0 z-[220] hidden items-center justify-center p-6" style="background:rgba(5,5,8,0.82);backdrop-filter:blur(14px);">
+    <div class="grid w-full overflow-hidden rounded-[24px] lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]" style="max-width:1100px;max-height:calc(100vh - 48px);background:var(--pd-raised);border:0.5px solid var(--pd-hairline2);">
+      <div class="relative flex items-center justify-center" style="background:#0a0a0b;min-height:320px;">
+        <div id="pd-lb-media" class="h-full w-full"></div>
+        <button type="button" id="pd-lb-prev" class="absolute left-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full" style="background:rgba(10,10,11,0.55);border:0.5px solid rgba(255,255,255,0.14);color:#fff;cursor:pointer;" aria-label="Previous">‹</button>
+        <button type="button" id="pd-lb-next" class="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full" style="background:rgba(10,10,11,0.55);border:0.5px solid rgba(255,255,255,0.14);color:#fff;cursor:pointer;" aria-label="Next">›</button>
+      </div>
+      <div class="flex min-h-0 flex-col">
+        <div class="flex items-start justify-between gap-3" style="padding:20px 22px;border-bottom:0.5px solid var(--pd-hairline);">
+          <div class="min-w-0">
+            <div id="pd-lb-kind" class="font-mono uppercase" style="font-size:10px;color:var(--pd-lilac);letter-spacing:0.8px;"></div>
+            <div id="pd-lb-title" class="mt-1 truncate font-display font-medium text-ink" style="font-size:20px;letter-spacing:-0.4px;"></div>
+            <div id="pd-lb-meta" class="mt-1 text-ink-3" style="font-size:12px;"></div>
+          </div>
+          <button type="button" id="pd-lb-close" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);cursor:pointer;" aria-label="Close">✕</button>
+        </div>
+        <div class="flex flex-col gap-2" style="padding:18px 22px;">
+          <div class="grid grid-cols-2 gap-2">
+            <a id="pd-lb-download" href="#" download class="flex items-center justify-center rounded-xl font-bold" style="padding:11px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">Download</a>
+            <button type="button" id="pd-lb-share" class="flex items-center justify-center rounded-xl font-semibold text-ink" style="padding:11px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);font-size:13px;cursor:pointer;">Share link</button>
+          </div>
+          <a id="pd-lb-remix" href="#" class="flex items-center justify-center rounded-xl font-semibold text-ink-2" style="padding:10px;background:transparent;border:0.5px solid var(--pd-hairline);font-size:12.5px;">Remix / open template</a>
+          <button type="button" id="pd-lb-delete" class="mt-1 flex items-center justify-center rounded-xl font-semibold" style="padding:10px;background:transparent;border:0.5px solid color-mix(in srgb, var(--pd-pink) 40%, transparent);color:var(--pd-pink);font-size:12.5px;cursor:pointer;">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="application/json" id="pd-gallery-data" is:inline set:html={JSON.stringify(items)}></script>
+
+  <style>
+    .pd-gtab { background: var(--pd-bg2); color: var(--pd-ink-2, var(--pd-ink2)); border: 0.5px solid var(--pd-hairline); }
+    .pd-gtab[data-active="true"] { background: var(--pd-ink); color: var(--pd-bg); border-color: transparent; }
+    #pd-lb.open { display: flex; }
+  </style>
+
+  <script>
+    interface Item { id: string; type: string; kind: string; output_url: string; template_id: string | null; created: string; template_title: string | null; }
+    const all: Item[] = JSON.parse(document.getElementById("pd-gallery-data")?.textContent || "[]");
+    const lb = document.getElementById("pd-lb");
+    if (lb && all.length) {
+      const media = document.getElementById("pd-lb-media")!;
+      const kindEl = document.getElementById("pd-lb-kind")!;
+      const titleEl = document.getElementById("pd-lb-title")!;
+      const metaEl = document.getElementById("pd-lb-meta")!;
+      const dl = document.getElementById("pd-lb-download") as HTMLAnchorElement;
+      const remix = document.getElementById("pd-lb-remix") as HTMLAnchorElement;
+      let visible: Item[] = all.slice();
+      let cur = 0;
+
+      function render() {
+        const it = visible[cur];
+        if (!it) return;
+        media.innerHTML = "";
+        const el = it.type === "video" ? document.createElement("video") : document.createElement("img");
+        el.src = it.output_url;
+        if (it.type === "video") { (el as HTMLVideoElement).controls = true; (el as HTMLVideoElement).playsInline = true; }
+        el.style.cssText = "width:100%;height:100%;max-height:calc(100vh - 48px);object-fit:contain;";
+        media.appendChild(el);
+        kindEl.textContent = it.kind + " · saved";
+        titleEl.textContent = it.template_title || it.kind;
+        metaEl.textContent = `${it.type === "video" ? "Video" : "Image"} · ${it.created}`;
+        dl.href = it.output_url;
+        remix.href = it.template_id ? `/studio/${it.template_id}` : "/";
+      }
+      function open(idx: number) {
+        const id = all[idx]?.id;
+        cur = Math.max(0, visible.findIndex((v) => v.id === id));
+        render();
+        lb!.classList.add("open");
+        document.body.style.overflow = "hidden";
+      }
+      function close() {
+        lb!.classList.remove("open");
+        document.body.style.overflow = "";
+        media.innerHTML = "";
+      }
+
+      document.querySelectorAll<HTMLElement>(".pd-gcard").forEach((card) => {
+        card.addEventListener("click", () => open(Number(card.dataset.idx)));
+      });
+      document.getElementById("pd-lb-close")!.addEventListener("click", close);
+      lb.addEventListener("click", (e) => { if (e.target === lb) close(); });
+      document.getElementById("pd-lb-prev")!.addEventListener("click", () => { cur = (cur - 1 + visible.length) % visible.length; render(); });
+      document.getElementById("pd-lb-next")!.addEventListener("click", () => { cur = (cur + 1) % visible.length; render(); });
+      window.addEventListener("keydown", (e) => {
+        if (!lb.classList.contains("open")) return;
+        if (e.key === "Escape") close();
+        if (e.key === "ArrowLeft") { cur = (cur - 1 + visible.length) % visible.length; render(); }
+        if (e.key === "ArrowRight") { cur = (cur + 1) % visible.length; render(); }
+      });
+
+      document.getElementById("pd-lb-share")!.addEventListener("click", () => {
+        const it = visible[cur];
+        navigator.clipboard?.writeText(it.output_url).catch(() => {});
+        (window as any).pdToast?.("Link copied", { accent: "var(--pd-mint)" });
+      });
+      document.getElementById("pd-lb-delete")!.addEventListener("click", async () => {
+        const it = visible[cur];
+        if (!confirm("Delete this creation? This can't be undone.")) return;
+        const res = await fetch("/api/generations/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id }) });
+        if (res.ok) {
+          document.querySelector(`.pd-gcard[data-idx="${all.indexOf(it)}"]`)?.remove();
+          visible = visible.filter((v) => v.id !== it.id);
+          (window as any).pdToast?.("Deleted", { accent: "var(--pd-pink)" });
+          if (!visible.length) return close();
+          cur = Math.min(cur, visible.length - 1);
+          render();
+        }
+      });
+
+      // tab filter
+      document.querySelectorAll<HTMLElement>(".pd-gtab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const t = tab.dataset.tab;
+          document.querySelectorAll<HTMLElement>(".pd-gtab").forEach((x) => x.setAttribute("data-active", String(x === tab)));
+          document.querySelectorAll<HTMLElement>(".pd-gcard").forEach((card) => {
+            const show = t === "All" || (t === "Video" ? card.dataset.type === "video" : card.dataset.type !== "video");
+            card.style.display = show ? "" : "none";
+          });
+        });
+      });
+    }
+  </script>
 </AppShell>
