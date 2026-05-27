@@ -6,6 +6,7 @@ import RailHead from "../components/ui/RailHead.astro";
 import QuickLaunch from "../components/home/QuickLaunch.astro";
 import CardRail from "../components/home/CardRail.astro";
 import FeatureBanner from "../components/home/FeatureBanner.astro";
+import Reveal from "../components/motion/Reveal.tsx";
 import { listTemplates, templateToRail } from "../lib/templates";
 
 const db = Astro.locals.runtime.env.DB;
@@ -62,16 +63,18 @@ const heroSlides: HeroSlide[] = videoTemplates.slice(0, 5).map((t) => ({
 
     <section class="mb-9">
       <RailHead title="Main character energy" sub="Cinematic · Movie Studio" accent="var(--pd-mint)" />
-      <FeatureBanner
-        tone="dusk"
-        kicker="Featured · Movie Studio"
-        title={"Put yourself in\nthe action scene."}
-        sub="4 presets · 8 cr each · Kling Pro"
-        ctaLabel="Open Movie Studio"
-        accent="var(--pd-mint)"
-        href="/video"
-        height={260}
-      />
+      <Reveal client:visible>
+        <FeatureBanner
+          tone="dusk"
+          kicker="Featured · Movie Studio"
+          title={"Put yourself in\nthe action scene."}
+          sub="4 presets · 8 cr each · Kling Pro"
+          ctaLabel="Open Movie Studio"
+          accent="var(--pd-mint)"
+          href="/video"
+          height={260}
+        />
+      </Reveal>
     </section>
 
     <section class="mb-9">
@@ -79,28 +82,30 @@ const heroSlides: HeroSlide[] = videoTemplates.slice(0, 5).map((t) => ({
       <CardRail items={presetCards} height={260} width={180} />
     </section>
 
-    <section class="mb-9 grid grid-cols-1 gap-3.5 md:grid-cols-2">
-      <FeatureBanner
-        tone="pink"
-        kicker="New tool"
-        title={"Fashion\nTry-on"}
-        sub="Upload · wear · save"
-        ctaLabel="Open"
-        accent="var(--pd-pink)"
-        href="/fashion"
-        height={220}
-      />
-      <FeatureBanner
-        tone="teal"
-        kicker="Photoshoots"
-        title={"Editorial Noir\n24 frames."}
-        sub="$4.99 · 30 cr"
-        ctaLabel="Run pack"
-        accent="var(--pd-teal)"
-        href="/shoots"
-        height={220}
-      />
-    </section>
+    <Reveal client:visible>
+      <section class="mb-9 grid grid-cols-1 gap-3.5 md:grid-cols-2">
+        <FeatureBanner
+          tone="pink"
+          kicker="New tool"
+          title={"Fashion\nTry-on"}
+          sub="Upload · wear · save"
+          ctaLabel="Open"
+          accent="var(--pd-pink)"
+          href="/fashion"
+          height={220}
+        />
+        <FeatureBanner
+          tone="teal"
+          kicker="Photoshoots"
+          title={"Editorial Noir\n24 frames."}
+          sub="$4.99 · 30 cr"
+          ctaLabel="Run pack"
+          accent="var(--pd-teal)"
+          href="/shoots"
+          height={220}
+        />
+      </section>
+    </Reveal>
 
     <section>
       <RailHead title="Beauty Studio" sub="Try a look · 1 cr each" accent="var(--pd-mint)" seeAllHref="/beauty" />
