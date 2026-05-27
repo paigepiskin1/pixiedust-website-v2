@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "astro dev",
+    "dev": "node scripts/dev.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
