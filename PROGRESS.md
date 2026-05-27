@@ -57,7 +57,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | 1 | Scaffold (Astro/Tailwind/CF, bindings stub, archive demo) | ✅ Done |
 | 2 | Design system + app shell | ✅ Done |
 | 3 | Public/static pages | ✅ Done |
-| 4 | Auth (Firebase: Google/email+password/Apple) | ⬜ |
+| 4 | Auth (Firebase: Google/email+password/Apple) | ✅ Done |
 | 5 | Data model + template system (D1) | ⬜ |
 | 6 | Generation pipeline (Worker → SyncNode → Bunny) | ⬜ |
 | 7 | User features (gallery, account, explore feed) | ⬜ |
@@ -70,9 +70,16 @@ Carry over the old dynamic-placeholder template model, improved:
 
 ## Open questions (need answers before the noted phase)
 
-- **Credentials (Phase 4/9):** Firebase config + Stripe keys are NOT in `CLAUDE.local.md`
-  (brief said they'd be there). They ARE hardcoded in old `back/config.php` /
-  `back/global.functions.php` — can be pulled into Wrangler secrets with user OK. Never commit.
+- **Firebase console (before live auth testing):** the existing `pixie-dust-apps` project already
+  has Google + email/password enabled (old site used them). For full end-to-end on the new site:
+  (1) add the deployed origin (and `localhost` for dev) to Firebase **Authorized domains**;
+  (2) enable the **Apple** provider (net-new — needs an Apple Service ID + key). Until then,
+  Google/email work where the project allows; Apple sign-in will error `auth/operation-not-allowed`.
+  NOTE: I have NOT created test accounts in the production Firebase project — live sign-in is the
+  user's call (it writes real users). The code path is built + the session/me/account plumbing is
+  verified locally with the D1/KV bindings.
+- **Stripe keys (Phase 9):** still NOT in `CLAUDE.local.md`; hardcoded in old `back/config.php`.
+  Pull into Wrangler secrets with user OK. Never commit.
 - **Pricing (Phase 9):** subscription tiers + credit-pack SKUs still TBD. PRD reference:
   Free $0 / Plus $15 / Studio $45; top-ups Starter 100cr/$8, Creator 500cr/$32, Pro 2000cr/$96;
   non-subscriber ~5× multiplier (unconfirmed). Rollover & grandfathering policy TBD.
@@ -129,6 +136,16 @@ The full old-site functional inventory and the design audit were produced during
   `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
   `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
   localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.
+- **2026-05-27** — Phase 4 done. Auth: Firebase client (`src/lib/firebase-client.ts`, public config
+  in `firebase-config.ts`) for Google/Apple/email+password + verification/reset. Server-side
+  ID-token verification via Web Crypto against Google certs (`firebase-verify.ts`) — no service
+  account. API endpoints `/api/auth/{session,me,signout}`; opaque sessions in KV; HttpOnly cookie
+  (secure only on https so localhost works). D1 `users` table (`migrations/0001_init.sql`, applied
+  `--local`). `src/middleware.ts` sets `locals.user` for SSR routes; shell hydrates auth state
+  client-side via `/api/auth/me`. Sign-in page `/auth/sign-in` (immersive editorial split,
+  signup/login toggle); gated `/account` (SSR, redirects logged-out → sign-in?redirect=). Verified
+  locally: `/api/auth/me`→{user:null}, `/account` redirect, toggle, UI in desktop+narrow.
+  **Tooling:** pinned **wrangler 3** (v4 needs Node 22; we're on 20). Installed `firebase` v12.
 - **2026-05-26** — Phase 3 done. Public pages built + verified: Home (hero carousel, quick-launch,
   rails, feature banners — `src/components/home/`), catalog pages (Presets/Shoots/Video/Motion/
   Beauty/Trending/Fashion/Avatar/Ad/Gallery) via `FilterableCatalog` with client-side filtering

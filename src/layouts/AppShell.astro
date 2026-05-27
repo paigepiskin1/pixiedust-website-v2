@@ -25,4 +25,26 @@ const { title, description, credits = 47 } = Astro.props;
   </div>
   <MobileDrawer credits={credits} />
   <Toast />
+
+  <script is:inline>
+    // Hydrate auth state into the shell (static pages render the logged-out
+    // default; this upgrades to the signed-in user when a session exists).
+    fetch("/api/auth/me", { headers: { accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : { user: null }))
+      .then(({ user }) => {
+        const set = (sel, fn) => document.querySelectorAll(sel).forEach(fn);
+        if (user) {
+          const name = user.name || (user.email ? user.email.split("@")[0] : "You");
+          set(".pd-acct-name", (e) => (e.textContent = name));
+          set(".pd-acct-sub", (e) => (e.textContent = user.isAdmin ? "Admin" : "Member"));
+          set(".pd-acct-avatar", (e) => (e.textContent = (name[0] || "U").toUpperCase()));
+          set(".pd-credits-val", (e) => (e.textContent = String(user.credits)));
+          set(".pd-acct-link", (e) => e.setAttribute("href", "/account"));
+          document.documentElement.setAttribute("data-auth", "in");
+        } else {
+          document.documentElement.setAttribute("data-auth", "out");
+        }
+      })
+      .catch(() => {});
+  </script>
 </Base>

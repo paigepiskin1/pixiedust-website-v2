@@ -1,0 +1,326 @@
+---
+import Base from "../../layouts/Base.astro";
+import Media from "../../components/ui/Media.astro";
+import type { Tone } from "../../lib/content";
+
+// The post-sign-in redirect (?redirect=) is read + sanitized client-side.
+const slides: { tone: Tone; kicker: string; title: string; cred: string }[] = [
+  { tone: "lilac", kicker: "Motion · trending", title: "Snakes wrapped,\nin 8 seconds.", cred: "428k creators · this week" },
+  { tone: "pink", kicker: "Photoshoot · 24 shots", title: "A full editorial,\nno set rental.", cred: "Used by 12 of TIME’s 100" },
+  { tone: "dusk", kicker: "Cinema · Kling Pro", title: "Main character\nenergy on tap.", cred: "186k cinematic scenes / week" },
+  { tone: "mint", kicker: "Fashion try-on", title: "Wear the wardrobe.\nKeep your face.", cred: "2 cr · works in seconds" },
+];
+const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$0", "to start"]];
+---
+
+<Base title="Sign in — PixieDust">
+  <div
+    class="relative grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.85fr)]"
+    style="background:var(--pd-bg);"
+  >
+    <!-- LEFT: editorial proof -->
+    <aside class="relative overflow-hidden" style="min-height:280px;border-right:0.5px solid var(--pd-hairline);">
+      {
+        slides.map((sl, idx) => (
+          <div class="pd-auth-slide absolute inset-0 transition-opacity duration-[900ms]" data-idx={idx} style={`opacity:${idx === 0 ? 1 : 0};`}>
+            <Media tone={sl.tone} angle={130} />
+            <div class="absolute inset-0" style="background:linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.8) 100%);" />
+          </div>
+        ))
+      }
+      <div class="absolute left-9 top-7 flex items-center gap-[9px]">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="11" stroke="#fff" stroke-width="1.4"></circle>
+          <circle cx="12" cy="12" r="5.5" fill="#fff"></circle>
+          <circle cx="12" cy="12" r="2" fill="rgba(10,10,11,0.9)"></circle>
+        </svg>
+        <span class="font-display font-semibold text-white" style="font-size:18px;letter-spacing:-0.5px;">PixieDust</span>
+      </div>
+
+      <div class="absolute right-7 top-6 hidden gap-2 lg:flex">
+        {
+          stats.map(([a, b]) => (
+            <div
+              class="flex items-center gap-1.5 rounded-full"
+              style="padding:8px 12px;background:rgba(10,10,11,0.55);backdrop-filter:blur(12px);border:0.5px solid rgba(255,255,255,0.14);"
+            >
+              <span class="font-display font-semibold text-white" style="font-size:13px;letter-spacing:-0.2px;">{a}</span>
+              <span class="font-mono uppercase" style="font-size:9.5px;color:rgba(255,255,255,0.65);letter-spacing:0.5px;">{b}</span>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="absolute inset-x-9 bottom-14" style="max-width:560px;">
+        <div id="pd-auth-kicker" class="mb-3 font-mono uppercase" style="font-size:10.5px;color:rgba(255,255,255,0.7);letter-spacing:1.4px;">{slides[0].kicker}</div>
+        <h2 id="pd-auth-title" class="font-display font-medium text-white" style="font-size:52px;letter-spacing:-1.5px;line-height:0.98;">
+          {slides[0].title.split("\n").map((l, i) => (<>{i > 0 && <br />}{l}</>))}
+        </h2>
+        <div class="mt-[22px] flex items-center gap-2.5">
+          <span class="size-1.5 rounded-full" style="background:var(--pd-amber);box-shadow:0 0 10px var(--pd-amber);"></span>
+          <span id="pd-auth-cred" class="font-mono uppercase" style="font-size:11px;color:rgba(255,255,255,0.78);letter-spacing:0.6px;">{slides[0].cred}</span>
+        </div>
+      </div>
+
+      <div id="pd-auth-pips" class="absolute bottom-14 right-9 flex gap-1.5">
+        {
+          slides.map((_, idx) => (
+            <button
+              type="button"
+              class="pd-auth-pip"
+              data-idx={idx}
+              aria-label={`Slide ${idx + 1}`}
+              style={`width:${idx === 0 ? 22 : 6}px;height:6px;border-radius:6px;border:none;cursor:pointer;padding:0;background:${idx === 0 ? "#fff" : "rgba(255,255,255,0.35)"};transition:width 320ms;`}
+            />
+          ))
+        }
+      </div>
+    </aside>
+
+    <!-- RIGHT: form -->
+    <section class="relative flex flex-col justify-center" style="padding:64px 72px;">
+      <a href="/" class="absolute right-9 top-7 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.6px;">← back</a>
+
+      <div id="pd-auth-form" data-mode="signup" class="mx-auto w-full" style="max-width:380px;">
+        <div class="mb-2.5 font-mono font-semibold uppercase" style="font-size:10.5px;color:var(--pd-lilac);letter-spacing:1.2px;">
+          <span data-when="signup">Sign up · 5 free credits</span>
+          <span data-when="login" class="hidden">Welcome back</span>
+        </div>
+        <h1 class="font-display font-medium text-ink" style="font-size:36px;letter-spacing:-1px;line-height:1.05;">
+          <span data-when="signup">Make your dust.</span>
+          <span data-when="login" class="hidden">Sign in to your studio.</span>
+        </h1>
+        <p class="mt-3 text-ink-3" style="font-size:14px;letter-spacing:-0.1px;line-height:1.5;">
+          <span data-when="signup">180+ AI creative tools. One credit ledger. Five credits on the house.</span>
+          <span data-when="login" class="hidden">Pick up where you left off — every project, gallery item, and credit is exactly where you left it.</span>
+        </p>
+
+        <div class="mt-7 flex flex-col gap-2">
+          <button type="button" id="pd-apple" class="pd-oauth flex items-center justify-center gap-2.5 rounded-[11px] font-semibold" style="padding:13px 14px;font-size:14px;">
+            <svg width="15" height="17" viewBox="0 0 14 17" fill="currentColor"><path d="M11.6 9c0-1.6.9-2.9 2.1-3.6-.7-1-1.7-1.5-3-1.6-1.3-.1-2.6.7-3.1.7-.6 0-1.7-.7-2.7-.7-1.4 0-2.7.8-3.4 2C-.3 8.2.6 12 2.3 14c.7 1 1.5 2.1 2.6 2 .9 0 1.3-.6 2.5-.6 1.1 0 1.5.6 2.6.6 1.1 0 1.8-1 2.5-2 .5-.7.7-1.1 1-1.9-2-.6-2.4-3.4-.4-3.1zM9.5 2.6C10.1 1.9 10.5 1 10.4 0c-.9 0-1.9.6-2.5 1.3C7.3 2 6.9 2.9 7 3.9c1 .1 1.9-.5 2.5-1.3z" transform="translate(0 1)"></path></svg>
+            Continue with Apple
+          </button>
+          <button type="button" id="pd-google" class="pd-oauth flex items-center justify-center gap-2.5 rounded-[11px] font-semibold" style="padding:13px 14px;font-size:14px;">
+            <svg width="16" height="16" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.5h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6z"></path><path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 0 0 9 18z"></path><path fill="#FBBC05" d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V5H.9a9 9 0 0 0 0 8l3-2.3z"></path><path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 0 0 .9 5l3 2.3C4.6 5.2 6.6 3.6 9 3.6z"></path></svg>
+            Continue with Google
+          </button>
+        </div>
+
+        <div class="my-[22px] flex items-center gap-2.5">
+          <div class="h-px flex-1" style="background:var(--pd-hairline);"></div>
+          <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:1px;">or with email</span>
+          <div class="h-px flex-1" style="background:var(--pd-hairline);"></div>
+        </div>
+
+        <input
+          id="pd-email"
+          type="email"
+          placeholder="you@email.com"
+          autocomplete="email"
+          class="w-full rounded-[11px] text-ink outline-none"
+          style="padding:13px 14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:14px;letter-spacing:-0.1px;"
+        />
+        <input
+          id="pd-password"
+          type="password"
+          placeholder="Password"
+          autocomplete="current-password"
+          class="mt-2 w-full rounded-[11px] text-ink outline-none"
+          style="padding:13px 14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:14px;letter-spacing:-0.1px;"
+        />
+
+        <div id="pd-auth-error" class="mt-2 hidden rounded-lg" style="padding:9px 12px;background:color-mix(in srgb, var(--pd-pink) 12%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-pink) 40%, transparent);color:var(--pd-pink);font-size:12.5px;"></div>
+
+        <button
+          type="button"
+          id="pd-submit"
+          class="mt-2 flex w-full items-center justify-center gap-2 rounded-[11px] font-bold"
+          style="padding:13px 14px;background:var(--pd-lilac);color:#0A0A0B;font-size:14px;letter-spacing:-0.1px;cursor:pointer;"
+        >
+          <span data-when="signup">Create account</span>
+          <span data-when="login" class="hidden">Sign in</span>
+        </button>
+
+        <button type="button" id="pd-forgot" data-when="login" class="mt-2.5 hidden w-full text-center font-medium text-ink-3" style="font-size:12px;background:none;border:none;cursor:pointer;">
+          Forgot your password?
+        </button>
+
+        <div class="mt-[22px] text-center text-ink-3" style="font-size:12.5px;letter-spacing:-0.1px;">
+          <span data-when="signup">Already have an account? </span>
+          <span data-when="login" class="hidden">Don't have one? </span>
+          <button type="button" id="pd-toggle" class="font-semibold text-ink" style="font-size:12.5px;background:none;border:none;cursor:pointer;padding:0;">
+            <span data-when="signup">Sign in</span>
+            <span data-when="login" class="hidden">Sign up</span>
+          </button>
+        </div>
+
+        <div class="mt-7 flex items-center justify-between pt-[18px]" style="border-top:0.5px solid var(--pd-hairline);">
+          <div class="flex items-center gap-2">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="5" width="8" height="5.5" rx="1"></rect><path d="M3.5 5V3a2.5 2.5 0 0 1 5 0v2"></path></svg>
+            <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.5px;">SOC 2 · encrypted</span>
+          </div>
+          <div class="flex gap-3.5">
+            <a href="/legal/terms" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">Terms</a>
+            <a href="/legal/privacy" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">Privacy</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <style>
+    .pd-oauth {
+      background: var(--pd-bg2);
+      color: var(--pd-ink);
+      border: 0.5px solid var(--pd-hairline2);
+      cursor: pointer;
+      transition: background 120ms;
+    }
+    .pd-oauth:hover {
+      background: var(--pd-bg3);
+    }
+    #pd-email:focus,
+    #pd-password:focus {
+      border-color: var(--pd-hairline3);
+    }
+  </style>
+
+  <script>
+    import {
+      signInWithGoogle,
+      signInWithApple,
+      signUpWithEmail,
+      signInWithEmailPassword,
+      resetPassword,
+      establishSession,
+      authErrorMessage,
+    } from "../../lib/firebase-client";
+
+    const params = new URLSearchParams(location.search);
+    const rawRedirect = params.get("redirect") || "/";
+    const redirect = rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/";
+
+    // ── editorial carousel ──
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".pd-auth-slide"));
+    const pips = Array.from(document.querySelectorAll<HTMLElement>(".pd-auth-pip"));
+    const slideData = [
+      { kicker: "Motion · trending", title: "Snakes wrapped,\nin 8 seconds.", cred: "428k creators · this week" },
+      { kicker: "Photoshoot · 24 shots", title: "A full editorial,\nno set rental.", cred: "Used by 12 of TIME’s 100" },
+      { kicker: "Cinema · Kling Pro", title: "Main character\nenergy on tap.", cred: "186k cinematic scenes / week" },
+      { kicker: "Fashion try-on", title: "Wear the wardrobe.\nKeep your face.", cred: "2 cr · works in seconds" },
+    ];
+    const kickerEl = document.getElementById("pd-auth-kicker")!;
+    const titleEl = document.getElementById("pd-auth-title")!;
+    const credEl = document.getElementById("pd-auth-cred")!;
+    let si = 0;
+    function showSlide(n: number) {
+      si = (n + slides.length) % slides.length;
+      slides.forEach((s, i) => (s.style.opacity = i === si ? "1" : "0"));
+      pips.forEach((p, i) => {
+        p.style.width = i === si ? "22px" : "6px";
+        p.style.background = i === si ? "#fff" : "rgba(255,255,255,0.35)";
+      });
+      kickerEl.textContent = slideData[si].kicker;
+      titleEl.innerHTML = slideData[si].title.replace(/\n/g, "<br>");
+      credEl.textContent = slideData[si].cred;
+    }
+    pips.forEach((p, i) => p.addEventListener("click", () => showSlide(i)));
+    if (slides.length) setInterval(() => showSlide(si + 1), 4500);
+
+    // ── mode toggle (signup | login) ──
+    const form = document.getElementById("pd-auth-form")!;
+    function applyMode() {
+      const mode = form.dataset.mode;
+      document.querySelectorAll<HTMLElement>("[data-when]").forEach((el) => {
+        el.classList.toggle("hidden", el.dataset.when !== mode);
+      });
+      (document.getElementById("pd-password") as HTMLInputElement).setAttribute(
+        "autocomplete",
+        mode === "signup" ? "new-password" : "current-password"
+      );
+    }
+    document.getElementById("pd-toggle")!.addEventListener("click", () => {
+      form.dataset.mode = form.dataset.mode === "signup" ? "login" : "signup";
+      hideError();
+      applyMode();
+    });
+
+    // ── helpers ──
+    const errEl = document.getElementById("pd-auth-error")!;
+    const submitBtn = document.getElementById("pd-submit") as HTMLButtonElement;
+    const emailEl = document.getElementById("pd-email") as HTMLInputElement;
+    const passEl = document.getElementById("pd-password") as HTMLInputElement;
+    function showError(msg: string) {
+      errEl.textContent = msg;
+      errEl.classList.remove("hidden");
+    }
+    function hideError() {
+      errEl.classList.add("hidden");
+    }
+    let busy = false;
+    async function withBusy(fn: () => Promise<void>) {
+      if (busy) return;
+      busy = true;
+      submitBtn.style.opacity = "0.6";
+      submitBtn.style.cursor = "wait";
+      hideError();
+      try {
+        await fn();
+      } catch (err) {
+        showError(authErrorMessage(err));
+        submitBtn.style.opacity = "1";
+        submitBtn.style.cursor = "pointer";
+      } finally {
+        busy = false;
+      }
+    }
+    function go() {
+      window.location.href = redirect;
+    }
+
+    // ── handlers ──
+    document.getElementById("pd-google")!.addEventListener("click", () =>
+      withBusy(async () => {
+        const user = await signInWithGoogle();
+        await establishSession(user);
+        go();
+      })
+    );
+    document.getElementById("pd-apple")!.addEventListener("click", () =>
+      withBusy(async () => {
+        const user = await signInWithApple();
+        await establishSession(user);
+        go();
+      })
+    );
+    submitBtn.addEventListener("click", () =>
+      withBusy(async () => {
+        const email = emailEl.value.trim();
+        const password = passEl.value;
+        if (!email || !password) throw new Error("Enter your email and password.");
+        const mode = form.dataset.mode;
+        const user = mode === "signup" ? await signUpWithEmail(email, password) : await signInWithEmailPassword(email, password);
+        await establishSession(user);
+        go();
+      })
+    );
+    [emailEl, passEl].forEach((el) =>
+      el.addEventListener("keydown", (e) => {
+        if ((e as KeyboardEvent).key === "Enter") submitBtn.click();
+      })
+    );
+    document.getElementById("pd-forgot")!.addEventListener("click", async () => {
+      const email = emailEl.value.trim();
+      if (!email) return showError("Enter your email first, then tap reset.");
+      try {
+        await resetPassword(email);
+        hideError();
+        (window as any).pdToast?.("Password reset link sent — check your email.");
+      } catch (err) {
+        showError(authErrorMessage(err));
+      }
+    });
+
+    applyMode();
+  </script>
+</Base>

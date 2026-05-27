@@ -1,4 +1,5 @@
 // Server-side user persistence (D1). Used by the auth endpoints + middleware.
+import type { D1Database } from "@cloudflare/workers-types";
 import type { FirebaseClaims } from "./firebase-verify";
 
 export interface DbUser {

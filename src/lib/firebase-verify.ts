@@ -39,7 +39,7 @@ async function getKeys(): Promise<Record<string, CryptoKey>> {
 
   const res = await fetch(JWK_URL);
   if (!res.ok) throw new Error("Could not fetch Firebase signing keys");
-  const { keys } = (await res.json()) as { keys: JsonWebKey[] };
+  const { keys } = (await res.json()) as { keys: Array<JsonWebKey & { kid?: string }> };
 
   const imported: Record<string, CryptoKey> = {};
   for (const jwk of keys) {
@@ -74,7 +74,13 @@ export async function verifyIdToken(token: string): Promise<FirebaseClaims> {
   if (!key) throw new Error("Unknown signing key");
 
   const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-  const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlToBytes(sigB64), data);
+  const sig = b64urlToBytes(sigB64);
+  const ok = await crypto.subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    sig as unknown as BufferSource,
+    data as unknown as BufferSource
+  );
   if (!ok) throw new Error("Invalid token signature");
 
   const p = b64urlToJson<Record<string, any>>(payloadB64);

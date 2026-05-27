@@ -1,5 +1,7 @@
 // Opaque session ids stored in KV (sess:<id> -> firebase uid), referenced by an
 // HttpOnly cookie. Keeps the Firebase ID token out of long-lived storage.
+import type { KVNamespace } from "@cloudflare/workers-types";
+
 export const SESSION_COOKIE = "pd_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
