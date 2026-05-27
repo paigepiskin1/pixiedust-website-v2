@@ -1,14 +1,18 @@
 ---
+export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import RailHead from "../components/ui/RailHead.astro";
 import FeatureBanner from "../components/home/FeatureBanner.astro";
 import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
-import { MOTION } from "../lib/catalog";
+import { listTemplates, templateToCard } from "../lib/templates";
 import { workspaceHref } from "../lib/workspace";
+
+const db = Astro.locals.runtime.env.DB;
+const items = (await listTemplates(db, { kind: "motion" })).map(templateToCard);
 ---
 
-<AppShell title="Motion Transfer — PixieDust">
+<AppShell title="Motion Transfer — PixieDust" credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <PageHeader
       kicker="Upload + swap · Kling Pro"
@@ -28,6 +32,6 @@ import { workspaceHref } from "../lib/workspace";
       />
     </div>
     <RailHead title="Trending motions" sub="Pick a template" accent="var(--pd-lilac)" />
-    <FilterableCatalog items={MOTION} aspect="9 / 14" />
+    <FilterableCatalog items={items} aspect="9 / 14" />
   </div>
 </AppShell>

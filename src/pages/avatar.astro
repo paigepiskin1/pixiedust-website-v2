@@ -1,17 +1,21 @@
 ---
+export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
-import { AVATAR } from "../lib/catalog";
+import { listTemplates, templateToCard } from "../lib/templates";
+
+const db = Astro.locals.runtime.env.DB;
+const items = (await listTemplates(db, { kind: "avatar" })).map(templateToCard);
 ---
 
-<AppShell title="Avatar Studio — PixieDust">
+<AppShell title="Avatar Studio — PixieDust" credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <PageHeader
       kicker="No training needed · instant"
       title="Avatar Studio"
       sub="Build a custom model from scratch — or restyle yourself into any aesthetic. No setup, no LoRA, no waiting."
     />
-    <FilterableCatalog items={AVATAR} aspect="1 / 1.3" />
+    <FilterableCatalog items={items} aspect="1 / 1.3" />
   </div>
 </AppShell>

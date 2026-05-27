@@ -58,7 +58,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | 2 | Design system + app shell | ✅ Done |
 | 3 | Public/static pages | ✅ Done |
 | 4 | Auth (Firebase: Google/email+password/Apple) | ✅ Done |
-| 5 | Data model + template system (D1) | ⬜ |
+| 5 | Data model + template system (D1) | ✅ Done |
 | 6 | Generation pipeline (Worker → SyncNode → Bunny) | ⬜ |
 | 7 | User features (gallery, account, explore feed) | ⬜ |
 | 8 | Admin backend (templates, users, content, moderation) | ⬜ |
@@ -136,6 +136,20 @@ The full old-site functional inventory and the design audit were produced during
   `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
   `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
   localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.
+- **2026-05-27** — Phase 5 done. Full D1 schema (`migrations/0002_schema.sql`): templates
+  (provider/model/input_json + fields_json + steps_json for multi-step + cost/quality/aspects/
+  quantities + workspace hints + preview), generations, credit_ledger, subscription_tiers,
+  credit_packs, subscriptions, admin_audit. Data layer `src/lib/templates.ts` (list/get,
+  `resolveInput` merges user inputs into `{{key}}` placeholders + validates, `computeCost` =
+  cost×qty×qualityMult, `templateToCard`/`templateToRail`). `src/lib/credits.ts` (ledger-backed
+  `adjustBalance` + atomic `debit`). Seed: `scripts/gen-seed.ts` (run via tsx) expands the catalog
+  datasets → `seed/seed.sql` = **106 templates** (flux-schnell images / seedance-1-lite video —
+  known-working via SyncNode) + 3 tiers (Free/Plus/Studio) + 3 credit packs; applied `--local`.
+  Catalog tool pages + home rails + `/studio/[id]` workspace now read **live from D1** (SSR,
+  prerender=false). Verified: /presets = 37 cards from D1, /studio/preset-kodak-portra loads the
+  real template (cost 2cr, Flux Schnell, fields). **Tooling:** added `tsx` (devDep).
+  TBD (Phase 9): final tier/pack pricing + non-subscriber multiplier — seeded values are placeholders.
+  NOTE: re-seeding (`seed/seed.sql`) does `DELETE FROM templates` first — wipes admin-created rows in dev.
 - **2026-05-27** — Phase 4 done. Auth: Firebase client (`src/lib/firebase-client.ts`, public config
   in `firebase-config.ts`) for Google/Apple/email+password + verification/reset. Server-side
   ID-token verification via Web Crypto against Google certs (`firebase-verify.ts`) — no service

@@ -1,12 +1,17 @@
 ---
+export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import FeatureBanner from "../components/home/FeatureBanner.astro";
 import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
-import { SHOOTS, SHOOT_CATS } from "../lib/catalog";
+import { listTemplates, templateToCard } from "../lib/templates";
+import { SHOOT_CATS } from "../lib/catalog";
+
+const db = Astro.locals.runtime.env.DB;
+const items = (await listTemplates(db, { kind: "shoot" })).map(templateToCard);
 ---
 
-<AppShell title="AI Photoshoots — PixieDust">
+<AppShell title="AI Photoshoots — PixieDust" credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <PageHeader
       kicker="Themed packs · 12–30 frames"
@@ -25,6 +30,6 @@ import { SHOOTS, SHOOT_CATS } from "../lib/catalog";
         height={240}
       />
     </div>
-    <FilterableCatalog items={SHOOTS} categories={SHOOT_CATS} aspect="1 / 1.3" />
+    <FilterableCatalog items={items} categories={SHOOT_CATS} aspect="1 / 1.3" />
   </div>
 </AppShell>

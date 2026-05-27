@@ -1,17 +1,22 @@
 ---
+export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
-import { PRESETS, PRESET_CATS } from "../lib/catalog";
+import { listTemplates, templateToCard } from "../lib/templates";
+import { PRESET_CATS } from "../lib/catalog";
+
+const db = Astro.locals.runtime.env.DB;
+const items = (await listTemplates(db, { kind: "preset" })).map(templateToCard);
 ---
 
-<AppShell title="Presets — PixieDust">
+<AppShell title="Presets — PixieDust" credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <PageHeader
       kicker="Single-image restyle · 2 cr"
       title="Presets"
       sub="120+ aesthetic looks. Drop a photo, pick a vibe — film stocks, decades, painters, cameras, color grades."
     />
-    <FilterableCatalog items={PRESETS} categories={PRESET_CATS} aspect="1 / 1.25" />
+    <FilterableCatalog items={items} categories={PRESET_CATS} aspect="1 / 1.25" />
   </div>
 </AppShell>

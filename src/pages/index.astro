@@ -1,14 +1,25 @@
 ---
+export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import HomeHero from "../components/home/HomeHero.astro";
 import RailHead from "../components/ui/RailHead.astro";
 import QuickLaunch from "../components/home/QuickLaunch.astro";
 import CardRail from "../components/home/CardRail.astro";
 import FeatureBanner from "../components/home/FeatureBanner.astro";
-import { TRENDING, PRESET_TEASERS, BEAUTY_LOOKS } from "../lib/content";
+import { listTemplates, templateToRail } from "../lib/templates";
+
+const db = Astro.locals.runtime.env.DB;
+const [trending, presets, beauty] = await Promise.all([
+  listTemplates(db, { featured: true, limit: 8 }),
+  listTemplates(db, { kind: "preset", limit: 8 }),
+  listTemplates(db, { kind: "beauty", limit: 8 }),
+]);
+const trendingCards = trending.map(templateToRail);
+const presetCards = presets.map(templateToRail);
+const beautyCards = beauty.map(templateToRail);
 ---
 
-<AppShell title="PixieDust — Home">
+<AppShell title="PixieDust — Home" credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <HomeHero />
 
@@ -19,7 +30,7 @@ import { TRENDING, PRESET_TEASERS, BEAUTY_LOOKS } from "../lib/content";
 
     <section class="mb-9">
       <RailHead title="Trending this week" sub="Most-used · mixed" accent="var(--pd-pink)" seeAllHref="/trending" />
-      <CardRail items={TRENDING} />
+      <CardRail items={trendingCards} />
     </section>
 
     <section class="mb-9">
@@ -38,7 +49,7 @@ import { TRENDING, PRESET_TEASERS, BEAUTY_LOOKS } from "../lib/content";
 
     <section class="mb-9">
       <RailHead title="Presets" sub="Film · era · creative · pro" accent="var(--pd-amber)" seeAllHref="/presets" />
-      <CardRail items={PRESET_TEASERS} height={260} width={180} />
+      <CardRail items={presetCards} height={260} width={180} />
     </section>
 
     <section class="mb-9 grid grid-cols-1 gap-3.5 md:grid-cols-2">
@@ -66,7 +77,7 @@ import { TRENDING, PRESET_TEASERS, BEAUTY_LOOKS } from "../lib/content";
 
     <section>
       <RailHead title="Beauty Studio" sub="Try a look · 1 cr each" accent="var(--pd-mint)" seeAllHref="/beauty" />
-      <CardRail items={BEAUTY_LOOKS} height={220} width={170} />
+      <CardRail items={beautyCards} height={220} width={170} />
     </section>
   </div>
 </AppShell>
