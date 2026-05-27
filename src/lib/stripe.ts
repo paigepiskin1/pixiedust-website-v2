@@ -36,6 +36,79 @@ export async function createCheckoutSession(
   return { id: data.id!, url: data.url };
 }
 
+// ─── Generic REST helpers + customer / payment-method management ───
+async function stripeFetch(secretKey: string, method: "GET" | "POST", path: string, params?: Record<string, unknown>) {
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${secretKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+    body: method === "POST" && params ? encode(params).join("&") : undefined,
+  });
+  const data = (await res.json()) as any;
+  if (!res.ok) throw new Error(data?.error?.message || `Stripe error (${res.status})`);
+  return data;
+}
+
+/** Get the user's Stripe customer id, creating + persisting one if missing. */
+export async function getOrCreateCustomer(
+  secretKey: string,
+  db: import("@cloudflare/workers-types").D1Database,
+  user: { id: number; uid: string; email: string | null; name: string | null; stripe_customer_id?: string | null }
+): Promise<string> {
+  if (user.stripe_customer_id) return user.stripe_customer_id;
+  const cust = await stripeFetch(secretKey, "POST", "/customers", {
+    email: user.email ?? undefined,
+    name: user.name ?? undefined,
+    metadata: { user_id: user.id, user_uid: user.uid },
+  });
+  await db.prepare("UPDATE users SET stripe_customer_id = ? WHERE id = ?").bind(cust.id, user.id).run();
+  return cust.id as string;
+}
+
+export interface SavedCard {
+  id: string;
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  isDefault: boolean;
+}
+
+export async function listPaymentMethods(secretKey: string, customerId: string): Promise<SavedCard[]> {
+  const [pms, cust] = await Promise.all([
+    stripeFetch(secretKey, "GET", `/payment_methods?customer=${customerId}&type=card&limit=20`),
+    stripeFetch(secretKey, "GET", `/customers/${customerId}`),
+  ]);
+  const defaultPm = cust?.invoice_settings?.default_payment_method as string | undefined;
+  return (pms.data || []).map((pm: any) => ({
+    id: pm.id,
+    brand: pm.card?.brand ?? "card",
+    last4: pm.card?.last4 ?? "????",
+    exp_month: pm.card?.exp_month ?? 0,
+    exp_year: pm.card?.exp_year ?? 0,
+    isDefault: pm.id === defaultPm,
+  }));
+}
+
+export async function detachPaymentMethod(secretKey: string, pmId: string): Promise<void> {
+  await stripeFetch(secretKey, "POST", `/payment_methods/${pmId}/detach`);
+}
+
+/** Confirm a payment method belongs to this customer before mutating it. */
+export async function paymentMethodBelongsTo(secretKey: string, pmId: string, customerId: string): Promise<boolean> {
+  try {
+    const pm = await stripeFetch(secretKey, "GET", `/payment_methods/${pmId}`);
+    return pm?.customer === customerId;
+  } catch {
+    return false;
+  }
+}
+
+export async function setDefaultPaymentMethod(secretKey: string, customerId: string, pmId: string): Promise<void> {
+  await stripeFetch(secretKey, "POST", `/customers/${customerId}`, {
+    invoice_settings: { default_payment_method: pmId },
+  });
+}
+
 /** Verify a Stripe webhook signature (HMAC-SHA256) using Web Crypto. */
 export async function verifyWebhookSignature(
   payload: string,

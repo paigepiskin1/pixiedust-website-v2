@@ -113,8 +113,14 @@ const labelStyle = "display:block;margin-bottom:6px;font-family:var(--font-mono)
             <div class="mt-4 flex gap-2"><a href="/credits" class="rounded-xl font-bold" style="padding:10px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">Get credits</a></div>
           </div>
           <div style={cardStyle}>
-            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Billing</h3>
-            <p class="mt-2 text-ink-3" style="font-size:12.5px;line-height:1.5;">Subscriptions, payment methods, and invoices arrive in Phase 9 (Stripe). Credit packs are available now on the credits page.</p>
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Payment methods</h3>
+              <button type="button" id="pd-add-card" class="rounded-xl font-bold" style="padding:8px 14px;background:var(--pd-ink);color:var(--pd-bg);font-size:12.5px;cursor:pointer;border:none;">+ Add card</button>
+            </div>
+            <p class="mt-2 text-ink-3" style="font-size:12.5px;line-height:1.5;">The card you attach here is used for subscriptions and credit top-ups. Card details are entered securely on Stripe.</p>
+            <div id="pd-cards" class="mt-4 flex flex-col gap-2">
+              <div class="text-ink-3" style="font-size:12.5px;">Loading…</div>
+            </div>
           </div>
         </div>
 
@@ -220,6 +226,70 @@ const labelStyle = "display:block;margin-bottom:6px;font-family:var(--font-mono)
     document.querySelectorAll<HTMLElement>(".pd-toast-btn").forEach((b) =>
       b.addEventListener("click", () => (window as any).pdToast?.(b.dataset.toast))
     );
+
+    // ─── Payment methods ───
+    const cardsEl = document.getElementById("pd-cards");
+    const addCardBtn = document.getElementById("pd-add-card");
+    function cardIcon(brand: string): string {
+      const b = (brand || "").toLowerCase();
+      const map: Record<string, string> = { visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover" };
+      return map[b] || brand.charAt(0).toUpperCase() + brand.slice(1);
+    }
+    async function loadCards() {
+      if (!cardsEl) return;
+      try {
+        const data = await (await fetch("/api/billing/cards", { credentials: "include" })).json();
+        const cards = data.cards || [];
+        if (!cards.length) {
+          cardsEl.innerHTML = '<div style="font-size:12.5px;color:var(--pd-ink3);">No card on file yet. Add one to enable one-click top-ups and subscriptions.</div>';
+          return;
+        }
+        cardsEl.innerHTML = "";
+        cards.forEach((c: any) => {
+          const row = document.createElement("div");
+          row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline);border-radius:12px;";
+          row.innerHTML =
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<span style="font-weight:600;font-size:12.5px;color:var(--pd-ink);">' + cardIcon(c.brand) + "</span>" +
+            '<span style="font-family:var(--pd-mono,monospace);font-size:12.5px;color:var(--pd-ink2);">•••• ' + c.last4 + "</span>" +
+            '<span style="font-size:11px;color:var(--pd-ink3);">exp ' + String(c.exp_month).padStart(2, "0") + "/" + String(c.exp_year).slice(-2) + "</span>" +
+            (c.isDefault ? '<span class="font-mono uppercase" style="font-size:9px;letter-spacing:.5px;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--pd-mint) 14%,transparent);color:var(--pd-mint);">Default</span>' : "") +
+            "</div>";
+          const rm = document.createElement("button");
+          rm.type = "button";
+          rm.textContent = "Remove";
+          rm.style.cssText = "background:none;border:none;color:var(--pd-pink);font-size:11.5px;cursor:pointer;font-family:var(--pd-mono,monospace);";
+          rm.addEventListener("click", async () => {
+            if (!confirm("Remove this card?")) return;
+            rm.disabled = true;
+            rm.textContent = "Removing…";
+            const r = await fetch("/api/billing/cards/remove", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ id: c.id }) });
+            if (r.ok) { (window as any).pdToast?.("Card removed."); loadCards(); }
+            else { rm.disabled = false; rm.textContent = "Remove"; (window as any).pdToast?.("Could not remove card."); }
+          });
+          row.appendChild(rm);
+          cardsEl.appendChild(row);
+        });
+      } catch {
+        cardsEl.innerHTML = '<div style="font-size:12.5px;color:var(--pd-pink);">Could not load payment methods.</div>';
+      }
+    }
+    if (addCardBtn) {
+      addCardBtn.addEventListener("click", async () => {
+        addCardBtn.setAttribute("disabled", "true");
+        (addCardBtn as HTMLButtonElement).textContent = "Redirecting…";
+        try {
+          const r = await fetch("/api/billing/cards", { method: "POST", credentials: "include" });
+          const d = await r.json();
+          if (d.url) window.location.href = d.url;
+          else { (addCardBtn as HTMLButtonElement).textContent = "+ Add card"; addCardBtn.removeAttribute("disabled"); (window as any).pdToast?.(d.error || "Could not start."); }
+        } catch {
+          (addCardBtn as HTMLButtonElement).textContent = "+ Add card"; addCardBtn.removeAttribute("disabled");
+        }
+      });
+    }
+    if (new URLSearchParams(location.search).get("card") === "added") (window as any).pdToast?.("Card added — set as your default.", { accent: "var(--pd-mint)" });
+    loadCards();
 
     // save profile
     document.getElementById("pd-save-profile")?.addEventListener("click", async () => {

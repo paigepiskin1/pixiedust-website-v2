@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIContext } from "astro";
 import { getUserByUid } from "../../../lib/users";
-import { createCheckoutSession } from "../../../lib/stripe";
+import { createCheckoutSession, getOrCreateCustomer } from "../../../lib/stripe";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -28,6 +28,8 @@ export async function POST({ request, locals, url }: APIContext) {
   const cancel_url = `${origin}/credits?status=cancel`;
 
   try {
+    // Reuse the user's Stripe customer so an attached card is offered + reused.
+    const customer = await getOrCreateCustomer(env.STRIPE_SECRET_KEY, db, dbUser);
     let params: Record<string, unknown>;
 
     if (body.kind === "pack") {
@@ -42,9 +44,11 @@ export async function POST({ request, locals, url }: APIContext) {
 
       params = {
         mode: "payment",
-        customer_email: dbUser.email ?? undefined,
+        customer,
         success_url,
         cancel_url,
+        // Save the card used so it's available for future top-ups + subscriptions.
+        payment_intent_data: { setup_future_usage: "off_session" },
         line_items: [
           {
             quantity: 1,
@@ -67,7 +71,7 @@ export async function POST({ request, locals, url }: APIContext) {
       const meta = { user_id: dbUser.id, user_uid: dbUser.uid, kind: "sub", tier_id: tier.id, credits: tier.monthly_credits };
       params = {
         mode: "subscription",
-        customer_email: dbUser.email ?? undefined,
+        customer,
         success_url,
         cancel_url,
         line_items: [
