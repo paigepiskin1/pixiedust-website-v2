@@ -1,0 +1,45 @@
+---
+import Media from "../ui/Media.astro";
+import { QUICK_TOOLS } from "../../lib/content";
+---
+
+<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+  {
+    QUICK_TOOLS.map((t) => (
+      <a
+        href={t.href}
+        class="pd-lift group relative flex flex-col justify-between overflow-hidden rounded-[18px] p-[18px]"
+        style="height:168px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);isolation:isolate;"
+      >
+        <div class="absolute inset-0 z-0 transition-transform duration-[400ms] group-hover:scale-[1.04]">
+          <Media tone={t.tone} />
+        </div>
+        <div
+          class="absolute inset-0 z-0"
+          style="background:linear-gradient(180deg, rgba(10,10,11,0) 0%, rgba(10,10,11,0.15) 45%, rgba(10,10,11,0.75) 78%, rgba(10,10,11,0.96) 100%);"
+        />
+        <div
+          class="absolute z-0"
+          style={`right:-40px;top:-40px;width:180px;height:180px;border-radius:999px;background:radial-gradient(circle, color-mix(in srgb, ${t.accent} 22%, transparent) 0%, transparent 70%);`}
+        />
+        <div
+          class="relative z-10 flex size-10 items-center justify-center rounded-xl font-display font-semibold"
+          style={`background:rgba(10,10,11,0.55);backdrop-filter:blur(10px);border:0.5px solid color-mix(in srgb, ${t.accent} 53%, transparent);font-size:18px;color:${t.accent};box-shadow:0 4px 12px -4px rgba(0,0,0,0.4);`}
+        >
+          {t.glyph}
+        </div>
+        <div class="relative z-10">
+          <div class="font-semibold text-white" style="font-size:15px;letter-spacing:-0.2px;text-shadow:0 1px 8px rgba(0,0,0,0.55);">
+            {t.name}
+          </div>
+          <div
+            class="mt-1 font-mono uppercase"
+            style="font-size:10px;color:rgba(255,255,255,0.78);letter-spacing:0.5px;text-shadow:0 1px 6px rgba(0,0,0,0.5);"
+          >
+            {t.sub}
+          </div>
+        </div>
+      </a>
+    ))
+  }
+</div>

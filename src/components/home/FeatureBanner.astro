@@ -1,0 +1,62 @@
+---
+import Media from "../ui/Media.astro";
+import Pill from "../ui/Pill.astro";
+import type { Tone } from "../../lib/content";
+
+interface Props {
+  tone?: Tone;
+  kicker: string;
+  title: string; // may contain \n
+  sub?: string;
+  ctaLabel?: string;
+  accent?: string;
+  href?: string;
+  height?: number;
+}
+const {
+  tone = "dusk",
+  kicker,
+  title,
+  sub,
+  ctaLabel,
+  accent = "var(--pd-mint)",
+  href = "#",
+  height = 220,
+} = Astro.props;
+const lines = title.split("\n");
+---
+
+<a
+  href={href}
+  class="pd-lift relative block w-full overflow-hidden rounded-[24px]"
+  style={`height:${height}px;background:var(--pd-bg2);`}
+>
+  <Media tone={tone} angle={105} />
+  <div class="absolute inset-0" style="background:linear-gradient(90deg, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.3) 60%, transparent 100%);"></div>
+  <div class="absolute bottom-7 left-8 top-7 flex max-w-[60%] flex-col justify-between">
+    <div><Pill color={accent} label={kicker} /></div>
+    <div>
+      <div class="font-display font-medium text-white" style="font-size:32px;letter-spacing:-0.8px;line-height:1.02;">
+        {lines.map((l, i) => (<>{i > 0 && <br />}{l}</>))}
+      </div>
+      {
+        sub && (
+          <div class="mt-2.5 font-mono uppercase" style="font-size:10.5px;color:rgba(255,255,255,0.6);letter-spacing:0.5px;">
+            {sub}
+          </div>
+        )
+      }
+      {
+        ctaLabel && (
+          <div
+            class="mt-[18px] inline-flex items-center gap-[7px] rounded-full font-bold"
+            style="padding:9px 16px 9px 14px;background:#fff;color:#0A0A0B;font-size:12.5px;"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 1 L9 5 L2 9 Z" fill="#0A0A0B" /></svg>
+            {ctaLabel}
+          </div>
+        )
+      }
+    </div>
+  </div>
+</a>

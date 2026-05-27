@@ -1,0 +1,17 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
+import { TRENDING_GRID } from "../lib/catalog";
+---
+
+<AppShell title="Trending — PixieDust">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <PageHeader
+      kicker="Updated weekly · this week"
+      title="Trending"
+      sub="What's working right now — across every tool. Most-used wins."
+    />
+    <FilterableCatalog items={TRENDING_GRID} aspect="1 / 1.25" />
+  </div>
+</AppShell>

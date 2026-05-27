@@ -1,0 +1,17 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
+import { PRESETS, PRESET_CATS } from "../lib/catalog";
+---
+
+<AppShell title="Presets — PixieDust">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <PageHeader
+      kicker="Single-image restyle · 2 cr"
+      title="Presets"
+      sub="120+ aesthetic looks. Drop a photo, pick a vibe — film stocks, decades, painters, cameras, color grades."
+    />
+    <FilterableCatalog items={PRESETS} categories={PRESET_CATS} aspect="1 / 1.25" />
+  </div>
+</AppShell>

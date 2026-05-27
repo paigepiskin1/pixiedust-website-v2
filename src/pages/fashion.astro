@@ -1,0 +1,17 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
+import { FASHION } from "../lib/catalog";
+---
+
+<AppShell title="Fashion Try-on — PixieDust">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <PageHeader
+      kicker="Wear anything · 2 cr"
+      title="Fashion Try-on"
+      sub="Upload a photo, upload a garment — or pick a look. We'll dress you in seconds."
+    />
+    <FilterableCatalog items={FASHION} aspect="9 / 13" />
+  </div>
+</AppShell>

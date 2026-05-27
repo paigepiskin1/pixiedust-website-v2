@@ -1,0 +1,96 @@
+---
+import Media from "../ui/Media.astro";
+import Pill from "../ui/Pill.astro";
+import CreditChip from "../ui/CreditChip.astro";
+import { HERO_SLIDES } from "../../lib/content";
+---
+
+<div id="pd-hero" class="relative mb-8 overflow-hidden rounded-[24px]" style="height:460px;background:var(--pd-bg2);">
+  {
+    HERO_SLIDES.map((s, idx) => (
+      <div
+        class="pd-hero-slide absolute inset-0 transition-opacity duration-[800ms]"
+        data-idx={idx}
+        style={`opacity:${idx === 0 ? 1 : 0};pointer-events:${idx === 0 ? "auto" : "none"};`}
+      >
+        <Media tone={s.tone} angle={130} />
+        <div class="absolute inset-0" style="background:linear-gradient(110deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0) 100%);" />
+        <div class="absolute inset-0" style="background:linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.6) 100%);" />
+        <div class="absolute inset-x-7 top-[22px] flex justify-between">
+          <Pill color="var(--pd-pink)" label={`Hot · ${s.hot}`} />
+          <div
+            class="font-mono"
+            style="padding:5px 11px;border-radius:999px;background:rgba(10,10,11,0.55);backdrop-filter:blur(10px);font-size:10.5px;color:#fff;letter-spacing:0.6px;"
+          >
+            {s.dur}
+          </div>
+        </div>
+        <div class="absolute bottom-9 left-9" style="max-width:620px;">
+          <div class="mb-3 font-mono uppercase" style="font-size:11px;color:rgba(255,255,255,0.55);letter-spacing:1.3px;">
+            {s.kicker}
+          </div>
+          <h2 class="font-display font-medium text-white" style="font-size:56px;letter-spacing:-1.6px;line-height:0.98;">
+            {s.title.split("\n").map((l, i) => (<>{i > 0 && <br />}{l}</>))}
+          </h2>
+          <div class="mt-[22px] flex items-center gap-2.5">
+            <a
+              href={s.href}
+              class="inline-flex items-center gap-2 rounded-full font-bold"
+              style="padding:11px 20px 11px 16px;background:#fff;color:#0A0A0B;font-size:13.5px;letter-spacing:-0.1px;"
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11"><path d="M2 1 L10 5.5 L2 10 Z" fill="#0A0A0B" /></svg>
+              {s.cta}
+            </a>
+            <CreditChip cr={s.cr} size="md" />
+          </div>
+        </div>
+      </div>
+    ))
+  }
+  <div id="pd-hero-pips" class="absolute bottom-7 right-7 z-[2] flex gap-1.5">
+    {
+      HERO_SLIDES.map((_, idx) => (
+        <button
+          type="button"
+          class="pd-hero-pip"
+          data-idx={idx}
+          aria-label={`Slide ${idx + 1}`}
+          style={`width:${idx === 0 ? 24 : 6}px;height:6px;border-radius:6px;border:none;cursor:pointer;background:${idx === 0 ? "#fff" : "rgba(255,255,255,0.35)"};transition:width 350ms;`}
+        />
+      ))
+    }
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    const root = document.getElementById("pd-hero");
+    if (!root) return;
+    const slides = Array.prototype.slice.call(root.querySelectorAll(".pd-hero-slide"));
+    const pips = Array.prototype.slice.call(document.querySelectorAll("#pd-hero-pips .pd-hero-pip"));
+    let i = 0;
+    let paused = false;
+    let timer;
+    function show(n) {
+      i = (n + slides.length) % slides.length;
+      slides.forEach((s, idx) => {
+        s.style.opacity = idx === i ? "1" : "0";
+        s.style.pointerEvents = idx === i ? "auto" : "none";
+      });
+      pips.forEach((p, idx) => {
+        p.style.width = idx === i ? "24px" : "6px";
+        p.style.background = idx === i ? "#fff" : "rgba(255,255,255,0.35)";
+      });
+    }
+    function start() {
+      clearInterval(timer);
+      timer = setInterval(() => {
+        if (!paused) show(i + 1);
+      }, 4500);
+    }
+    pips.forEach((p, idx) => p.addEventListener("click", () => show(idx)));
+    root.addEventListener("mouseenter", () => (paused = true));
+    root.addEventListener("mouseleave", () => (paused = false));
+    start();
+  })();
+</script>

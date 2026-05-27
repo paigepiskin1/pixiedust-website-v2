@@ -1,45 +1,72 @@
 ---
 import AppShell from "../layouts/AppShell.astro";
-import Media from "../components/ui/Media.astro";
-import Pill from "../components/ui/Pill.astro";
-import CreditChip from "../components/ui/CreditChip.astro";
-
-const tiles = [
-  { tone: "lilac", label: "Presets", sub: "120+ looks" },
-  { tone: "teal", label: "Photoshoots", sub: "Editorial packs" },
-  { tone: "pink", label: "Video", sub: "Cinematic" },
-  { tone: "mint", label: "Beauty", sub: "Hair · makeup" },
-  { tone: "amber", label: "Ad Studio", sub: "Commercial" },
-  { tone: "dusk", label: "Avatar", sub: "Build a base" },
-] as const;
+import HomeHero from "../components/home/HomeHero.astro";
+import RailHead from "../components/ui/RailHead.astro";
+import QuickLaunch from "../components/home/QuickLaunch.astro";
+import CardRail from "../components/home/CardRail.astro";
+import FeatureBanner from "../components/home/FeatureBanner.astro";
+import { TRENDING, PRESET_TEASERS, BEAUTY_LOOKS } from "../lib/content";
 ---
 
 <AppShell title="PixieDust — Home">
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
-    <div class="mb-2 flex items-center gap-3">
-      <Pill color="var(--pd-lilac)" label="Phase 2 · Shell" />
-      <CreditChip cr={47} />
-    </div>
+    <HomeHero />
 
-    <h1 class="font-display font-medium tracking-tight text-ink" style="font-size:38px;line-height:1.05;letter-spacing:-1px;">
-      Welcome back
-    </h1>
-    <p class="mt-1 text-ink-2" style="font-size:14.5px;">
-      The app shell is live — sidebar, topbar, mobile drawer, and theme switching.
-      Real pages land in Phase 3.
-    </p>
+    <section class="mb-9">
+      <RailHead title="Start a project" sub="Pick a tool" accent="var(--pd-teal)" />
+      <QuickLaunch />
+    </section>
 
-    <div class="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3">
-      {
-        tiles.map((t) => (
-          <div
-            class="aspect-[4/3] overflow-hidden rounded-[18px]"
-            style="border:0.5px solid var(--pd-hairline);"
-          >
-            <Media tone={t.tone} label={t.label} sub={t.sub} />
-          </div>
-        ))
-      }
-    </div>
+    <section class="mb-9">
+      <RailHead title="Trending this week" sub="Most-used · mixed" accent="var(--pd-pink)" seeAllHref="/trending" />
+      <CardRail items={TRENDING} />
+    </section>
+
+    <section class="mb-9">
+      <RailHead title="Main character energy" sub="Cinematic · Movie Studio" accent="var(--pd-mint)" />
+      <FeatureBanner
+        tone="dusk"
+        kicker="Featured · Movie Studio"
+        title={"Put yourself in\nthe action scene."}
+        sub="4 presets · 8 cr each · Kling Pro"
+        ctaLabel="Open Movie Studio"
+        accent="var(--pd-mint)"
+        href="/video"
+        height={260}
+      />
+    </section>
+
+    <section class="mb-9">
+      <RailHead title="Presets" sub="Film · era · creative · pro" accent="var(--pd-amber)" seeAllHref="/presets" />
+      <CardRail items={PRESET_TEASERS} height={260} width={180} />
+    </section>
+
+    <section class="mb-9 grid grid-cols-1 gap-3.5 md:grid-cols-2">
+      <FeatureBanner
+        tone="pink"
+        kicker="New tool"
+        title={"Fashion\nTry-on"}
+        sub="Upload · wear · save"
+        ctaLabel="Open"
+        accent="var(--pd-pink)"
+        href="/fashion"
+        height={220}
+      />
+      <FeatureBanner
+        tone="teal"
+        kicker="Photoshoots"
+        title={"Editorial Noir\n24 frames."}
+        sub="$4.99 · 30 cr"
+        ctaLabel="Run pack"
+        accent="var(--pd-teal)"
+        href="/shoots"
+        height={220}
+      />
+    </section>
+
+    <section>
+      <RailHead title="Beauty Studio" sub="Try a look · 1 cr each" accent="var(--pd-mint)" seeAllHref="/beauty" />
+      <CardRail items={BEAUTY_LOOKS} height={220} width={170} />
+    </section>
   </div>
 </AppShell>

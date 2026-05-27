@@ -1,0 +1,9 @@
+---
+import AppShell from "../../layouts/AppShell.astro";
+import LegalLayout from "../../components/legal/LegalLayout.astro";
+import { ACCEPTABLE_USE } from "../../lib/legal";
+---
+
+<AppShell title="Acceptable Use Policy — PixieDust">
+  <LegalLayout doc={ACCEPTABLE_USE} />
+</AppShell>

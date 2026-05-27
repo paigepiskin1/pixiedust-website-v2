@@ -1,0 +1,33 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import RailHead from "../components/ui/RailHead.astro";
+import FeatureBanner from "../components/home/FeatureBanner.astro";
+import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
+import { MOTION } from "../lib/catalog";
+import { workspaceHref } from "../lib/workspace";
+---
+
+<AppShell title="Motion Transfer — PixieDust">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <PageHeader
+      kicker="Upload + swap · Kling Pro"
+      title="Motion Transfer"
+      sub="Pick a motion template — or upload any video — and swap yourself in. Body-aware, frame-perfect."
+    />
+    <div class="mb-7">
+      <FeatureBanner
+        tone="ice"
+        kicker="UGC Studio"
+        title={"Upload your own video.\nWe'll do the rest."}
+        sub="MP4 · MOV · up to 30s"
+        ctaLabel="Upload"
+        accent="var(--pd-teal)"
+        href={workspaceHref("motion-upload", "upload")}
+        height={220}
+      />
+    </div>
+    <RailHead title="Trending motions" sub="Pick a template" accent="var(--pd-lilac)" />
+    <FilterableCatalog items={MOTION} aspect="9 / 14" />
+  </div>
+</AppShell>

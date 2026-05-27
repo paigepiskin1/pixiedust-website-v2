@@ -1,0 +1,17 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
+import { AD } from "../lib/catalog";
+---
+
+<AppShell title="Ad Studio — PixieDust">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <PageHeader
+      kicker="Brand-ready · multi-format export"
+      title="Ad Studio"
+      sub="Campaign-ready creative in minutes. Product shots, UGC, lifestyle, video. Export 1:1, 9:16, 16:9, 4:5."
+    />
+    <FilterableCatalog items={AD} aspect="1 / 1.2" />
+  </div>
+</AppShell>

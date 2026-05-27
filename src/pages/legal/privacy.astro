@@ -1,0 +1,9 @@
+---
+import AppShell from "../../layouts/AppShell.astro";
+import LegalLayout from "../../components/legal/LegalLayout.astro";
+import { PRIVACY } from "../../lib/legal";
+---
+
+<AppShell title="Privacy Policy — PixieDust">
+  <LegalLayout doc={PRIVACY} />
+</AppShell>

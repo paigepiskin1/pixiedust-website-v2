@@ -1,0 +1,112 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import Dot from "../components/ui/Dot.astro";
+import Media from "../components/ui/Media.astro";
+
+const tones = ["lilac", "pink", "dusk", "mint"] as const;
+const suggestions = [
+  { name: "Home", href: "/", glyph: "⌂" },
+  { name: "Trending", href: "/trending", glyph: "↗" },
+  { name: "My creations", href: "/gallery", glyph: "◫" },
+  { name: "Buy credits", href: "/credits", glyph: "✦" },
+];
+---
+
+<AppShell title="Lost in the dust — PixieDust">
+  <div
+    class="mx-auto grid w-full grid-cols-1 items-center gap-9 lg:grid-cols-[1.1fr_1fr]"
+    style="max-width:1480px;padding:28px;min-height:calc(100vh - 140px);"
+  >
+    <div class="relative z-10">
+      <div class="mb-4 flex items-center gap-[7px]">
+        <Dot color="var(--pd-pink)" size={5} />
+        <span class="font-mono uppercase" style="font-size:10.5px;color:var(--pd-ink3);letter-spacing:1.2px;">
+          Error · 404 · page not found
+        </span>
+      </div>
+      <h1 class="font-display font-medium text-ink" style="font-size:92px;letter-spacing:-2.6px;line-height:0.95;">
+        Lost in<br />the dust.
+      </h1>
+      <p class="mt-5 text-ink-2" style="font-size:15px;letter-spacing:-0.1px;line-height:1.55;max-width:480px;">
+        The link you followed doesn't lead anywhere we recognize — maybe it expired, maybe it was never
+        real. Either way, the studio is right behind you.
+      </p>
+
+      <div class="mt-7 flex flex-wrap gap-2.5">
+        <a
+          href="/"
+          class="inline-flex items-center gap-2 rounded-xl font-bold"
+          style="padding:13px 22px;background:var(--pd-lilac);color:#0A0A0B;font-size:13.5px;letter-spacing:-0.1px;"
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6 L6.5 2 L11 6"></path><path d="M3.5 5.5 V11 H9.5 V5.5"></path></svg>
+          Take me home
+        </a>
+        <a
+          href="/search"
+          class="inline-flex items-center gap-2 rounded-xl font-semibold text-ink"
+          style="padding:13px 22px;background:transparent;border:0.5px solid var(--pd-hairline2);font-size:13.5px;letter-spacing:-0.1px;"
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="3.5"></circle><path d="M8 8 L11 11"></path></svg>
+          Search instead
+        </a>
+      </div>
+
+      <div class="mt-9 pt-[22px]" style="border-top:0.5px solid var(--pd-hairline);">
+        <div class="mb-3 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">
+          Maybe one of these
+        </div>
+        <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {
+            suggestions.map((s) => (
+              <a
+                href={s.href}
+                class="flex items-center gap-2.5 rounded-xl"
+                style="padding:14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+              >
+                <span
+                  class="flex size-7 items-center justify-center rounded-lg font-display"
+                  style="background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:14px;color:var(--pd-lilac);"
+                >
+                  {s.glyph}
+                </span>
+                <span class="font-semibold text-ink" style="font-size:12.5px;letter-spacing:-0.05px;">{s.name}</span>
+              </a>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="pd-404-panel"
+      class="relative hidden overflow-hidden rounded-[24px] lg:block"
+      style="height:min(540px,70vh);background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+    >
+      {
+        tones.map((tt, idx) => (
+          <div class="pd-404-tone absolute inset-0 transition-opacity duration-[1100ms]" data-idx={idx} style={`opacity:${idx === 0 ? 1 : 0};`}>
+            <Media tone={tt} angle={130} />
+            <div class="absolute inset-0" style="background:linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%);" />
+          </div>
+        ))
+      }
+      <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div class="font-display font-medium" style="font-size:260px;color:rgba(255,255,255,0.15);letter-spacing:-10px;line-height:1;text-shadow:0 20px 60px rgba(0,0,0,0.4);">
+          404
+        </div>
+      </div>
+    </div>
+  </div>
+</AppShell>
+
+<script is:inline>
+  (function () {
+    const tones = Array.prototype.slice.call(document.querySelectorAll("#pd-404-panel .pd-404-tone"));
+    if (!tones.length) return;
+    let i = 0;
+    setInterval(() => {
+      i = (i + 1) % tones.length;
+      tones.forEach((t, idx) => (t.style.opacity = idx === i ? "1" : "0"));
+    }, 2400);
+  })();
+</script>

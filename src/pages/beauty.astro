@@ -1,0 +1,17 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
+import { BEAUTY, BEAUTY_CATS } from "../lib/catalog";
+---
+
+<AppShell title="Beauty Studio — PixieDust">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <PageHeader
+      kicker="Hair · makeup · skin · 1 cr"
+      title="Beauty Studio"
+      sub="Try a look in seconds. Mix and match — every output stays in your gallery."
+    />
+    <FilterableCatalog items={BEAUTY} categories={BEAUTY_CATS} aspect="9 / 12" />
+  </div>
+</AppShell>

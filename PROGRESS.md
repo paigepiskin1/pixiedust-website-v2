@@ -56,7 +56,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | 0 | Discovery + plan | ✅ Done |
 | 1 | Scaffold (Astro/Tailwind/CF, bindings stub, archive demo) | ✅ Done |
 | 2 | Design system + app shell | ✅ Done |
-| 3 | Public/static pages | ⬜ |
+| 3 | Public/static pages | ✅ Done |
 | 4 | Auth (Firebase: Google/email+password/Apple) | ⬜ |
 | 5 | Data model + template system (D1) | ⬜ |
 | 6 | Generation pipeline (Worker → SyncNode → Bunny) | ⬜ |
@@ -129,3 +129,12 @@ The full old-site functional inventory and the design audit were produced during
   `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
   `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
   localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.
+- **2026-05-26** — Phase 3 done. Public pages built + verified: Home (hero carousel, quick-launch,
+  rails, feature banners — `src/components/home/`), catalog pages (Presets/Shoots/Video/Motion/
+  Beauty/Trending/Fashion/Avatar/Ad/Gallery) via `FilterableCatalog` with client-side filtering
+  (`src/components/catalog/`), Search (`/search`, live filter + scopes + suggestions), Legal
+  (Terms/Privacy/Acceptable-use via `LegalLayout` with sticky TOC scroll-spy), and a styled 404.
+  Placeholder content lives in `src/lib/content.ts` + `src/lib/catalog.ts` + `src/lib/legal.ts`
+  (real data comes from D1 in Phase 5). Template card links resolve to a `/studio/[kind]/[id]`
+  workspace **stub** (`prerender=false`) until Phase 6. `PageHeader`/`RailHead` added to `ui/`.
+  NOTE: Gallery is a placeholder grid; the real user gallery + lightbox are Phase 7.

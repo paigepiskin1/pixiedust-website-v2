@@ -1,0 +1,36 @@
+---
+import Dot from "./Dot.astro";
+
+interface Props {
+  kicker?: string;
+  title: string;
+  sub?: string;
+}
+const { kicker, title, sub } = Astro.props;
+---
+
+<div class="mb-[22px] flex items-end justify-between gap-4">
+  <div>
+    {
+      kicker && (
+        <div class="mb-[7px] flex items-center gap-[7px]">
+          <Dot color="var(--pd-lilac)" size={5} />
+          <span class="font-mono uppercase" style="font-size:10.5px;color:var(--pd-ink3);letter-spacing:1.2px;">
+            {kicker}
+          </span>
+        </div>
+      )
+    }
+    <h1 class="font-display font-medium text-ink" style="font-size:38px;letter-spacing:-1px;line-height:1.05;">
+      {title}
+    </h1>
+    {
+      sub && (
+        <p class="mt-2 text-ink-3" style="font-size:14.5px;letter-spacing:-0.1px;max-width:540px;line-height:1.45;">
+          {sub}
+        </p>
+      )
+    }
+  </div>
+  <slot name="right" />
+</div>

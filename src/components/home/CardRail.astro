@@ -1,0 +1,15 @@
+---
+import ContentCard from "./ContentCard.astro";
+import type { RailCard } from "../../lib/content";
+
+interface Props {
+  items: RailCard[];
+  height?: number;
+  width?: number;
+}
+const { items, height = 260, width = 200 } = Astro.props;
+---
+
+<div class="pd-rail flex gap-3 overflow-x-auto pb-1" style="scroll-snap-type:x mandatory;">
+  {items.map((it) => <ContentCard item={it} height={height} width={width} />)}
+</div>

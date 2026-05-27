@@ -81,6 +81,25 @@
   background: var(--pd-bg2);
 }
 
+/* Hover-lift cards (content cards, quick tiles, banners). */
+.pd-lift {
+  transition: transform 180ms, border-color 180ms, box-shadow 180ms;
+}
+.pd-lift:hover {
+  transform: translateY(-2px);
+}
+.pd-card:hover {
+  box-shadow: var(--pd-shadow);
+}
+
+/* Horizontal rail: hide scrollbar but keep scrollable. */
+.pd-rail {
+  scrollbar-width: none;
+}
+.pd-rail::-webkit-scrollbar {
+  display: none;
+}
+
 :root[data-theme="light"] {
   --pd-bg: #f5f3ef;
   --pd-bg2: #fbfaf7;

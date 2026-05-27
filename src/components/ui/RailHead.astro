@@ -1,0 +1,34 @@
+---
+import Dot from "./Dot.astro";
+
+interface Props {
+  title: string;
+  sub?: string;
+  accent?: string;
+  seeAllHref?: string;
+}
+const { title, sub, accent = "var(--pd-lilac)", seeAllHref } = Astro.props;
+---
+
+<div class="mb-3.5 flex items-end justify-between gap-4">
+  <div>
+    {
+      sub && (
+        <div class="mb-[5px] flex items-center gap-[7px]">
+          <Dot color={accent} size={5} />
+          <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.9px;">
+            {sub}
+          </span>
+        </div>
+      )
+    }
+    <h2 class="font-display font-semibold text-ink" style="font-size:22px;letter-spacing:-0.5px;">{title}</h2>
+  </div>
+  {
+    seeAllHref && (
+      <a href={seeAllHref} class="shrink-0 font-medium text-ink-3" style="font-size:12.5px;letter-spacing:-0.1px;padding:4px;">
+        See all →
+      </a>
+    )
+  }
+</div>

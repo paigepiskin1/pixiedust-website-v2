@@ -1,0 +1,61 @@
+---
+import Media from "../ui/Media.astro";
+import Pill from "../ui/Pill.astro";
+import CreditChip from "../ui/CreditChip.astro";
+import type { RailCard } from "../../lib/content";
+
+interface Props {
+  item: RailCard;
+  height?: number;
+  width?: number;
+}
+const { item, height = 260, width = 200 } = Astro.props;
+---
+
+<a
+  href={item.href ?? "#"}
+  class="pd-card pd-lift group relative block shrink-0 overflow-hidden rounded-[18px]"
+  style={`width:${width}px;height:${height}px;background:var(--pd-bg2);scroll-snap-align:start;`}
+>
+  <Media tone={item.tone ?? "teal"} />
+  <div class="absolute inset-0" style="background:linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.85) 100%);"></div>
+
+  {
+    item.type && (
+      <div class="absolute left-3 top-3">
+        <Pill color={item.accent ?? "var(--pd-lilac)"} label={item.type} />
+      </div>
+    )
+  }
+  {
+    item.meta && (
+      <div
+        class="absolute right-3 top-3 font-mono"
+        style="padding:3px 9px;border-radius:999px;background:rgba(10,10,11,0.6);backdrop-filter:blur(10px);font-size:10px;color:#fff;letter-spacing:0.5px;"
+      >
+        {item.meta}
+      </div>
+    )
+  }
+
+  <div
+    class="absolute left-1/2 top-1/2 flex size-[52px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
+    style="background:rgba(255,255,255,0.94);backdrop-filter:blur(10px);"
+  >
+    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 1 L14 8 L3 15 Z" fill="#0A0A0B"></path></svg>
+  </div>
+
+  <div class="absolute inset-x-3.5 bottom-3">
+    <div class="font-semibold text-white" style="font-size:14.5px;letter-spacing:-0.2px;">{item.name}</div>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      {
+        item.sub && (
+          <span class="font-mono" style="font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:0.4px;">
+            {item.sub}
+          </span>
+        )
+      }
+      {item.cr != null && <CreditChip cr={item.cr} />}
+    </div>
+  </div>
+</a>

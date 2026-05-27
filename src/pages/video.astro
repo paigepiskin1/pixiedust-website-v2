@@ -1,0 +1,17 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
+import { VIDEO, VIDEO_CATS } from "../lib/catalog";
+---
+
+<AppShell title="Video — PixieDust">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <PageHeader
+      kicker="Kling 3.0 · Seedance 2.0 · Veo"
+      title="Video"
+      sub="Cinematic scenes, photo-to-life, fashion runway, video-game openings — drop yourself into the frame."
+    />
+    <FilterableCatalog items={VIDEO} categories={VIDEO_CATS} aspect="9 / 14" />
+  </div>
+</AppShell>

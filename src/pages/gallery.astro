@@ -1,0 +1,50 @@
+---
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
+import type { CatalogItem } from "../lib/catalog";
+import type { Tone } from "../lib/content";
+import { workspaceHref } from "../lib/workspace";
+
+// Placeholder "creations" — real user gallery + lightbox land in Phase 7.
+const raw: { name: string; sub: string; tag: string; meta: string; tone: Tone; accent: string }[] = [
+  { name: "Editorial Noir · 12", sub: "24 frames · 2d ago", tag: "Photoshoot", meta: "24", tone: "noir", accent: "var(--pd-teal)" },
+  { name: "Snakes wrap · v3", sub: "0:08 · today", tag: "Motion", meta: "0:08", tone: "lilac", accent: "var(--pd-lilac)" },
+  { name: "Glazed glow", sub: "1 frame · 5h ago", tag: "Beauty", meta: "1", tone: "pink", accent: "var(--pd-mint)" },
+  { name: "Café main char", sub: "0:10 · 3d ago", tag: "Cinematic", meta: "0:10", tone: "amber", accent: "var(--pd-mint)" },
+  { name: "Wes Anderson · 4", sub: "4 frames · 1w ago", tag: "Preset", meta: "4", tone: "pink", accent: "var(--pd-amber)" },
+  { name: "Cyber goddess", sub: "24 frames · 1w ago", tag: "Photoshoot", meta: "24", tone: "lilac", accent: "var(--pd-teal)" },
+  { name: "Anime self", sub: "8 frames · 1w ago", tag: "Avatar", meta: "8", tone: "lilac", accent: "var(--pd-lilac)" },
+  { name: "Y2K runway · v2", sub: "0:10 · 2w ago", tag: "Motion", meta: "0:10", tone: "pink", accent: "var(--pd-lilac)" },
+  { name: "Polaroid 600", sub: "1 frame · 2w ago", tag: "Preset", meta: "1", tone: "amber", accent: "var(--pd-amber)" },
+  { name: "Noir chase", sub: "0:12 · 3w ago", tag: "Cinematic", meta: "0:12", tone: "dusk", accent: "var(--pd-mint)" },
+  { name: "LinkedIn pack", sub: "12 frames · 3w ago", tag: "Photoshoot", meta: "12", tone: "ice", accent: "var(--pd-teal)" },
+  { name: "Cinestill 800T", sub: "1 frame · 1mo ago", tag: "Preset", meta: "1", tone: "pink", accent: "var(--pd-amber)" },
+];
+
+const items: CatalogItem[] = raw.map((r) => ({
+  ...r,
+  c: /^\d+:\d+/.test(r.meta) ? "Video" : "Images",
+  href: workspaceHref("remix", r.name),
+}));
+const tabs = ["All", "Images", "Video", "Drafts"];
+---
+
+<AppShell title="My creations — PixieDust">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <PageHeader
+      kicker={`${items.length} creations · 14 GB`}
+      title="My creations"
+      sub="Everything you've made. Click any to pop it out — download, share, or delete."
+    >
+      <a
+        slot="right"
+        href="/"
+        class="shrink-0 rounded-xl font-bold"
+        style="padding:10px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;letter-spacing:-0.1px;"
+        >+ New project</a
+      >
+    </PageHeader>
+    <FilterableCatalog items={items} categories={tabs} aspect="1 / 1.25" />
+  </div>
+</AppShell>
