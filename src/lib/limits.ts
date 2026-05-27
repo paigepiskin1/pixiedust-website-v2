@@ -36,8 +36,10 @@ export async function checkRateLimit(kv: KVNamespace, userId: number, limit: num
 }
 
 export async function countActiveGenerations(db: D1Database, userId: number): Promise<number> {
+  // Only count recent in-flight jobs so a stuck/never-polled generation can't
+  // lock a user out of the concurrency slot forever.
   const row = await db
-    .prepare("SELECT COUNT(*) AS n FROM generations WHERE user_id = ? AND status IN ('pending','processing')")
+    .prepare("SELECT COUNT(*) AS n FROM generations WHERE user_id = ? AND status IN ('pending','processing') AND created_at > datetime('now','-15 minutes')")
     .bind(userId)
     .first<{ n: number }>();
   return row?.n ?? 0;

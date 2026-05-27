@@ -108,6 +108,24 @@ The full old-site functional inventory and the design audit were produced during
 
 ---
 
+## File uploads + motion-control + examples (2026-05-27)
+
+- **File upload**: `src/lib/bunny.ts` (PUT to Bunny storage → public pull-zone URL) + `POST /api/upload`
+  (auth, multipart, type/size guard). Workspace file fields upload on change, store the URL, include it
+  in generate inputs (replaces the old skip-file behavior); generate is blocked while uploading.
+  VERIFIED a round-trip upload to `pixiecdn.b-cdn.net/uploads/<uid>/…`.
+- **Kling motion-control template** added (`motion-kling-control`, kind=motion, type=video, visible +
+  featured) from the imported `kwaivgi/kling-v3-motion-control` schema: subject image + motion video
+  (file) + optional prompt. Runs via the new upload support.
+- **Examples filled**: generated real outputs and set previews for `preset-kodak-portra`,
+  `beauty-glazed-glow`, `shoot-editorial-noir` — the **preview_image/preview_video is what renders on
+  the homepage rails + tool sections + workspace card**. Confirmed Kodak Portra's portrait shows on the
+  home Trending rail. (Motion-control has no example yet — needs a real subject+motion upload; an admin
+  can run it in-studio and "Use as example".)
+- **Stuck-generation guard**: `countActiveGenerations` now only counts jobs from the last 15 min, so a
+  never-polled generation can't permanently consume a concurrency slot. (Note: a background sweep to
+  refund/fail truly-abandoned jobs is still worth adding for prod.)
+
 ## Template examples + per-second pricing (2026-05-27)
 
 - **Set example from results**: editor "Examples" panel lists this template's completed test results;

@@ -246,10 +246,49 @@ const config = {
       });
     });
 
+    const fileUrls: Record<string, string> = {};
+    let uploading = 0;
+
+    // Upload file fields to Bunny on selection; store the public URL.
+    root.querySelectorAll<HTMLInputElement>('input[type="file"][data-field]').forEach((el) => {
+      const key = el.dataset.field!;
+      const note = document.createElement("div");
+      note.style.cssText = "margin-top:5px;font-size:11px;color:var(--pd-ink3);";
+      el.insertAdjacentElement("afterend", note);
+      el.addEventListener("change", async () => {
+        const f = el.files && el.files[0];
+        if (!f) return;
+        uploading++;
+        note.textContent = "Uploading…";
+        const fd = new FormData();
+        fd.append("file", f);
+        try {
+          const r = await fetch("/api/upload", { method: "POST", body: fd });
+          const d = await r.json();
+          if (r.ok) {
+            fileUrls[key] = d.url;
+            note.textContent = "✓ uploaded";
+            note.style.color = "var(--pd-mint)";
+          } else {
+            note.textContent = d.error || "Upload failed";
+            note.style.color = "var(--pd-pink)";
+          }
+        } catch {
+          note.textContent = "Upload failed";
+          note.style.color = "var(--pd-pink)";
+        } finally {
+          uploading--;
+        }
+      });
+    });
+
     function collectInputs(): Record<string, unknown> {
       const out: Record<string, unknown> = {};
       root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[data-field]").forEach((el) => {
-        if ((el as HTMLInputElement).type === "file") return; // upload not wired this phase
+        if ((el as HTMLInputElement).type === "file") {
+          if (fileUrls[el.dataset.field!]) out[el.dataset.field!] = fileUrls[el.dataset.field!];
+          return;
+        }
         out[el.dataset.field!] = el.value;
       });
       return out;
@@ -325,6 +364,10 @@ const config = {
     async function generate() {
       if (!cfg.signedIn) {
         window.location.href = "/auth/sign-in?redirect=" + encodeURIComponent(location.pathname);
+        return;
+      }
+      if (uploading > 0) {
+        showError("Hang on — a file is still uploading.");
         return;
       }
       const c = cost();
