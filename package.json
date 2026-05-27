@@ -9,8 +9,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "deploy": "npm run build && node scripts/dev.mjs wrangler pages deploy dist --project-name=pixiedust-sys --commit-dirty=true",
-    "db:migrate": "node scripts/dev.mjs wrangler d1 migrations apply pixiedust --remote",
-    "db:export-previews": "node scripts/dev.mjs node scripts/export-previews.mjs"
+    "db:migrate": "node scripts/dev.mjs wrangler d1 migrations apply pixiedust --remote"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.13",
