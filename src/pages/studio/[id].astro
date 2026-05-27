@@ -20,6 +20,17 @@ const baseCost = computeCost(template, { quantity: template.quantities?.[0] ?? 1
 const qualityKeys = template.quality ? Object.keys(template.quality) : [];
 const qualityLabels: Record<string, string> = { std: "Standard", pro: "Pro", cinema: "Cinema" };
 
+function formatAccept(accept: string | undefined): string {
+  if (!accept) return "";
+  return accept.split(",").map(s => {
+    s = s.trim();
+    if (s.startsWith("image/")) return s.slice(6).toUpperCase();
+    if (s.startsWith("video/")) return s.slice(6).toUpperCase();
+    if (s.startsWith(".")) return s.slice(1).toUpperCase();
+    return s;
+  }).slice(0, 5).join(", ");
+}
+
 const config = {
   id: template.id,
   type: template.type,
@@ -84,9 +95,10 @@ const config = {
                   <input data-field={f.key} type="number" min={f.min} max={f.max} step={f.step} value={f.default as number | undefined} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;" />
                 ) : f.type === "file" ? (
                   <div class="pd-file-wrap" data-fieldkey={f.key}>
-                    <label class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1.5 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s;">
+                    <label class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
-                      <span style="font-size:12px;color:var(--pd-ink3);">Click to upload</span>
+                      <span style="font-size:12px;color:var(--pd-ink3);">Click or drag to upload</span>
+                      {f.accept && <span style="font-size:10.5px;color:var(--pd-ink4);">{formatAccept(f.accept)} · 1 file max</span>}
                       <input data-field={f.key} type="file" accept={f.accept} class="absolute inset-0 cursor-pointer opacity-0" style="z-index:1;" />
                     </label>
                     <div class="pd-file-preview hidden overflow-hidden rounded-xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
@@ -250,6 +262,39 @@ const config = {
     let uploading = 0;
 
     // Upload file fields to Bunny on selection; store the public URL.
+    async function handleUpload(
+      file: File, key: string,
+      zone: HTMLElement | null, preview: HTMLElement | null,
+      previewImg: HTMLImageElement | null, status: HTMLElement | null
+    ) {
+      const localUrl = URL.createObjectURL(file);
+      if (previewImg) previewImg.src = localUrl;
+      zone?.classList.add("hidden");
+      preview?.classList.remove("hidden");
+      if (status) { status.textContent = "Uploading…"; status.style.color = "var(--pd-ink3)"; }
+      uploading++;
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const r = await fetch("/api/upload", { method: "POST", body: fd });
+        const d = await r.json();
+        if (r.ok) {
+          fileUrls[key] = d.url;
+          if (previewImg) previewImg.src = d.url;
+          URL.revokeObjectURL(localUrl);
+          if (status) { status.textContent = "✓ Uploaded"; status.style.color = "var(--pd-mint)"; }
+        } else {
+          if (status) { status.textContent = d.error || "Upload failed"; status.style.color = "var(--pd-pink)"; }
+          delete fileUrls[key];
+        }
+      } catch {
+        if (status) { status.textContent = "Upload failed"; status.style.color = "var(--pd-pink)"; }
+        delete fileUrls[key];
+      } finally {
+        uploading--;
+      }
+    }
+
     root.querySelectorAll<HTMLInputElement>('input[type="file"][data-field]').forEach((el) => {
       const key = el.dataset.field!;
       const wrap = el.closest(".pd-file-wrap") as HTMLElement | null;
@@ -261,36 +306,21 @@ const config = {
 
       el.addEventListener("change", async () => {
         const file = el.files?.[0];
-        if (!file) return;
+        if (file) await handleUpload(file, key, zone, preview, previewImg, status);
+      });
 
-        // Show immediate local preview
-        const localUrl = URL.createObjectURL(file);
-        if (previewImg) previewImg.src = localUrl;
-        zone?.classList.add("hidden");
-        preview?.classList.remove("hidden");
-        if (status) { status.textContent = "Uploading…"; status.style.color = "var(--pd-ink3)"; }
-
-        uploading++;
-        const fd = new FormData();
-        fd.append("file", file);
-        try {
-          const r = await fetch("/api/upload", { method: "POST", body: fd });
-          const d = await r.json();
-          if (r.ok) {
-            fileUrls[key] = d.url;
-            if (previewImg) previewImg.src = d.url;
-            URL.revokeObjectURL(localUrl);
-            if (status) { status.textContent = "✓ Uploaded"; status.style.color = "var(--pd-mint)"; }
-          } else {
-            if (status) { status.textContent = d.error || "Upload failed"; status.style.color = "var(--pd-pink)"; }
-            delete fileUrls[key];
-          }
-        } catch {
-          if (status) { status.textContent = "Upload failed"; status.style.color = "var(--pd-pink)"; }
-          delete fileUrls[key];
-        } finally {
-          uploading--;
-        }
+      // Drag-and-drop onto the zone label
+      let dragCount = 0;
+      zone?.addEventListener("dragenter", e => { e.preventDefault(); dragCount++; (zone as HTMLElement).style.borderColor = "var(--pd-lilac)"; (zone as HTMLElement).style.background = "color-mix(in srgb,var(--pd-lilac) 5%,var(--pd-bg))"; });
+      zone?.addEventListener("dragleave", () => { if (--dragCount === 0) { (zone as HTMLElement).style.borderColor = ""; (zone as HTMLElement).style.background = ""; } });
+      zone?.addEventListener("dragover", e => e.preventDefault());
+      zone?.addEventListener("drop", async e => {
+        e.preventDefault();
+        dragCount = 0;
+        (zone as HTMLElement).style.borderColor = "";
+        (zone as HTMLElement).style.background = "";
+        const file = (e as DragEvent).dataTransfer?.files?.[0];
+        if (file) await handleUpload(file, key, zone, preview, previewImg, status);
       });
 
       clearBtn?.addEventListener("click", () => {

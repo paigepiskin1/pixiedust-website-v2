@@ -102,6 +102,12 @@ const tabs = ["All", "Images", "Video"];
           </div>
         </div>
 
+        <!-- Search -->
+        <div class="mb-5 relative">
+          <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="var(--pd-ink4)" stroke-width="1.7" stroke-linecap="round"><circle cx="5.5" cy="5.5" r="3.5"/><path d="M9 9l2.5 2.5"/></svg>
+          <input id="pd-search" type="search" placeholder="Search by prompt or template…" autocomplete="off" class="w-full rounded-xl outline-none" style="padding:9px 12px 9px 32px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:12.5px;color:var(--pd-ink);" />
+        </div>
+
         <!-- Day groups -->
         {dayGroups.map(group => (
           <div class="pd-day-group mb-8" data-day={group.day}>
@@ -160,28 +166,44 @@ const tabs = ["All", "Images", "Video"];
         <button type="button" id="pd-lb-next" class="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full" style="background:rgba(10,10,11,0.55);border:0.5px solid rgba(255,255,255,0.14);color:#fff;cursor:pointer;" aria-label="Next">›</button>
       </div>
       <div class="flex min-h-0 flex-col overflow-y-auto">
-        <div class="flex items-center justify-between gap-3" style="padding:14px 18px;border-bottom:0.5px solid var(--pd-hairline);position:sticky;top:0;z-index:2;background:var(--pd-raised);">
+        <div class="flex items-center justify-between gap-3" style="padding:12px 16px;border-bottom:0.5px solid var(--pd-hairline);position:sticky;top:0;z-index:2;background:var(--pd-raised);">
           <div class="min-w-0">
             <div id="pd-lb-kind" class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-lilac);letter-spacing:0.8px;"></div>
-            <div id="pd-lb-title" class="truncate font-display font-medium text-ink" style="font-size:16px;letter-spacing:-0.3px;"></div>
-            <div id="pd-lb-meta" class="text-ink-3" style="font-size:11px;"></div>
+            <div id="pd-lb-title" class="truncate font-display font-medium text-ink" style="font-size:15px;letter-spacing:-0.3px;"></div>
+            <div id="pd-lb-meta" class="text-ink-3" style="font-size:10.5px;"></div>
           </div>
           <button type="button" id="pd-lb-close" class="flex size-7 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);cursor:pointer;font-size:13px;" aria-label="Close">✕</button>
         </div>
-        <div class="flex flex-col gap-1.5" style="padding:12px 18px 12px;">
-          <div class="grid grid-cols-2 gap-1.5">
-            <a id="pd-lb-download" href="#" download class="flex items-center justify-center rounded-xl font-bold" style="padding:8px;background:var(--pd-lilac);color:#0A0A0B;font-size:12.5px;">Download</a>
-            <button type="button" id="pd-lb-share" class="flex items-center justify-center rounded-xl font-semibold text-ink" style="padding:8px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);font-size:12.5px;cursor:pointer;">Copy link</button>
-          </div>
-          <div class="grid gap-1.5" id="pd-lb-secondary" style="grid-template-columns:1fr 1fr;">
-            <button type="button" id="pd-lb-copy-prompt" class="flex items-center justify-center gap-1 rounded-xl font-semibold text-ink-2" style="display:none;padding:7px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:11.5px;cursor:pointer;">
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3.5" y="3.5" width="6" height="6" rx="1.2"/><path d="M1.5 8.5V2h6.5" stroke-linecap="round"/></svg>
-              Copy prompt
-            </button>
-            <a id="pd-lb-remix" href="#" class="flex items-center justify-center rounded-xl font-semibold text-ink-2" style="padding:7px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:11.5px;">Remix</a>
-          </div>
-          <button type="button" id="pd-lb-delete" class="flex items-center justify-center rounded-xl font-semibold" style="padding:7px;background:transparent;border:0.5px solid color-mix(in srgb, var(--pd-pink) 40%, transparent);color:var(--pd-pink);font-size:12px;cursor:pointer;">Delete</button>
+        <!-- Icon action bar -->
+        <div class="flex items-center gap-1.5" style="padding:12px 16px;">
+          <a id="pd-lb-download" href="#" download title="Download" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-lilac);color:#0A0A0B;">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v7M4.5 7l2.5 2.5L9.5 7"/><path d="M2 12h10"/></svg>
+          </a>
+          <button type="button" id="pd-lb-share" title="Copy link" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);cursor:pointer;">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10" cy="2.5" r="1.5"/><circle cx="10" cy="10.5" r="1.5"/><circle cx="2.5" cy="6.5" r="1.5"/><path d="M4 6.5l4.5-3.5M4 6.5l4.5 3.5"/></svg>
+          </button>
+          <button type="button" id="pd-lb-copy-prompt" title="Copy prompt" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="display:none;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);cursor:pointer;">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3.5" y="3.5" width="6" height="6" rx="1.2"/><path d="M1.5 8.5V2h6.5"/></svg>
+          </button>
+          <a id="pd-lb-remix" href="#" title="Remix" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11l9-9M8 2h3v3M5 11H2V8"/></svg>
+          </a>
+          <div style="flex:1;"></div>
+          <button type="button" id="pd-lb-delete" title="Delete" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:transparent;border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);cursor:pointer;">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3h9M4 3V2h4v1M4.5 5v4.5M7.5 5v4.5M2.5 3l.5 7.5h6l.5-7.5"/></svg>
+          </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm dialog (replaces browser confirm()) -->
+  <div id="pd-confirm" class="fixed inset-0 z-[280] items-center justify-center p-4" style="display:none;background:rgba(5,5,8,0.65);backdrop-filter:blur(8px);">
+    <div class="w-full rounded-2xl" style="max-width:300px;padding:20px 22px;background:var(--pd-raised);border:0.5px solid var(--pd-hairline2);">
+      <p id="pd-confirm-msg" class="text-ink" style="font-size:13.5px;line-height:1.5;margin-bottom:16px;"></p>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="pd-confirm-yes" type="button" class="rounded-xl font-semibold" style="padding:9px;background:transparent;border:0.5px solid color-mix(in srgb,var(--pd-pink) 50%,transparent);color:var(--pd-pink);font-size:12.5px;cursor:pointer;">Delete</button>
+        <button id="pd-confirm-no" type="button" class="rounded-xl font-semibold" style="padding:9px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);font-size:12.5px;cursor:pointer;">Cancel</button>
       </div>
     </div>
   </div>
@@ -223,13 +245,35 @@ const tabs = ["All", "Images", "Video"];
     const deleted = new Set<string>();
     const selected = new Set<string>();
     let activeTab = "All";
+    let searchQuery = "";
     let visible: Item[] = all.slice();
     let cur = 0;
     let selectMode = false;
 
     function refreshVisible() {
-      visible = all.filter(it => !deleted.has(it.id) && (activeTab === "All" || (activeTab === "Video" ? it.type === "video" : it.type !== "video")));
+      const q = searchQuery.toLowerCase();
+      visible = all.filter(it => {
+        if (deleted.has(it.id)) return false;
+        if (activeTab !== "All" && (activeTab === "Video" ? it.type !== "video" : it.type === "video")) return false;
+        if (q) {
+          const hay = ((it.prompt ?? "") + " " + (it.template_title ?? "")).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
     }
+
+    // ── Confirm modal ─────────────────────────────────────────
+    const confirmEl = document.getElementById("pd-confirm")!;
+    const confirmMsgEl = document.getElementById("pd-confirm-msg")!;
+    const confirmYesEl = document.getElementById("pd-confirm-yes") as HTMLButtonElement;
+    const confirmNoEl = document.getElementById("pd-confirm-no") as HTMLButtonElement;
+    let _confirmRes: ((v: boolean) => void) | null = null;
+    function pdConfirm(msg: string): Promise<boolean> {
+      return new Promise(resolve => { confirmMsgEl.textContent = msg; confirmEl.style.display = "flex"; _confirmRes = resolve; });
+    }
+    [confirmYesEl, confirmNoEl].forEach((btn, i) => btn.addEventListener("click", () => { confirmEl.style.display = "none"; _confirmRes?.(i === 0); _confirmRes = null; }));
+    confirmEl.addEventListener("click", e => { if (e.target === confirmEl) { confirmEl.style.display = "none"; _confirmRes?.(false); _confirmRes = null; } });
 
     // ── Lightbox ──────────────────────────────────────────────
     function render() {
@@ -248,13 +292,10 @@ const tabs = ["All", "Images", "Video"];
       kindEl.textContent = it.kind + " · saved";
       titleEl.textContent = it.template_title || it.kind;
       metaEl.textContent = `${it.type === "video" ? "Video" : "Image"} · ${it.created}`;
-      dlLink.href = it.output_url;
+      dlLink.href = `/api/download?id=${it.id}`;
       remixLink.href = it.template_id ? `/studio/${it.template_id}` : "/";
       const hasPrompt = !!it.prompt;
       copyPromptBtn.style.display = hasPrompt ? "flex" : "none";
-      // collapse secondary row to 1 col when no prompt so Remix isn't orphaned
-      const secondary = document.getElementById("pd-lb-secondary");
-      if (secondary) secondary.style.gridTemplateColumns = hasPrompt ? "1fr 1fr" : "1fr";
     }
 
     function openLb(id: string) {
@@ -309,7 +350,7 @@ const tabs = ["All", "Images", "Video"];
     }
 
     document.getElementById("pd-lb-delete")!.addEventListener("click", async () => {
-      if (!confirm("Delete this creation? This can't be undone.")) return;
+      if (!await pdConfirm("Delete this creation? This can't be undone.")) return;
       const id = visible[cur]?.id;
       if (!id) return;
       const ok = await deleteItem(id);
@@ -323,9 +364,7 @@ const tabs = ["All", "Images", "Video"];
     document.querySelectorAll<HTMLElement>(".pd-qd-btn").forEach(btn => {
       btn.addEventListener("click", async e => {
         e.stopPropagation();
-        const id = btn.dataset.id!;
-        if (!confirm("Delete this creation?")) return;
-        await deleteItem(id);
+        await deleteItem(btn.dataset.id!);
       });
     });
 
@@ -393,7 +432,7 @@ const tabs = ["All", "Images", "Video"];
     bulkDeleteBtn.addEventListener("click", async () => {
       const ids = [...selected];
       if (!ids.length) return;
-      if (!confirm(`Delete ${ids.length} creation${ids.length === 1 ? "" : "s"}? This can't be undone.`)) return;
+      if (!await pdConfirm(`Delete ${ids.length} creation${ids.length === 1 ? "" : "s"}? This can't be undone.`)) return;
       bulkDeleteBtn.disabled = true;
       bulkDeleteBtn.textContent = "Deleting…";
       await Promise.all(ids.map(id =>
@@ -425,16 +464,33 @@ const tabs = ["All", "Images", "Video"];
         if (!it) continue;
         const ext = it.type === "video" ? "mp4" : "jpg";
         try {
-          const blob = await fetch(it.output_url).then(r => r.blob());
+          const blob = await fetch(`/api/download?id=${it.id}`).then(r => r.blob());
           const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `pixiedust-${++n}.${ext}` });
           a.click();
           URL.revokeObjectURL(a.href);
           await new Promise(r => setTimeout(r, 250));
-        } catch { window.open(it.output_url, "_blank"); }
+        } catch { window.open(`/api/download?id=${it.id}`, "_blank"); }
       }
       bulkDownloadBtn.disabled = false;
       bulkDownloadBtn.textContent = "Download";
       (window as any).pdToast?.(`Downloaded ${ids.length} file${ids.length === 1 ? "" : "s"}`, { accent: "var(--pd-mint)" });
+    });
+
+    // ── Search ────────────────────────────────────────────────
+    document.getElementById("pd-search")?.addEventListener("input", e => {
+      searchQuery = (e.target as HTMLInputElement).value.trim();
+      const q = searchQuery.toLowerCase();
+      document.querySelectorAll<HTMLElement>(".pd-gcard").forEach(card => {
+        const it = all.find(x => x.id === card.dataset.id);
+        const tabMatch = activeTab === "All" || (activeTab === "Video" ? card.dataset.type === "video" : card.dataset.type !== "video");
+        const searchMatch = !q || ((it?.prompt ?? "") + " " + (it?.template_title ?? "")).toLowerCase().includes(q);
+        card.style.display = tabMatch && searchMatch ? "" : "none";
+      });
+      document.querySelectorAll<HTMLElement>(".pd-day-group").forEach(g => {
+        g.style.display = Array.from(g.querySelectorAll<HTMLElement>(".pd-gcard")).some(c => c.style.display !== "none") ? "" : "none";
+      });
+      refreshVisible();
+      cur = 0;
     });
 
     } // end if all.length

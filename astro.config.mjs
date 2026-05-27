@@ -9,7 +9,7 @@ import react from '@astrojs/react';
 export default defineConfig({
   output: 'static',
   adapter: cloudflare({
-    platformProxy: { enabled: true, remote: true },
+    platformProxy: /** @type {any} */ ({ enabled: true, remote: true }),
   }),
   integrations: [react()],
   vite: {
