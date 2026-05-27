@@ -291,6 +291,18 @@ const config = {
       errEl.classList.remove("hidden");
     }
 
+    // Humanize provider errors and make clear the user wasn't charged. Most
+    // failures (e.g. the model's safety filter) aren't the user's fault.
+    function friendlyError(raw: unknown): string {
+      const e = String(raw ?? "").replace(/\s*\(refunded\)\s*$/i, "");
+      if (/e005|flagged as sensitive|safety|moderation|content policy|nsfw|sensitive/i.test(e))
+        return "The model's safety filter blocked this — it often triggers on real faces or sensitive content. You weren't charged; try a different photo or prompt.";
+      if (/rate limit|slow down/i.test(e)) return "Too many requests right now. You weren't charged — try again in a minute.";
+      if (/timeout|timed out/i.test(e)) return "This took too long and timed out. You weren't charged — try again.";
+      if (/not enough credits/i.test(e)) return "Not enough credits.";
+      return (e || "Generation failed") + " — you weren't charged.";
+    }
+
     // Each Generate click spawns an independent job tile that polls on its own,
     // so users can queue many generations in parallel (async). The button is
     // never disabled.
@@ -372,7 +384,7 @@ const config = {
         if (data.status === "failed") {
           credits += cost(); // refunded
           refreshButton();
-          tileFail(tile, data.error ? `Failed: ${data.error} (refunded)` : "Failed — credits refunded.");
+          tileFail(tile, friendlyError(data.error));
           return;
         }
       }
@@ -405,7 +417,7 @@ const config = {
             tileFail(tile, "Not enough credits.");
             setTimeout(() => (window.location.href = "/credits"), 900);
           } else {
-            tileFail(tile, data.error || "Could not start generation.");
+            tileFail(tile, friendlyError(data.error || "Could not start generation."));
           }
           return;
         }
