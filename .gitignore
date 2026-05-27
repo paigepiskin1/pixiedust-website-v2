@@ -5,9 +5,6 @@ CLAUDE.local.md
 .dev.vars
 sandbox/.env
 
-# Migration exports (generated from the legacy DB; reproducible via scripts/)
-seed/migrate-users.sql
-
 # Dependencies
 node_modules/
 

@@ -10,10 +10,7 @@
     "check": "astro check",
     "deploy": "npm run build && node scripts/dev.mjs wrangler pages deploy dist --project-name=pixiedust-sys --commit-dirty=true",
     "db:migrate": "node scripts/dev.mjs wrangler d1 migrations apply pixiedust --remote",
-    "db:export-previews": "node scripts/dev.mjs node scripts/export-previews.mjs",
-    "db:migrate:local": "wrangler d1 migrations apply pixiedust --local",
-    "db:seed:local": "wrangler d1 execute pixiedust --local --file=seed/seed.sql && wrangler d1 execute pixiedust --local --file=seed/migrate-templates.sql && wrangler d1 execute pixiedust --local --file=seed/seed-previews.sql && wrangler d1 execute pixiedust --local --command=\"INSERT OR IGNORE INTO users (uid,email,name,balance,is_admin,is_adult) VALUES ('2P84xTEyuXQoPUIknbZkDS40JdB2','claude.tester@pixiedust.dev','Claude Tester',1000,0,1),('7RkzBfyW7pW0cGhTV8exuhCXI6I3','claude.admin@pixiedust.dev','Claude Admin',1000,1,1);\"",
-    "db:reset:local": "npm run db:migrate:local && npm run db:seed:local"
+    "db:export-previews": "node scripts/dev.mjs node scripts/export-previews.mjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.13",
