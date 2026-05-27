@@ -3,11 +3,19 @@ import { NAV_SECTIONS, isActive } from "../../lib/nav";
 import Logo from "./Logo.astro";
 import NavItem from "./NavItem.astro";
 import ThemeToggle from "./ThemeToggle.astro";
+import type { PublicUser } from "../../lib/users";
 
 interface Props {
   credits?: number;
+  user?: PublicUser | null;
 }
-const { credits = 47 } = Astro.props;
+const { credits = 47, user = null } = Astro.props;
+// Server-render the real account so navigation doesn't flash the logged-out
+// default before /api/auth/me hydrates (the script still runs for static pages).
+const acctName = user ? user.name || (user.email ? user.email.split("@")[0] : "You") : "Sign in";
+const acctSub = user ? (user.isAdmin ? "Admin" : "Member") : "Get 5 free credits";
+const acctAvatar = user ? (acctName[0] || "U").toUpperCase() : "✦";
+const acctHref = user ? "/account" : "/auth/sign-in";
 const pathname = Astro.url.pathname;
 const toggleBtn =
   "pd-collapse-toggle flex items-center justify-center rounded-lg transition-colors";
@@ -87,7 +95,7 @@ const toggleBtn =
     </div>
 
     <a
-      href="/auth/sign-in"
+      href={acctHref}
       class="pd-acct-link flex items-center gap-[9px] rounded-[10px]"
       style="padding:7px 8px;margin-top:2px;"
     >
@@ -95,11 +103,11 @@ const toggleBtn =
         class="pd-acct-avatar flex size-7 shrink-0 items-center justify-center rounded-full font-semibold text-white"
         style="background:linear-gradient(135deg, var(--pd-lilac), var(--pd-pink));font-size:12px;"
       >
-        ✦
+        {acctAvatar}
       </div>
       <div class="pd-hide-collapsed flex min-w-0 flex-col">
-        <span class="pd-acct-name font-semibold text-ink" style="font-size:12.5px;letter-spacing:-0.1px;">Sign in</span>
-        <span class="pd-acct-sub font-mono" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">Get 5 free credits</span>
+        <span class="pd-acct-name font-semibold text-ink" style="font-size:12.5px;letter-spacing:-0.1px;">{acctName}</span>
+        <span class="pd-acct-sub font-mono" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">{acctSub}</span>
       </div>
     </a>
   </div>

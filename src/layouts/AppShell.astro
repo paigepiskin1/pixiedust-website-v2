@@ -10,12 +10,16 @@ interface Props {
   description?: string;
   credits?: number;
 }
-const { title, description, credits = 47 } = Astro.props;
+const { title, description } = Astro.props;
+// Read the signed-in user server-side so the shell renders the real account on
+// first paint (no flash of the logged-out default on navigation).
+const user = Astro.locals.user ?? null;
+const credits = user?.credits ?? Astro.props.credits ?? 47;
 ---
 
 <Base title={title} description={description}>
   <div class="flex min-h-screen">
-    <Sidebar credits={credits} />
+    <Sidebar credits={credits} user={user} />
     <div class="flex min-w-0 flex-1 flex-col">
       <Topbar />
       <main class="flex-1">
@@ -23,7 +27,7 @@ const { title, description, credits = 47 } = Astro.props;
       </main>
     </div>
   </div>
-  <MobileDrawer credits={credits} />
+  <MobileDrawer credits={credits} user={user} />
   <Toast />
 
   <script is:inline>
