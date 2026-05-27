@@ -1,0 +1,75 @@
+---
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+import { listEmailLog, emailLogStats } from "../../../lib/mailgun";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const [rows, stats] = await Promise.all([listEmailLog(db, 150), emailLogStats(db)]);
+
+const badge = (status: string) => {
+  if (status === "sent") return { c: "var(--pd-mint)", t: "Sent" };
+  if (status === "error") return { c: "var(--pd-pink)", t: "Error" };
+  return { c: "var(--pd-amber)", t: "Queued" };
+};
+const fmt = (s: string) => (s ? s.replace("T", " ").slice(0, 16) : "");
+---
+
+<AdminShell title="Admin · Email" tab="email">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Email log</h1>
+      <p class="mt-1 text-ink-3" style="font-size:13.5px;">Every outbound email (welcome, feedback, transactional) and its delivery status.</p>
+    </div>
+    <div class="flex gap-2 font-mono" style="font-size:11px;">
+      <span style="padding:6px 11px;border-radius:999px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);">Total {stats.total}</span>
+      <span style="padding:6px 11px;border-radius:999px;background:color-mix(in srgb,var(--pd-mint) 12%,transparent);color:var(--pd-mint);">Sent {stats.sent}</span>
+      <span style="padding:6px 11px;border-radius:999px;background:color-mix(in srgb,var(--pd-pink) 12%,transparent);color:var(--pd-pink);">Error {stats.error}</span>
+      {stats.queued > 0 && <span style="padding:6px 11px;border-radius:999px;background:color-mix(in srgb,var(--pd-amber) 12%,transparent);color:var(--pd-amber);">Queued {stats.queued}</span>}
+    </div>
+  </div>
+
+  {
+    rows.length === 0 ? (
+      <div class="mt-6 rounded-2xl text-center text-ink-3" style="padding:48px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:13px;">
+        No emails sent yet. Submit the feedback form or trigger a send to see it logged here.
+      </div>
+    ) : (
+      <div class="mt-6 overflow-hidden rounded-2xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+        <table class="w-full" style="border-collapse:collapse;font-size:12.5px;">
+          <thead>
+            <tr class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.6px;text-align:left;">
+              <th style="padding:11px 14px;">When</th>
+              <th style="padding:11px 14px;">To</th>
+              <th style="padding:11px 14px;">Subject</th>
+              <th style="padding:11px 14px;">Type</th>
+              <th style="padding:11px 14px;">Status</th>
+              <th style="padding:11px 14px;">Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const b = badge(r.status);
+              return (
+                <tr style="border-top:0.5px solid var(--pd-hairline);">
+                  <td class="font-mono text-ink-3" style="padding:10px 14px;white-space:nowrap;font-size:11px;">{fmt(r.created_at)}</td>
+                  <td class="text-ink-2" style="padding:10px 14px;">{r.to_email}</td>
+                  <td class="text-ink" style="padding:10px 14px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{r.subject}</td>
+                  <td class="font-mono text-ink-3" style="padding:10px 14px;font-size:11px;">{r.template ?? "—"}</td>
+                  <td style="padding:10px 14px;">
+                    <span class="font-mono uppercase" style={`font-size:9.5px;letter-spacing:0.5px;padding:3px 9px;border-radius:999px;color:${b.c};background:color-mix(in srgb,${b.c} 13%,transparent);`}>{b.t}</span>
+                  </td>
+                  <td class="font-mono text-ink-3" style="padding:10px 14px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;" title={r.error ?? r.provider_id ?? ""}>
+                    {r.error ? r.error : r.provider_id ?? "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+</AdminShell>

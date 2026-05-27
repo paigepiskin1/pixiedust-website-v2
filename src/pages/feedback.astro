@@ -1,0 +1,117 @@
+---
+export const prerender = false;
+import AppShell from "../layouts/AppShell.astro";
+import Dot from "../components/ui/Dot.astro";
+
+const topics = ["General", "Bug report", "Feature request", "Billing", "Other"];
+const userEmail = Astro.locals.user?.email ?? "";
+const userName = Astro.locals.user?.name ?? "";
+---
+
+<AppShell title="Feedback — PixieDust">
+  <div class="mx-auto w-full" style="max-width:680px;padding:28px;">
+    <div class="mb-[7px] flex items-center gap-[7px]">
+      <Dot color="var(--pd-mint)" size={5} />
+      <span class="font-mono uppercase" style="font-size:10.5px;color:var(--pd-ink3);letter-spacing:1.2px;">Feedback · we read everything</span>
+    </div>
+    <h1 class="font-display font-medium text-ink" style="font-size:32px;letter-spacing:-0.8px;">Send us a note</h1>
+    <p class="mt-1.5 text-ink-3" style="font-size:14px;line-height:1.5;">
+      Found a bug, want a feature, or just have a thought? Tell us — it goes straight to the team.
+    </p>
+
+    <form id="pd-feedback" class="mt-7 flex flex-col gap-4">
+      <div class="flex flex-col gap-1.5">
+        <label class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Topic</label>
+        <select id="fb-topic" class="pd-field">
+          {topics.map((t) => <option value={t}>{t}</option>)}
+        </select>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="flex flex-col gap-1.5">
+          <label class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Name (optional)</label>
+          <input id="fb-name" type="text" value={userName} placeholder="Your name" class="pd-field" autocomplete="name" />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Email</label>
+          <input id="fb-email" type="email" value={userEmail} placeholder="you@email.com" class="pd-field" autocomplete="email" required />
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Message</label>
+        <textarea id="fb-message" rows="6" placeholder="What's on your mind?" class="pd-field" style="resize:vertical;min-height:120px;"></textarea>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button
+          type="submit"
+          id="fb-submit"
+          class="rounded-[10px] font-bold"
+          style="padding:11px 20px;background:var(--pd-ink);color:var(--pd-bg);font-size:13.5px;letter-spacing:-0.1px;cursor:pointer;border:none;"
+        >Send feedback</button>
+        <span id="fb-status" class="text-ink-3" style="font-size:12.5px;"></span>
+      </div>
+    </form>
+  </div>
+</AppShell>
+
+<style>
+  .pd-field {
+    background: var(--pd-bg2);
+    border: 0.5px solid var(--pd-hairline2);
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 13.5px;
+    color: var(--pd-ink);
+    outline: none;
+    width: 100%;
+  }
+  .pd-field:focus {
+    border-color: var(--pd-hairline3);
+    background: var(--pd-bg3);
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    const form = document.getElementById("pd-feedback");
+    if (!form) return;
+    const status = document.getElementById("fb-status");
+    const submit = document.getElementById("fb-submit");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = {
+        topic: document.getElementById("fb-topic").value,
+        name: document.getElementById("fb-name").value,
+        email: document.getElementById("fb-email").value,
+        message: document.getElementById("fb-message").value,
+      };
+      submit.disabled = true;
+      status.textContent = "Sending…";
+      status.style.color = "var(--pd-ink3)";
+      try {
+        const r = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+        if (r.ok && data.ok) {
+          status.textContent = "Thanks — your feedback is on its way.";
+          status.style.color = "var(--pd-mint)";
+          form.reset();
+          window.pdToast && window.pdToast("Feedback sent — thank you!", { accent: "var(--pd-mint)" });
+        } else {
+          status.textContent = data.error || "Something went wrong.";
+          status.style.color = "var(--pd-pink)";
+        }
+      } catch {
+        status.textContent = "Network error. Please try again.";
+        status.style.color = "var(--pd-pink)";
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  })();
+</script>

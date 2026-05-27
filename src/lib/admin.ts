@@ -6,6 +6,7 @@ export const ADMIN_NAV = [
   { k: "templates", name: "Templates", href: "/admin/templates" },
   { k: "users", name: "Users", href: "/admin/users" },
   { k: "content", name: "Content", href: "/admin/content" },
+  { k: "email", name: "Email", href: "/admin/email" },
 ];
 
 export function isAdmin(locals: App.Locals): boolean {

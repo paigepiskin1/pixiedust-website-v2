@@ -18,6 +18,10 @@ interface Env {
   REPLICATE_API_TOKEN: string;
   OPENROUTER_API_KEY: string;
   ADMIN_API_TOKEN: string;
+  MAILGUN_API_KEY: string;
+  MAILGUN_DOMAIN: string;
+  MAILGUN_FROM: string;
+  MAILGUN_FEEDBACK_TO: string;
 }
 
 declare namespace App {
