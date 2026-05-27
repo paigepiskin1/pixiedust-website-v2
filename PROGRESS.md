@@ -59,7 +59,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | 3 | Public/static pages | ✅ Done |
 | 4 | Auth (Firebase: Google/email+password/Apple) | ✅ Done |
 | 5 | Data model + template system (D1) | ✅ Done |
-| 6 | Generation pipeline (Worker → SyncNode → Bunny) | ⬜ |
+| 6 | Generation pipeline (Worker → SyncNode → Bunny) | ✅ Done |
 | 7 | User features (gallery, account, explore feed) | ⬜ |
 | 8 | Admin backend (templates, users, content, moderation) | ⬜ |
 | 9 | Monetization (Stripe subs + credit packs, ledger, audit) | ⬜ |
@@ -136,6 +136,17 @@ The full old-site functional inventory and the design audit were produced during
   `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
   `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
   localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.
+- **2026-05-27** — Phase 6 done. Generation pipeline VERIFIED end-to-end with a real flux-schnell
+  run (claude.tester): debit → SyncNode → poll → output rendered → output auto-hosted to Bunny
+  (`pixiecdn.b-cdn.net/gen_...`). `src/lib/syncnode.ts` (submit/poll, provider routing, status
+  normalize). `src/lib/limits.ts` (per-tier KV rate limit + concurrency). Endpoints
+  `POST /api/generate` (auth → resolve+validate → cost → concurrency+rate-limit → atomic debit →
+  create generation → dispatch → refund+fail on dispatch error) and `GET /api/generate/status`
+  (poll → record output_url / refund on failure, idempotent). `/studio/[id]` is now the real
+  3-column workspace (template card · inputs with aspect/quality/quantity controls · output canvas)
+  with client polling, optimistic credit display, and insufficient-credits → /credits funnel.
+  Accounting reconciles (balance = 1000 + Σ ledger deltas; one ledger row per generation).
+  `.dev.vars` holds SYNCNODE_API_KEY + BUNNY_* for local Worker env.
 - **2026-05-27** — Phase 5 done. Full D1 schema (`migrations/0002_schema.sql`): templates
   (provider/model/input_json + fields_json + steps_json for multi-step + cost/quality/aspects/
   quantities + workspace hints + preview), generations, credit_ledger, subscription_tiers,

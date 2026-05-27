@@ -1,6 +1,5 @@
 ---
-// Template detail / workspace. The full 3-column generation UI is built in
-// Phase 6; this loads the real template from D1 and previews its config.
+// The 3-column generation workspace, wired to /api/generate + SyncNode.
 export const prerender = false;
 import AppShell from "../../layouts/AppShell.astro";
 import Pill from "../../components/ui/Pill.astro";
@@ -11,63 +10,352 @@ import { getTemplate, allFields, computeCost } from "../../lib/templates";
 const { id } = Astro.params;
 const db = Astro.locals.runtime.env.DB;
 const template = id ? await getTemplate(db, id) : null;
-
-if (!template) {
-  return new Response(null, { status: 404, headers: { Location: "/" } });
-}
+if (!template) return new Response(null, { status: 302, headers: { Location: "/" } });
 
 const fields = allFields(template);
-const baseCost = computeCost(template, { quantity: 1 });
 const accent = template.accent ?? "var(--pd-lilac)";
+const credits = Astro.locals.user?.credits ?? 0;
+const signedIn = !!Astro.locals.user;
+const baseCost = computeCost(template, { quantity: template.quantities?.[0] ?? 1 });
+const qualityKeys = template.quality ? Object.keys(template.quality) : [];
+const qualityLabels: Record<string, string> = { std: "Standard", pro: "Pro", cinema: "Cinema" };
+
+const config = {
+  id: template.id,
+  type: template.type,
+  creditCost: template.creditCost,
+  quality: template.quality,
+  credits,
+  signedIn,
+};
 ---
 
-<AppShell title={`${template.title} — PixieDust`} credits={Astro.locals.user?.credits ?? 47}>
+<AppShell title={`${template.title} — PixieDust`} credits={credits}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
-    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <!-- preview -->
-      <div class="overflow-hidden rounded-[24px]" style="border:0.5px solid var(--pd-hairline);aspect-ratio:16/10;">
-        <Media tone={template.tone} angle={130} label={template.title} sub={template.engine ?? undefined} />
-      </div>
+    <div class="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_minmax(0,1fr)]">
+      <!-- LEFT: template card -->
+      <aside class="lg:sticky lg:top-[88px] lg:self-start">
+        <div class="overflow-hidden rounded-[20px]" style="border:0.5px solid var(--pd-hairline);aspect-ratio:4/3;">
+          <Media tone={template.tone} angle={130} label={template.title} sub={template.engine ?? undefined} />
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+          <Pill color={accent} label={template.kind} />
+          {template.type === "video" && <Pill color="var(--pd-pink)" label="Video" />}
+        </div>
+        <h1 class="mt-2 font-display font-medium text-ink" style="font-size:24px;letter-spacing:-0.5px;line-height:1.1;">{template.title}</h1>
+        {template.subtitle && <div class="mt-1 text-ink-3" style="font-size:12.5px;">{template.subtitle}</div>}
+        {template.description && <p class="mt-2 text-ink-2" style="font-size:13px;line-height:1.5;">{template.description}</p>}
+        <div class="mt-4 grid grid-cols-2 gap-2">
+          {[["Engine", template.engine], ["ETA", template.eta], ["Cost", `${template.creditCost} cr`], ["Type", template.type]].filter(([, v]) => v).map(([k, v]) => (
+            <div class="rounded-xl" style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+              <div class="font-mono uppercase" style="font-size:9px;color:var(--pd-ink4);letter-spacing:0.6px;">{k}</div>
+              <div class="mt-0.5 font-semibold text-ink" style="font-size:12.5px;">{v}</div>
+            </div>
+          ))}
+        </div>
+      </aside>
 
-      <!-- template card -->
-      <div class="flex flex-col gap-4">
-        <div>
-          <div class="mb-2 flex items-center gap-2">
-            <Pill color={accent} label={template.kind} />
-            {template.type === "video" && <Pill color="var(--pd-pink)" label="Video" />}
+      <!-- CENTER: inputs -->
+      <section class="lg:sticky lg:top-[88px] lg:self-start">
+        <div class="rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div class="mb-3 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Your inputs</div>
+
+          <div class="flex flex-col gap-4">
+            {fields.map((f) => (
+              <label class="block">
+                <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
+                {f.type === "textarea" ? (
+                  <textarea data-field={f.key} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
+                ) : f.type === "select" ? (
+                  <select data-field={f.key} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;">
+                    {(f.options ?? []).map((o) => <option value={o.value} selected={o.value === f.default}>{o.label}</option>)}
+                  </select>
+                ) : f.type === "number" ? (
+                  <input data-field={f.key} type="number" min={f.min} max={f.max} step={f.step} value={f.default as number | undefined} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;" />
+                ) : f.type === "file" ? (
+                  <input data-field={f.key} type="file" accept={f.accept} class="w-full rounded-xl text-ink-2 outline-none" style="padding:10px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:12.5px;" />
+                ) : (
+                  <input data-field={f.key} type={f.type === "url" ? "url" : f.type === "email" ? "email" : "text"} placeholder={f.placeholder} value={String(f.default ?? "")} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;" />
+                )}
+                {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
+              </label>
+            ))}
+
+            {template.aspects && template.aspects.length > 0 && (
+              <div>
+                <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Aspect ratio</span>
+                <div class="flex flex-wrap gap-1.5" data-controls="aspect">
+                  {template.aspects.map((a, i) => (
+                    <button type="button" class="pd-seg rounded-lg font-mono" data-val={a} data-active={i === 0 ? "true" : "false"} style="padding:7px 12px;font-size:11px;cursor:pointer;">{a}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {qualityKeys.length > 1 && (
+              <div>
+                <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Quality</span>
+                <div class="flex flex-wrap gap-1.5" data-controls="quality">
+                  {qualityKeys.map((q, i) => (
+                    <button type="button" class="pd-seg rounded-lg font-semibold" data-val={q} data-mult={template.quality![q]} data-active={i === 0 ? "true" : "false"} style="padding:7px 12px;font-size:11.5px;cursor:pointer;">{qualityLabels[q] ?? q}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {template.quantities && template.quantities.length > 1 && (
+              <div>
+                <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Outputs</span>
+                <div class="flex flex-wrap gap-1.5" data-controls="quantity">
+                  {template.quantities.map((n, i) => (
+                    <button type="button" class="pd-seg rounded-lg font-semibold" data-val={n} data-active={i === 0 ? "true" : "false"} style="padding:7px 14px;font-size:12px;cursor:pointer;">{n}</button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;line-height:1.05;">
-            {template.title}
-          </h1>
-          {template.description && <p class="mt-2 text-ink-3" style="font-size:13.5px;line-height:1.5;">{template.description}</p>}
-        </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <CreditChip cr={baseCost} size="md" />
-          {template.engine && <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.6px;">{template.engine}</span>}
-          {template.eta && <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.6px;">· {template.eta}</span>}
-        </div>
+          <div id="pd-gen-error" class="mt-3 hidden rounded-lg" style="padding:9px 12px;background:color-mix(in srgb, var(--pd-pink) 12%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-pink) 40%, transparent);color:var(--pd-pink);font-size:12.5px;"></div>
 
-        <div class="rounded-2xl" style="padding:16px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
-          <div class="mb-2 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">
-            Inputs {template.steps ? `· ${template.steps.length} steps` : ""}
+          <button id="pd-generate" type="button" class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl font-bold" style="padding:13px 16px;background:var(--pd-lilac);color:#0A0A0B;font-size:14px;letter-spacing:-0.1px;cursor:pointer;">
+            <span id="pd-gen-label">Generate · {baseCost} cr</span>
+          </button>
+          <div class="mt-2 text-center font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.5px;">
+            {template.engine ?? "SyncNode"} · {template.eta ?? "async"}
           </div>
-          <ul class="flex flex-col gap-2">
-            {
-              fields.map((f) => (
-                <li class="flex items-center justify-between gap-3">
-                  <span class="text-ink" style="font-size:13px;">{f.label}{f.required ? " *" : ""}</span>
-                  <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.5px;">{f.type}</span>
-                </li>
-              ))
-            }
-          </ul>
         </div>
+      </section>
 
-        <div class="rounded-xl" style="padding:12px 14px;background:color-mix(in srgb, var(--pd-lilac) 10%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-lilac) 30%, transparent);">
-          <span class="text-ink-2" style="font-size:12.5px;">The full generation workspace (live inputs + output canvas, wired to SyncNode) lands in Phase 6.</span>
+      <!-- RIGHT: output canvas -->
+      <section>
+        <div id="pd-output" class="relative flex items-center justify-center overflow-hidden rounded-[20px]" style="min-height:420px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div id="pd-out-empty" class="px-8 text-center">
+            <div class="mx-auto mb-3 flex size-12 items-center justify-center rounded-full" style="background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 3v3M10 14v3M3 10h3M14 10h3M5 5l2 2M13 13l2 2M15 5l-2 2M5 15l2-2" /></svg>
+            </div>
+            <div class="text-ink-3" style="font-size:13px;">Your result appears here.</div>
+          </div>
+
+          <div id="pd-out-running" class="absolute inset-0 hidden">
+            <div class="absolute inset-0" style="filter:blur(2px);opacity:0.5;"><Media tone={template.tone} /></div>
+            <div class="absolute inset-0 flex flex-col items-center justify-center gap-3" style="background:color-mix(in srgb, var(--pd-bg) 50%, transparent);">
+              <div class="size-9 rounded-full" style="border:3px solid var(--pd-hairline2);border-top-color:var(--pd-lilac);animation:pd-spin 0.8s linear infinite;"></div>
+              <div id="pd-out-stage" class="font-mono uppercase text-ink-2" style="font-size:10.5px;letter-spacing:0.8px;">Submitting…</div>
+              <div class="h-1 w-40 overflow-hidden rounded-full" style="background:var(--pd-hairline2);">
+                <div id="pd-out-bar" class="h-full rounded-full" style="width:8%;background:var(--pd-lilac);transition:width 600ms;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="pd-out-result" class="hidden h-full w-full"></div>
         </div>
-      </div>
+        <div id="pd-out-actions" class="mt-3 hidden gap-2">
+          <a id="pd-download" href="#" download class="rounded-xl font-semibold text-ink" style="padding:9px 16px;border:0.5px solid var(--pd-hairline2);font-size:12.5px;">Download</a>
+          <button type="button" id="pd-again" class="rounded-xl font-semibold text-ink" style="padding:9px 16px;border:0.5px solid var(--pd-hairline2);background:transparent;font-size:12.5px;cursor:pointer;">Generate again</button>
+        </div>
+      </section>
     </div>
   </div>
+
+  <script type="application/json" id="pd-config" is:inline set:html={JSON.stringify(config)}></script>
+
+  <style>
+    .pd-seg { background: var(--pd-bg); color: var(--pd-ink-2, var(--pd-ink2)); border: 0.5px solid var(--pd-hairline2); }
+    .pd-seg[data-active="true"] { background: var(--pd-ink); color: var(--pd-bg); border-color: transparent; }
+    @keyframes pd-spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <script>
+    const cfg = JSON.parse(document.getElementById("pd-config")!.textContent || "{}");
+    const root = document;
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+
+    let credits: number = Number(cfg.credits) || 0;
+
+    function controlValue(group: string): string | null {
+      const wrap = root.querySelector(`[data-controls="${group}"]`);
+      if (!wrap) return null;
+      const active = wrap.querySelector<HTMLElement>('.pd-seg[data-active="true"]');
+      return active?.dataset.val ?? null;
+    }
+    function qualityMult(): number {
+      const q = controlValue("quality");
+      if (q && cfg.quality && cfg.quality[q]) return Number(cfg.quality[q]);
+      return 1;
+    }
+    function quantity(): number {
+      return Number(controlValue("quantity")) || 1;
+    }
+    function cost(): number {
+      return Math.ceil(Number(cfg.creditCost) * quantity() * qualityMult());
+    }
+
+    const genBtn = $("#pd-generate") as HTMLButtonElement;
+    const genLabel = $("#pd-gen-label");
+    function refreshButton() {
+      const c = cost();
+      if (!cfg.signedIn) {
+        genLabel.textContent = "Sign in to generate";
+        return;
+      }
+      if (credits < c) {
+        genLabel.textContent = `Get more credits · need ${c} cr`;
+        genBtn.style.background = "transparent";
+        genBtn.style.color = "var(--pd-ink)";
+        genBtn.style.border = "0.5px solid var(--pd-hairline2)";
+      } else {
+        genLabel.textContent = `Generate · ${c} cr`;
+        genBtn.style.background = "var(--pd-lilac)";
+        genBtn.style.color = "#0A0A0B";
+        genBtn.style.border = "none";
+      }
+    }
+
+    // segmented controls
+    root.querySelectorAll<HTMLElement>("[data-controls]").forEach((wrap) => {
+      wrap.querySelectorAll<HTMLElement>(".pd-seg").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          wrap.querySelectorAll<HTMLElement>(".pd-seg").forEach((b) => b.setAttribute("data-active", String(b === btn)));
+          refreshButton();
+        });
+      });
+    });
+
+    function collectInputs(): Record<string, unknown> {
+      const out: Record<string, unknown> = {};
+      root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[data-field]").forEach((el) => {
+        if ((el as HTMLInputElement).type === "file") return; // upload not wired this phase
+        out[el.dataset.field!] = el.value;
+      });
+      return out;
+    }
+
+    const errEl = $("#pd-gen-error");
+    const empty = $("#pd-out-empty");
+    const running = $("#pd-out-running");
+    const result = $("#pd-out-result");
+    const actions = $("#pd-out-actions");
+    const stage = $("#pd-out-stage");
+    const bar = $("#pd-out-bar");
+
+    function showError(msg: string) {
+      errEl.textContent = msg;
+      errEl.classList.remove("hidden");
+    }
+
+    function setStage(text: string, pct: number) {
+      stage.textContent = text;
+      bar.style.width = pct + "%";
+    }
+
+    async function poll(id: string): Promise<void> {
+      const stages = ["Reading your inputs", "Running the model", "Refining", "Almost there"];
+      let tick = 0;
+      while (true) {
+        await new Promise((r) => setTimeout(r, 2000));
+        tick++;
+        setStage(stages[Math.min(tick, stages.length - 1)] + "…", Math.min(12 + tick * 14, 92));
+        const res = await fetch(`/api/generate/status?id=${id}`);
+        const data = await res.json();
+        if (data.status === "completed") return renderResult(data.outputs || []);
+        if (data.status === "failed") {
+          running.classList.add("hidden");
+          empty.classList.remove("hidden");
+          credits += cost(); // refunded
+          refreshButton();
+          showError(data.error ? `Generation failed: ${data.error} (credits refunded)` : "Generation failed — credits refunded.");
+          genBtn.disabled = false;
+          return;
+        }
+      }
+    }
+
+    function renderResult(outputs: string[]) {
+      running.classList.add("hidden");
+      empty.classList.add("hidden");
+      result.classList.remove("hidden");
+      const isVideo = cfg.type === "video";
+      result.innerHTML = "";
+      const grid = document.createElement("div");
+      grid.style.cssText = `display:grid;gap:8px;height:100%;padding:8px;grid-template-columns:repeat(${outputs.length > 1 ? 2 : 1}, 1fr);`;
+      outputs.forEach((url) => {
+        const el = isVideo ? document.createElement("video") : document.createElement("img");
+        el.src = url;
+        if (isVideo) {
+          (el as HTMLVideoElement).controls = true;
+          (el as HTMLVideoElement).playsInline = true;
+        }
+        el.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:12px;";
+        grid.appendChild(el);
+      });
+      result.appendChild(grid);
+      const dl = $("#pd-download") as HTMLAnchorElement;
+      if (outputs[0]) dl.href = outputs[0];
+      actions.classList.remove("hidden");
+      actions.style.display = "flex";
+      genBtn.disabled = false;
+    }
+
+    async function generate() {
+      if (!cfg.signedIn) {
+        window.location.href = "/auth/sign-in?redirect=" + encodeURIComponent(location.pathname);
+        return;
+      }
+      const c = cost();
+      if (credits < c) {
+        window.location.href = "/credits";
+        return;
+      }
+      errEl.classList.add("hidden");
+      genBtn.disabled = true;
+      empty.classList.add("hidden");
+      result.classList.add("hidden");
+      actions.classList.add("hidden");
+      running.classList.remove("hidden");
+      setStage("Submitting…", 8);
+
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            templateId: cfg.id,
+            inputs: collectInputs(),
+            quality: controlValue("quality") || undefined,
+            quantity: quantity(),
+            aspect: controlValue("aspect") || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          running.classList.add("hidden");
+          empty.classList.remove("hidden");
+          genBtn.disabled = false;
+          if (data.needCredits) {
+            showError("Not enough credits.");
+            setTimeout(() => (window.location.href = "/credits"), 800);
+          } else {
+            showError(data.error || "Could not start generation.");
+          }
+          return;
+        }
+        credits -= c; // optimistic debit
+        refreshButton();
+        await poll(data.id);
+      } catch (err) {
+        running.classList.add("hidden");
+        empty.classList.remove("hidden");
+        showError("Network error — try again.");
+        genBtn.disabled = false;
+      }
+    }
+
+    genBtn.addEventListener("click", generate);
+    $("#pd-again")?.addEventListener("click", () => {
+      result.classList.add("hidden");
+      actions.classList.add("hidden");
+      empty.classList.remove("hidden");
+    });
+    refreshButton();
+  </script>
 </AppShell>
