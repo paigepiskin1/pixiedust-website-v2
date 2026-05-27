@@ -51,6 +51,8 @@ export interface RailCard {
   tone?: Tone;
   cr?: number;
   href?: string;
+  previewImage?: string;
+  previewVideo?: string;
 }
 
 export const TRENDING: RailCard[] = [

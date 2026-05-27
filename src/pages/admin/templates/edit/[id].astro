@@ -23,7 +23,8 @@ const DEF_INPUT = '{\n  "prompt": "{{prompt}}",\n  "num_outputs": 1\n}';
 const DEF_FIELDS = '[\n  { "key": "prompt", "type": "textarea", "label": "Prompt", "required": true }\n]';
 const KINDS = ["preset", "shoot", "cinema", "i2v", "fashion-video", "game-video", "motion", "beauty", "fashion", "avatar", "ad", "motion-upload"];
 const TONES = ["teal", "lilac", "mint", "pink", "noir", "dusk", "ice", "amber"];
-const PROVIDERS = ["replicate", "fal", "alibaba", "openai"];
+// Replicate only for now (other providers hidden until enabled).
+const PROVIDERS = ["replicate"];
 
 const inp = "width:100%;padding:10px 12px;border-radius:10px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:13px;outline:none;";
 const mono = inp + "font-family:var(--font-mono);font-size:12px;line-height:1.5;";
@@ -35,7 +36,12 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
 <AdminShell title={isNew ? "Admin · New template" : `Admin · ${v("title")}`} tab="templates">
   <div class="mb-5 flex items-center justify-between gap-4">
     <h1 class="font-display font-medium text-ink" style="font-size:28px;letter-spacing:-0.6px;">{isNew ? "New template" : v("title")}</h1>
-    <a href="/admin/templates" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">← All templates</a>
+    <div class="flex items-center gap-4">
+      {!isNew && (
+        <a href={`/studio/${v("id")}`} target="_blank" class="rounded-lg font-semibold" style="padding:7px 12px;font-size:11px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);">Open in studio ↗ (test)</a>
+      )}
+      <a href="/admin/templates" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">← All templates</a>
+    </div>
   </div>
 
   <form id="pd-tpl-form" class="max-w-3xl">
@@ -58,6 +64,20 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         <div style={h3 + "margin:0;"}>Provider payload</div>
         <button type="button" id="pd-scaffold" class="rounded-lg font-semibold" style="padding:7px 12px;font-size:11px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;">Scaffold fields from placeholders</button>
       </div>
+      <!-- Import tools -->
+      <div class="mb-3 rounded-xl" style="padding:14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline);">
+        <div class="mb-2 font-mono uppercase" style="font-size:9px;color:var(--pd-lilac);letter-spacing:0.7px;">Import — no manual mapping</div>
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="pd-import-model" type="text" placeholder="owner/name (e.g. google/nano-banana)" style={inp + "flex:1;min-width:240px;"} />
+          <button type="button" id="pd-import-btn" class="rounded-lg font-semibold" style="padding:9px 14px;font-size:12px;background:var(--pd-lilac);color:#0A0A0B;border:none;cursor:pointer;">Fetch Replicate schema</button>
+        </div>
+        <div class="mt-2 flex flex-wrap items-start gap-2">
+          <textarea id="pd-ai-raw" rows="2" placeholder="…or paste example params / describe it, then AI-convert" style={mono + "flex:1;min-width:240px;"}></textarea>
+          <button type="button" id="pd-ai-btn" class="rounded-lg font-semibold" style="padding:9px 14px;font-size:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;">AI convert</button>
+        </div>
+        <div id="pd-import-msg" class="mt-2 hidden" style="font-size:11.5px;"></div>
+      </div>
+
       <div class="grid gap-3 sm:grid-cols-2">
         <label><span style={lbl}>Provider</span><select name="provider" style={inp}>{PROVIDERS.map((p) => <option value={p} selected={v("provider", "replicate") === p}>{p}</option>)}</select></label>
         <label><span style={lbl}>Model</span><input name="model" value={v("model")} placeholder="black-forest-labs/flux-schnell" style={inp} /></label>
@@ -122,6 +142,56 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         .map((m) => ({ key: m[1], type: guess(m[1]), label: m[1].replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), required: m[2] === "*" }));
       fieldsEl.value = JSON.stringify(fields, null, 2);
       show(`Scaffolded ${fields.length} field(s) — review types/labels.`, true);
+    });
+
+    // ── Import helpers ──
+    const importMsg = document.getElementById("pd-import-msg")!;
+    const setField = (name: string, val: string) => {
+      const el = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+      if (el && val != null) el.value = val;
+    };
+    function importStatus(text: string, ok: boolean) {
+      importMsg.classList.remove("hidden");
+      importMsg.style.color = ok ? "var(--pd-mint)" : "var(--pd-pink)";
+      importMsg.textContent = text;
+    }
+
+    document.getElementById("pd-import-btn")!.addEventListener("click", async () => {
+      const model = (document.getElementById("pd-import-model") as HTMLInputElement).value.trim();
+      if (!model) return importStatus("Enter a model id (owner/name).", false);
+      importStatus("Fetching schema from Replicate…", true);
+      try {
+        const res = await fetch("/api/admin/replicate-schema", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
+        const d = await res.json();
+        if (!res.ok) return importStatus(d.error || "Import failed.", false);
+        setField("model", d.model);
+        setField("input_json", d.input_json);
+        setField("fields_json", d.fields_json);
+        (form.elements.namedItem("type") as HTMLSelectElement).value = d.type;
+        const titleEl = form.elements.namedItem("title") as HTMLInputElement;
+        if (!titleEl.value) titleEl.value = d.title;
+        const idEl = form.elements.namedItem("id") as HTMLInputElement;
+        if (!idEl.readOnly && !idEl.value) idEl.value = model.split(":")[0].split("/").pop()!.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        importStatus(`Imported ${d.type} model — ${JSON.parse(d.fields_json).length} field(s) generated.`, true);
+      } catch {
+        importStatus("Network error.", false);
+      }
+    });
+
+    document.getElementById("pd-ai-btn")!.addEventListener("click", async () => {
+      const raw = (document.getElementById("pd-ai-raw") as HTMLTextAreaElement).value.trim();
+      if (!raw) return importStatus("Paste params or a description first.", false);
+      importStatus("Asking Opus to convert…", true);
+      try {
+        const res = await fetch("/api/admin/ai-convert", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw }) });
+        const d = await res.json();
+        if (!res.ok) return importStatus(d.error || "AI convert failed.", false);
+        setField("input_json", d.input_json);
+        setField("fields_json", d.fields_json);
+        importStatus("AI converted — review the generated input + fields.", true);
+      } catch {
+        importStatus("Network error.", false);
+      }
     });
 
     form.addEventListener("submit", async (e) => {

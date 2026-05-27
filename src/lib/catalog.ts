@@ -14,6 +14,8 @@ export interface CatalogItem {
   cr?: number;
   c?: string; // category (for filtering)
   href: string;
+  previewImage?: string;
+  previewVideo?: string;
 }
 
 const AMBER = "var(--pd-amber)";

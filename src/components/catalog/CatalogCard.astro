@@ -17,7 +17,15 @@ const { item, aspect = "1 / 1.3" } = Astro.props;
   data-cat={item.c ?? "All"}
   style={`aspect-ratio:${aspect};background:var(--pd-bg2);`}
 >
-  <Media tone={item.tone} />
+  {
+    item.previewVideo ? (
+      <video src={item.previewVideo} muted loop playsinline preload="metadata" class="absolute inset-0 h-full w-full object-cover" />
+    ) : item.previewImage ? (
+      <img src={item.previewImage} loading="lazy" alt={item.name} class="absolute inset-0 h-full w-full object-cover" />
+    ) : (
+      <Media tone={item.tone} />
+    )
+  }
   <div class="absolute inset-0" style="background:linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.85) 100%);"></div>
 
   {item.tag && <div class="absolute left-3 top-3"><Pill color={item.accent} label={item.tag} /></div>}

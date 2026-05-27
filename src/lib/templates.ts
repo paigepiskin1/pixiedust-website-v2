@@ -35,6 +35,15 @@ export interface TemplateStep {
   title: string;
   subtitle?: string;
   fields: TemplateField[];
+  // Chain steps run their own model; input may reference {{stepId.output}}.
+  provider?: string;
+  model?: string;
+  input?: Record<string, unknown>;
+}
+
+/** A template is a chained pipeline when every step declares its own model. */
+export function isChain(t: Template): boolean {
+  return !!t.steps && t.steps.length > 0 && t.steps.every((s) => !!s.model);
 }
 
 export interface Template {
@@ -219,6 +228,39 @@ export function computeCost(t: Template, opts: { quality?: string; quantity?: nu
   return Math.ceil(t.creditCost * qty * mult);
 }
 
+/**
+ * Resolve a single chain step's input. Substitutes `{{key}}` from user inputs
+ * and `{{stepId.output}}` from prior step outputs. Used by the multi-step pipeline.
+ */
+export function resolveChainStep(
+  inputObj: unknown,
+  ctx: { user: Record<string, unknown>; outputs: Record<string, string> }
+): unknown {
+  const sub = (v: unknown): unknown => {
+    if (typeof v === "string") {
+      const exact = v.match(/^\{\{([\w.]+)\*?\}\}$/);
+      if (exact) {
+        const tok = exact[1];
+        if (tok.includes(".")) return ctx.outputs[tok.split(".")[0]] ?? "";
+        return ctx.user[tok] ?? "";
+      }
+      return v.replace(/\{\{([\w.]+)\*?\}\}/g, (_, tok: string) => {
+        if (tok.includes(".")) return ctx.outputs[tok.split(".")[0]] ?? "";
+        const u = ctx.user[tok];
+        return u != null ? String(u) : "";
+      });
+    }
+    if (Array.isArray(v)) return v.map(sub);
+    if (v && typeof v === "object") {
+      const o: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) o[k] = sub(val);
+      return o;
+    }
+    return v;
+  };
+  return sub(inputObj);
+}
+
 /** Workspace URL for a template. */
 export function templateHref(id: string): string {
   return `/studio/${id}`;
@@ -235,6 +277,8 @@ interface CardShape {
   cr?: number;
   c?: string;
   href: string;
+  previewImage?: string;
+  previewVideo?: string;
 }
 
 /** Map a template to the catalog-card shape (uses `tag` for the pill). */
@@ -249,6 +293,8 @@ export function templateToCard(t: Template): CardShape {
     cr: t.creditCost,
     c: t.category ?? undefined,
     href: templateHref(t.id),
+    previewImage: t.previewImage ?? undefined,
+    previewVideo: t.previewVideo ?? undefined,
   };
 }
 

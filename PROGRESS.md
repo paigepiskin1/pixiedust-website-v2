@@ -108,6 +108,26 @@ The full old-site functional inventory and the design audit were produced during
 
 ---
 
+## Template authoring tools + multi-step chaining (2026-05-27, post-Phase 9)
+
+- **Replicate-only** provider in the editor (others hidden).
+- **Schema import** (`/api/admin/replicate-schema` + `src/lib/replicate-schema.ts`): fetches a model's
+  OpenAPI input schema via the Replicate token and auto-generates `input_json` (`{{placeholders}}` +
+  static defaults) + typed `fields_json`. VERIFIED on flux-schnell/nano-banana/seedance.
+- **AI convert** (`/api/admin/ai-convert` + `src/lib/ai.ts`): Anthropic **Opus via OpenRouter**
+  turns pasted params / a description into the template scaffold. VERIFIED.
+- Editor "Import from Replicate" + "AI convert" + "Open in studio (test)" (admins can run **hidden**
+  templates to test before publish — `/api/generate` allows hidden for admins).
+- **Preview media**: templates show their `preview_video`/`preview_image` example (workspace LEFT
+  card + catalog/home cards) instead of the gradient placeholder when set.
+- **Multi-step chaining**: `steps_json` steps each carry provider/model/input; input can reference a
+  prior step's output via `{{stepId.output}}`. `isChain()` = every step has a model (vs UI-grouping
+  steps without models). Pipeline: `/api/generate` dispatches step 0; `/api/generate/status` is a
+  state machine that pipes each output into the next step's input and dispatches it (migration
+  `0003_chain.sql` adds `generations.chain_json`). VERIFIED end-to-end: nano-banana → seedance
+  produced a final **.mp4 on Bunny** (`pixiecdn.b-cdn.net/...mp4`). Keys: `REPLICATE_API_TOKEN` +
+  `OPENROUTER_API_KEY` in `.dev.vars`.
+
 ## Phase notes / gotchas
 
 - **Astro pinned to v5** (5.18.2), not v6 — local Node is v20.10.0 and Astro 6 needs a newer

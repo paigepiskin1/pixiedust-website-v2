@@ -35,8 +35,16 @@ const config = {
     <div class="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_minmax(0,1fr)]">
       <!-- LEFT: template card -->
       <aside class="lg:sticky lg:top-[88px] lg:self-start">
-        <div class="overflow-hidden rounded-[20px]" style="border:0.5px solid var(--pd-hairline);aspect-ratio:4/3;">
-          <Media tone={template.tone} angle={130} label={template.title} sub={template.engine ?? undefined} />
+        <div class="overflow-hidden rounded-[20px]" style="border:0.5px solid var(--pd-hairline);aspect-ratio:4/3;background:var(--pd-bg2);">
+          {
+            template.previewVideo ? (
+              <video src={template.previewVideo} muted loop autoplay playsinline class="h-full w-full object-cover" />
+            ) : template.previewImage ? (
+              <img src={template.previewImage} alt={template.title} class="h-full w-full object-cover" />
+            ) : (
+              <Media tone={template.tone} angle={130} label={template.title} sub={template.engine ?? undefined} />
+            )
+          }
         </div>
         <div class="mt-3 flex items-center gap-2">
           <Pill color={accent} label={template.kind} />
@@ -254,9 +262,10 @@ const config = {
       while (true) {
         await new Promise((r) => setTimeout(r, 2000));
         tick++;
-        setStage(stages[Math.min(tick, stages.length - 1)] + "…", Math.min(12 + tick * 14, 92));
         const res = await fetch(`/api/generate/status?id=${id}`);
         const data = await res.json();
+        if (data.steps > 1 && data.step) setStage(`Step ${data.step} of ${data.steps}…`, Math.min(12 + tick * 10, 92));
+        else setStage(stages[Math.min(tick, stages.length - 1)] + "…", Math.min(12 + tick * 14, 92));
         if (data.status === "completed") return renderResult(data.outputs || []);
         if (data.status === "failed") {
           running.classList.add("hidden");

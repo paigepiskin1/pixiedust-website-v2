@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { getTemplate, resolveInput, computeCost } from "../../../lib/templates";
+import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
@@ -28,18 +28,18 @@ export async function POST({ request, locals }: APIContext) {
   }
 
   const template = body.templateId ? await getTemplate(db, body.templateId) : null;
-  if (!template || template.isHidden) return json({ error: "Template not found." }, 404);
+  // Hidden templates are runnable by admins (for testing before publish).
+  if (!template || (template.isHidden && !user.isAdmin)) return json({ error: "Template not found." }, 404);
+  const inputs = body.inputs ?? {};
 
-  const { input, errors } = resolveInput(template, body.inputs ?? {});
-  if (errors.length) return json({ error: errors[0], errors }, 400);
+  // Validate required fields (covers single + multi-step via allFields).
+  const missing = allFields(template).filter((f) => f.required && (inputs[f.key] == null || inputs[f.key] === ""));
+  if (missing.length) return json({ error: `${missing[0].label} is required`, errors: missing.map((f) => `${f.label} is required`) }, 400);
 
-  // Apply workspace controls onto the resolved provider input.
   const qty = Math.max(1, Math.min(Number(body.quantity) || 1, 4));
-  if (body.aspect && "aspect_ratio" in input) input.aspect_ratio = body.aspect;
-  if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
-
   const cost = computeCost(template, { quality: body.quality, quantity: qty });
 
+  // Limits
   const tier = await getUserTier(db, userId);
   if ((await countActiveGenerations(db, userId)) >= tier.concurrency) {
     return json({ error: `Your plan allows ${tier.concurrency} generations at once.` }, 429);
@@ -52,6 +52,56 @@ export async function POST({ request, locals }: APIContext) {
   const deb = await debit(db, userId, cost, { reason: "generation_debit", refType: "generation", refId: genId });
   if (!deb.ok) return json({ error: "Not enough credits.", needCredits: true }, 402);
 
+  const fail = async (err: unknown) => {
+    await adjustBalance(db, userId, cost, { reason: "generation_refund", refType: "generation", refId: genId, note: "dispatch failed" });
+    await db
+      .prepare("UPDATE generations SET status='failed', error=?, credits_refunded=?, updated_at=datetime('now') WHERE id=?")
+      .bind(String((err as Error).message || err), cost, genId)
+      .run();
+    return json({ error: "Could not start generation — credits refunded.", detail: String((err as Error).message || err) }, 502);
+  };
+
+  // ─── Multi-step chain ───
+  if (isChain(template)) {
+    const steps = template.steps!.map((s) => ({
+      id: s.id,
+      provider: s.provider || template.provider,
+      model: s.model!,
+      input: s.input ?? {},
+      jobId: null as string | null,
+      output: null as string | null,
+      status: "pending" as string,
+    }));
+    const chain = { stepIndex: 0, userInputs: inputs, steps };
+    const step0Input = resolveChainStep(steps[0].input, { user: inputs, outputs: {} }) as Record<string, unknown>;
+
+    await db
+      .prepare(
+        `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, chain_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
+      )
+      .bind(genId, userId, template.id, template.kind, template.type, steps[0].provider, steps[0].model, JSON.stringify(step0Input), cost, body.quality ?? null, qty, JSON.stringify(chain))
+      .run();
+
+    try {
+      const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: steps[0].provider, model: steps[0].model, input: step0Input });
+      steps[0].jobId = jobId;
+      steps[0].status = "processing";
+      await db
+        .prepare("UPDATE generations SET status='processing', provider_job_id=?, chain_json=?, updated_at=datetime('now') WHERE id=?")
+        .bind(jobId, JSON.stringify(chain), genId)
+        .run();
+      return json({ id: genId, status: "processing", balance: deb.balance, cost, steps: steps.length });
+    } catch (err) {
+      return fail(err);
+    }
+  }
+
+  // ─── Single step ───
+  const { input } = resolveInput(template, inputs);
+  if (body.aspect && "aspect_ratio" in input) input.aspect_ratio = body.aspect;
+  if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
+
   await db
     .prepare(
       `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity)
@@ -61,23 +111,13 @@ export async function POST({ request, locals }: APIContext) {
     .run();
 
   try {
-    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, {
-      provider: template.provider,
-      model: template.model,
-      input,
-    });
+    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
     await db
-      .prepare("UPDATE generations SET status = 'processing', provider_job_id = ?, updated_at = datetime('now') WHERE id = ?")
+      .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
       .bind(jobId, genId)
       .run();
     return json({ id: genId, status: "processing", balance: deb.balance, cost });
   } catch (err) {
-    // Dispatch failed — refund and mark failed.
-    await adjustBalance(db, userId, cost, { reason: "generation_refund", refType: "generation", refId: genId, note: "dispatch failed" });
-    await db
-      .prepare("UPDATE generations SET status = 'failed', error = ?, credits_refunded = ?, updated_at = datetime('now') WHERE id = ?")
-      .bind(String((err as Error).message || err), cost, genId)
-      .run();
-    return json({ error: "Could not start generation — credits refunded.", detail: String((err as Error).message || err) }, 502);
+    return fail(err);
   }
 }

@@ -15,6 +15,8 @@ interface Env {
   BUNNY_PULL_ZONE_URL: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
+  REPLICATE_API_TOKEN: string;
+  OPENROUTER_API_KEY: string;
 }
 
 declare namespace App {

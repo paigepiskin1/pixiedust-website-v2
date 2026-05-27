@@ -17,7 +17,15 @@ const { item, height = 260, width = 200 } = Astro.props;
   class="pd-card pd-lift group relative block shrink-0 overflow-hidden rounded-[18px]"
   style={`width:${width}px;height:${height}px;background:var(--pd-bg2);scroll-snap-align:start;`}
 >
-  <Media tone={item.tone ?? "teal"} />
+  {
+    item.previewVideo ? (
+      <video src={item.previewVideo} muted loop playsinline preload="metadata" class="absolute inset-0 h-full w-full object-cover" />
+    ) : item.previewImage ? (
+      <img src={item.previewImage} loading="lazy" alt={item.name} class="absolute inset-0 h-full w-full object-cover" />
+    ) : (
+      <Media tone={item.tone ?? "teal"} />
+    )
+  }
   <div class="absolute inset-0" style="background:linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.85) 100%);"></div>
 
   {
