@@ -22,3 +22,6 @@ dist/
 # OS / editor
 .DS_Store
 *.log
+
+# Claude Code local settings (contains allowed-command history which can leak secrets)
+.claude/
