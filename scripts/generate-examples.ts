@@ -41,8 +41,14 @@ async function main() {
   // otherwise only those still missing an example.
   const FORCE = process.env.FORCE === "1";
   const list = await (await fetch(`${BASE}/api/admin/templates`, { headers: { Authorization: `Bearer ${TOKEN}` } })).json();
-  const todo = (list.templates as any[]).filter((t) => t.id.startsWith(PREFIX) && (FORCE || !t.has_example));
-  console.log(`${todo.length} template(s) to process (prefix "${PREFIX}", force=${FORCE}).`);
+  // IDS=a,b,c restricts to specific template ids (useful for retrying failures).
+  // GAP=ms adds a delay before each submission to dodge the per-user rate limit.
+  const IDS = (process.env.IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const GAP = Number(process.env.GAP || 0);
+  const todo = (list.templates as any[]).filter(
+    (t) => (IDS.length ? IDS.includes(t.id) : t.id.startsWith(PREFIX) && (FORCE || !t.has_example))
+  );
+  console.log(`${todo.length} template(s) to process (prefix "${PREFIX}", force=${FORCE}, ids=${IDS.length}, gap=${GAP}ms).`);
 
   let done = 0, failed = 0;
   for (const t of todo) {
@@ -56,6 +62,7 @@ async function main() {
       else inputs[f.key] = f.default || DEFAULT_PROMPT;
     }
 
+    if (GAP) await sleep(GAP);
     const g = await (await fetch(`${BASE}/api/generate`, { method: "POST", headers: authH, body: JSON.stringify({ templateId: t.id, inputs }) })).json();
     if (!g.id) { console.log(`  ✗ ${t.id}: ${g.error}${g.detail ? " — " + g.detail : ""}`); failed++; continue; }
 

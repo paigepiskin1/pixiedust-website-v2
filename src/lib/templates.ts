@@ -168,6 +168,18 @@ export async function listTemplates(db: D1Database, opts: ListOpts = {}): Promis
   return (results || []).map(rowToTemplate);
 }
 
+/** Free-text search across visible templates (title, subtitle, category, tags). */
+export async function searchTemplates(db: D1Database, q: string, limit = 60): Promise<Template[]> {
+  const term = `%${q.trim().toLowerCase()}%`;
+  const sql =
+    "SELECT * FROM templates WHERE is_hidden = 0 AND (" +
+    "lower(title) LIKE ? OR lower(coalesce(subtitle,'')) LIKE ? OR lower(coalesce(category,'')) LIKE ? " +
+    "OR lower(coalesce(tags_json,'')) LIKE ? OR lower(coalesce(description,'')) LIKE ?) " +
+    "ORDER BY is_featured DESC, sort_order ASC, title ASC LIMIT " + Math.max(1, Math.floor(limit));
+  const { results } = await db.prepare(sql).bind(term, term, term, term, term).all<TemplateRow>();
+  return (results || []).map(rowToTemplate);
+}
+
 export async function getTemplate(db: D1Database, id: string): Promise<Template | null> {
   const row = await db.prepare("SELECT * FROM templates WHERE id = ?").bind(id).first<TemplateRow>();
   return row ? rowToTemplate(row) : null;

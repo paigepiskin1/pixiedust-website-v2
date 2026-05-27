@@ -1,52 +1,41 @@
 ---
+export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import Dot from "../components/ui/Dot.astro";
 import CatalogCard from "../components/catalog/CatalogCard.astro";
 import type { CatalogItem } from "../lib/catalog";
-import type { Tone } from "../lib/content";
-import { workspaceHref } from "../lib/workspace";
+import { searchTemplates, templateToCard, listTemplates } from "../lib/templates";
 
 const q = (Astro.url.searchParams.get("q") || "").trim();
+const db = Astro.locals.runtime.env.DB;
 
-const raw: { name: string; sub: string; tone: Tone; kind: string; cr: number | null; type: string; meta?: string }[] = [
-  { name: "Kodak Portra", sub: "Preset · film · warm", tone: "amber", kind: "preset", cr: 2, type: "Preset" },
-  { name: "Snakes wrapped", sub: "Motion · 0:08 · 428k uses", tone: "lilac", kind: "motion", cr: 6, type: "Motion", meta: "0:08" },
-  { name: "Petals bloom", sub: "Photo-to-life · 0:06 · 312k", tone: "pink", kind: "i2v", cr: 4, type: "Motion", meta: "0:06" },
-  { name: "Editorial Noir", sub: "Photoshoot pack · 24 frames", tone: "noir", kind: "shoot", cr: 30, type: "Pack", meta: "24" },
-  { name: "Wes Anderson", sub: "Color grade · pastel · symmetric", tone: "pink", kind: "preset", cr: 2, type: "Preset" },
-  { name: "Cinestill 800T", sub: "Preset · tungsten halo", tone: "pink", kind: "preset", cr: 2, type: "Preset" },
-  { name: "Y2K runway", sub: "Motion · 0:10", tone: "pink", kind: "motion", cr: 6, type: "Motion", meta: "0:10" },
-  { name: "Anime self", sub: "Avatar · stylized", tone: "lilac", kind: "avatar", cr: 4, type: "Avatar" },
-  { name: "Glazed glow", sub: "Beauty · makeup · 1 cr", tone: "pink", kind: "beauty", cr: 1, type: "Beauty" },
-  { name: "Black tie", sub: "Fashion · formal", tone: "dusk", kind: "fashion", cr: 2, type: "Fashion" },
-  { name: "Noir chase", sub: "Cinematic · Kling Pro", tone: "amber", kind: "cinema", cr: 8, type: "Cinema", meta: "0:12" },
-  { name: "Ad Studio", sub: "Tool · commercial creative", tone: "amber", kind: "tool-ad", cr: null, type: "Tool" },
-  { name: "Beauty Studio", sub: "Tool · hair · makeup · skin", tone: "mint", kind: "tool-beauty", cr: null, type: "Tool" },
-];
+// Real, D1-backed results. Each card carries a normalized scope bucket so the
+// client-side scope chips can filter the rendered set without another query.
+function scopeOf(kind: string, type: string): string {
+  if (kind === "preset") return "Presets";
+  if (kind === "beauty") return "Beauty";
+  if (type === "video") return "Video";
+  return "Images";
+}
+const matched = q ? await searchTemplates(db, q) : [];
+const items: (CatalogItem & { type: string; kind: string })[] = matched.map((t) => {
+  const card = templateToCard(t);
+  return { ...card, tag: t.tags[0] ?? t.kind, type: scopeOf(t.kind, t.type), kind: t.kind };
+});
 
-const items: (CatalogItem & { type: string })[] = raw.map((r) => ({
-  name: r.name,
-  sub: r.sub,
-  tone: r.tone,
-  meta: r.meta,
-  tag: r.type,
-  accent: "var(--pd-lilac)",
-  cr: r.cr ?? undefined,
-  type: r.type,
-  href: r.kind.startsWith("tool-") ? `/${r.kind.replace("tool-", "")}` : workspaceHref(r.kind, r.name),
-}));
+const scopes = ["All", "Presets", "Video", "Beauty", "Images"];
 
-const scopes = ["All", "Tools", "Presets", "Templates", "Packs", "Avatars", "Gallery"];
-const recent = ["snakes wrap", "noir", "cinestill", "y2k", "editorial"];
+// Empty-state suggestions: real featured template titles to seed a search.
+const featured = q ? [] : await listTemplates(db, { featured: true, limit: 12 });
 const suggestions = [
-  { kicker: "Try a template", items: ["Snakes wrapped", "Petals bloom", "Y2K runway"] },
-  { kicker: "Popular presets", items: ["Kodak Portra", "Wes Anderson", "Cinestill 800T"] },
-  { kicker: "Hot this week", items: ["Editorial Noir", "Glass strut", "Soft Siren"] },
+  { kicker: "Popular right now", items: featured.slice(0, 6).map((t) => t.title) },
+  { kicker: "Browse by look", items: ["portrait", "cinematic", "anime", "vintage", "neon"] },
 ];
+const recent = ["portrait", "cinematic", "kodak", "anime", "noir"];
 ---
 
 <AppShell title="Search — PixieDust">
-  <div id="pd-search" class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+  <div id="pd-search" class="mx-auto w-full" style="max-width:1480px;padding:28px;" data-sq={q}>
     <div class="mb-6">
       <div class="mb-[7px] flex items-center gap-[7px]">
         <Dot color="var(--pd-lilac)" size={5} />
@@ -151,7 +140,11 @@ const suggestions = [
     <div id="pd-search-results" class="hidden grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
       {
         items.map((it) => (
-          <div class="pd-result" data-search={`${it.name} ${it.sub}`.toLowerCase()} data-type={it.type}>
+          <div
+            class="pd-result"
+            data-search={`${it.name} ${it.sub ?? ""} ${it.tag ?? ""} ${it.kind} ${it.c ?? ""}`.toLowerCase()}
+            data-type={it.type}
+          >
             <CatalogCard item={it} aspect="1 / 1.2" />
           </div>
         ))
@@ -172,18 +165,18 @@ const suggestions = [
     const term = root.querySelector<HTMLElement>("#pd-search-term")!;
     const cards = Array.from(root.querySelectorAll<HTMLElement>(".pd-result"));
     let scope = "All";
+    // The server already filtered cards for this query; force the field to match
+    // the URL (guards against browser autofill) and skip text-filtering the
+    // server set so category/tag matches aren't hidden by a name-only substring.
+    const serverQ = (root.dataset.sq || "").trim();
+    if (serverQ) input.value = serverQ;
 
     function scopeOk(type: string): boolean {
-      switch (scope) {
-        case "All": return true;
-        case "Tools": return type === "Tool";
-        case "Presets": return type === "Preset";
-        case "Templates": return ["Motion", "Cinema", "Avatar", "Fashion", "Beauty"].includes(type);
-        case "Packs": return type === "Pack";
-        case "Avatars": return type === "Avatar";
-        case "Gallery": return false;
-        default: return true;
-      }
+      return scope === "All" ? true : type === scope;
+    }
+    function serverSearch(term: string) {
+      const t = term.trim();
+      if (t) window.location.href = "/search?q=" + encodeURIComponent(t);
     }
 
     function run() {
@@ -196,10 +189,11 @@ const suggestions = [
         return;
       }
       empty.classList.add("hidden");
+      const skipText = query === serverQ.toLowerCase(); // server already matched
       let n = 0;
       cards.forEach((card) => {
         const hay = card.dataset.search || "";
-        const show = hay.includes(query) && scopeOk(card.dataset.type || "");
+        const show = (skipText || hay.includes(query)) && scopeOk(card.dataset.type || "");
         card.style.display = show ? "" : "none";
         if (show) n++;
       });
@@ -217,7 +211,10 @@ const suggestions = [
 
     input.addEventListener("input", run);
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        serverSearch(input.value);
+      } else if (e.key === "Escape") {
         input.value = "";
         run();
       }
@@ -229,13 +226,11 @@ const suggestions = [
         run();
       });
     });
+    // Suggestion + recent chips run a real (server) search for that term.
     root.querySelectorAll<HTMLElement>(".pd-suggest").forEach((b) => {
-      b.addEventListener("click", () => {
-        input.value = b.dataset.q || "";
-        input.focus();
-        run();
-      });
+      b.addEventListener("click", () => serverSearch(b.dataset.q || ""));
     });
+    input.focus();
     run();
   }
 </script>
