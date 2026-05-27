@@ -12,13 +12,14 @@
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.13",
-    "astro": "^5.18.2"
+    "astro": "^5.18.2",
+    "firebase": "^12.13.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@tailwindcss/vite": "^4.3.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
-    "wrangler": "^4.95.0"
+    "wrangler": "^3.114.17"
   }
 }

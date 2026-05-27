@@ -16,5 +16,7 @@ interface Env {
 }
 
 declare namespace App {
-  interface Locals extends Runtime {}
+  interface Locals extends Runtime {
+    user: import("./lib/users").PublicUser | null;
+  }
 }

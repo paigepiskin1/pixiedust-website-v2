@@ -58,21 +58,21 @@ const pathname = Astro.url.pathname;
       >
         <span class="flex items-center gap-[7px]">
           <span class="size-[7px] rounded-full" style="background:var(--pd-amber);box-shadow:0 0 8px var(--pd-amber);"></span>
-          <span class="font-semibold text-ink" style="font-size:13px;letter-spacing:-0.1px;">{credits} credits</span>
+          <span class="font-semibold text-ink" style="font-size:13px;letter-spacing:-0.1px;"><span class="pd-credits-val">{credits}</span> credits</span>
         </span>
         <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">Top up</span>
       </a>
       <ThemeToggle />
-      <a href="/account" class="flex items-center gap-[9px] rounded-[10px]" style="padding:8px;margin-top:2px;">
+      <a href="/auth/sign-in" class="pd-acct-link flex items-center gap-[9px] rounded-[10px]" style="padding:8px;margin-top:2px;">
         <div
-          class="flex size-[30px] shrink-0 items-center justify-center rounded-full font-semibold text-white"
+          class="pd-acct-avatar flex size-[30px] shrink-0 items-center justify-center rounded-full font-semibold text-white"
           style="background:linear-gradient(135deg, var(--pd-lilac), var(--pd-pink));font-size:13px;"
         >
-          K
+          ✦
         </div>
         <div class="flex flex-col">
-          <span class="font-semibold text-ink" style="font-size:13px;letter-spacing:-0.1px;">kavi.studio</span>
-          <span class="font-mono" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">Free plan</span>
+          <span class="pd-acct-name font-semibold text-ink" style="font-size:13px;letter-spacing:-0.1px;">Sign in</span>
+          <span class="pd-acct-sub font-mono" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.4px;">Get 5 free credits</span>
         </div>
       </a>
     </div>
