@@ -3,10 +3,12 @@ export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import CreditChip from "../components/ui/CreditChip.astro";
+import SparkleBurst from "../components/motion/SparkleBurst.tsx";
 import { getUserByUid } from "../lib/users";
 
 const user = Astro.locals.user;
 const db = Astro.locals.runtime.env.DB;
+const toppedUp = Astro.url.searchParams.get("status") === "success";
 
 let activeTier: string | null = null;
 if (user) {
@@ -29,6 +31,7 @@ const feats = (s: string) => { try { return JSON.parse(s) as string[]; } catch {
 ---
 
 <AppShell title="Credits & plans — PixieDust" credits={user?.credits ?? 47}>
+  {toppedUp && <SparkleBurst client:only="react" />}
   <div class="mx-auto w-full" style="max-width:1100px;padding:28px;">
     <PageHeader kicker="Billing · credits power every generation" title="Credits & plans" sub="Subscribe for a monthly allotment + discounted packs, or top up anytime. One credit ledger across the studio." />
 

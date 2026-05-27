@@ -16,5 +16,8 @@ export default defineConfig({
     // Cast: @tailwindcss/vite ships types against a different Vite copy than
     // Astro's bundled Vite — harmless duplicate-type clash, runtime is fine.
     plugins: [/** @type {any} */ (tailwindcss())],
+    // Force a single React instance so hooks work in client:only islands (motion
+    // can otherwise pull a second copy in dev → "invalid hook call").
+    resolve: { dedupe: ["react", "react-dom"] },
   },
 });
