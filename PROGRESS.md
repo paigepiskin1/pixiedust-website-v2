@@ -62,7 +62,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | 6 | Generation pipeline (Worker → SyncNode → Bunny) | ✅ Done |
 | 7 | User features (gallery, account) | ✅ Done |
 | 8 | Admin backend (templates, users, content, moderation) | ✅ Done |
-| 9 | Monetization (Stripe subs + credit packs, ledger, audit) | ⬜ |
+| 9 | Monetization (Stripe subs + credit packs, ledger, audit) | ✅ Done |
 | 10 | Migration (user accounts + balances) | ⬜ |
 | 11 | Deploy + hardening | ⬜ |
 
@@ -136,6 +136,17 @@ The full old-site functional inventory and the design audit were produced during
   `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
   `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
   localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.
+- **2026-05-27** — Phase 9 done. Monetization via Stripe. `src/lib/stripe.ts` (REST checkout with
+  dynamic price_data — no pre-created products; Web Crypto webhook signature verify). `POST /api/
+  billing/checkout` (pack=payment, sub=subscription; subscriber pack pricing if active sub).
+  `POST /api/billing/webhook` (verifies sig; checkout.session.completed → pack credit / sub row +
+  initial grant; invoice.paid subscription_cycle → renewal grant; subscription.deleted → cancel;
+  idempotent by session/invoice id via the ledger). `/credits` page renders tiers + packs from D1.
+  VERIFIED: checkout returns a real `cs_test_...` Stripe URL; a signed simulated webhook credited
+  the ledger (1000→1100, reason=purchase) and a duplicate was rejected. Using **TEST** Stripe keys
+  in `.dev.vars`. NOTE: live webhook delivery to localhost needs the Stripe CLI (`stripe listen`);
+  in prod set the webhook endpoint + LIVE keys in Pages env. Old code also has LIVE keys in
+  `back/config.php`.
 - **2026-05-27** — Phase 8 done. Admin backend (gated by `locals.user.isAdmin`, `AdminShell` chrome).
   `/admin` dashboard (template/user/generation/credit stats). `/admin/templates` list + editor
   (`/admin/templates/edit/[id]`, new+edit) covering the full schema incl. input_json/fields_json/

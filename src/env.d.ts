@@ -13,6 +13,8 @@ interface Env {
   BUNNY_STORAGE_ZONE: string;
   BUNNY_API_KEY: string;
   BUNNY_PULL_ZONE_URL: string;
+  STRIPE_SECRET_KEY: string;
+  STRIPE_WEBHOOK_SECRET: string;
 }
 
 declare namespace App {

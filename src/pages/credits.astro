@@ -1,0 +1,138 @@
+---
+export const prerender = false;
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import CreditChip from "../components/ui/CreditChip.astro";
+import { getUserByUid } from "../lib/users";
+
+const user = Astro.locals.user;
+const db = Astro.locals.runtime.env.DB;
+
+let activeTier: string | null = null;
+if (user) {
+  const dbUser = await getUserByUid(db, user.uid);
+  if (dbUser) {
+    const sub = await db.prepare("SELECT tier_id FROM subscriptions WHERE user_id = ? AND status='active'").bind(dbUser.id).first<{ tier_id: string }>();
+    activeTier = sub?.tier_id ?? "free";
+  }
+}
+
+interface Tier { id: string; name: string; price_cents: number; monthly_credits: number; pack_discount_pct: number; features_json: string; }
+interface Pack { id: string; name: string; credits: number; price_cents: number; subscriber_price_cents: number | null; badge: string | null; }
+
+const tiers = (await db.prepare("SELECT * FROM subscription_tiers WHERE is_active=1 ORDER BY sort_order").all<Tier>()).results ?? [];
+const packs = (await db.prepare("SELECT * FROM credit_packs WHERE is_active=1 ORDER BY sort_order").all<Pack>()).results ?? [];
+const subscribed = !!activeTier && activeTier !== "free";
+
+const usd = (c: number) => "$" + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
+const feats = (s: string) => { try { return JSON.parse(s) as string[]; } catch { return []; } };
+---
+
+<AppShell title="Credits & plans — PixieDust" credits={user?.credits ?? 47}>
+  <div class="mx-auto w-full" style="max-width:1100px;padding:28px;">
+    <PageHeader kicker="Billing · credits power every generation" title="Credits & plans" sub="Subscribe for a monthly allotment + discounted packs, or top up anytime. One credit ledger across the studio." />
+
+    <div id="pd-billing-msg" class="mb-5 hidden rounded-xl" style="padding:11px 14px;font-size:13px;"></div>
+
+    <!-- Subscription tiers -->
+    <div class="mb-3 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Subscriptions</div>
+    <div class="grid gap-4 md:grid-cols-3">
+      {
+        tiers.map((t) => {
+          const current = activeTier === t.id;
+          const isFree = t.price_cents === 0;
+          return (
+            <div class="flex flex-col rounded-2xl" style={`padding:22px;background:var(--pd-bg2);border:0.5px solid ${current ? "color-mix(in srgb, var(--pd-lilac) 50%, transparent)" : "var(--pd-hairline)"};`}>
+              <div class="font-display font-semibold text-ink" style="font-size:18px;letter-spacing:-0.3px;">{t.name}</div>
+              <div class="mt-1 font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.8px;">
+                {isFree ? "Free" : usd(t.price_cents)}<span class="text-ink-3" style="font-size:13px;font-weight:400;">{isFree ? "" : "/mo"}</span>
+              </div>
+              <div class="mt-1 text-ink-3" style="font-size:12.5px;">{t.monthly_credits} credits / month{t.pack_discount_pct ? ` · ${t.pack_discount_pct}% off packs` : ""}</div>
+              <ul class="mt-3 flex flex-1 flex-col gap-1.5">
+                {feats(t.features_json).map((f) => (
+                  <li class="flex items-center gap-2 text-ink-2" style="font-size:12.5px;"><span class="size-1 rounded-full" style="background:var(--pd-mint);" />{f}</li>
+                ))}
+              </ul>
+              <div class="mt-4">
+                {current ? (
+                  <div class="rounded-xl text-center font-semibold text-ink-3" style="padding:10px;border:0.5px solid var(--pd-hairline2);font-size:12.5px;">Current plan</div>
+                ) : isFree ? (
+                  <div class="rounded-xl text-center font-semibold text-ink-3" style="padding:10px;border:0.5px solid var(--pd-hairline2);font-size:12.5px;">Default</div>
+                ) : (
+                  <button type="button" class="pd-buy w-full rounded-xl font-bold" data-kind="sub" data-id={t.id} style="padding:11px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;cursor:pointer;border:none;">Subscribe</button>
+                )}
+              </div>
+            </div>
+          );
+        })
+      }
+    </div>
+
+    <!-- Credit packs -->
+    <div class="mb-3 mt-8 flex items-center gap-2">
+      <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Credit packs</span>
+      {!subscribed && <span class="font-mono" style="font-size:10px;color:var(--pd-ink4);">· subscribe for lower per-credit pricing</span>}
+    </div>
+    <div class="grid gap-4 md:grid-cols-3">
+      {
+        packs.map((p) => {
+          const price = subscribed && p.subscriber_price_cents != null ? p.subscriber_price_cents : p.price_cents;
+          return (
+            <div class="relative flex flex-col rounded-2xl" style="padding:22px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+              {p.badge && <span class="absolute right-4 top-4 rounded-full font-mono uppercase" style="padding:3px 8px;background:color-mix(in srgb, var(--pd-amber) 18%, transparent);color:var(--pd-amber);font-size:9px;letter-spacing:0.5px;">{p.badge}</span>}
+              <div class="font-display font-semibold text-ink" style="font-size:18px;letter-spacing:-0.3px;">{p.name}</div>
+              <div class="mt-2"><CreditChip cr={p.credits} size="md" /></div>
+              <div class="mt-3 font-display font-medium text-ink" style="font-size:28px;letter-spacing:-0.7px;">{usd(price)}</div>
+              {subscribed && p.subscriber_price_cents != null && p.subscriber_price_cents < p.price_cents && (
+                <div class="text-ink-4" style="font-size:11.5px;text-decoration:line-through;">{usd(p.price_cents)} standard</div>
+              )}
+              <button type="button" class="pd-buy mt-4 w-full rounded-xl font-bold" data-kind="pack" data-id={p.id} style="padding:11px;background:var(--pd-ink);color:var(--pd-bg);font-size:13px;cursor:pointer;border:none;">Buy {p.credits} credits</button>
+            </div>
+          );
+        })
+      }
+    </div>
+
+    <p class="mt-6 text-ink-4" style="font-size:11.5px;">Payments are processed by Stripe (test mode in development). Credits are added to your balance once payment confirms.</p>
+  </div>
+
+  <script>
+    const signedIn = !!document.querySelector("[data-auth]") || true;
+    const msg = document.getElementById("pd-billing-msg")!;
+    const params = new URLSearchParams(location.search);
+    if (params.get("status") === "success") {
+      msg.classList.remove("hidden");
+      msg.style.background = "color-mix(in srgb, var(--pd-mint) 12%, transparent)";
+      msg.style.color = "var(--pd-mint)";
+      msg.textContent = "Payment complete — credits land on your balance once Stripe confirms.";
+    } else if (params.get("status") === "cancel") {
+      msg.classList.remove("hidden");
+      msg.style.background = "var(--pd-bg2)";
+      msg.style.color = "var(--pd-ink2)";
+      msg.textContent = "Checkout canceled — no charge made.";
+    }
+
+    document.querySelectorAll<HTMLButtonElement>(".pd-buy").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const orig = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Redirecting…";
+        try {
+          const res = await fetch("/api/billing/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind: btn.dataset.kind, id: btn.dataset.id }),
+          });
+          const data = await res.json();
+          if (res.status === 401) { window.location.href = "/auth/sign-in?redirect=/credits"; return; }
+          if (data.url) window.location.href = data.url;
+          else { btn.disabled = false; btn.textContent = orig; (window as any).pdToast?.(data.error || "Could not start checkout."); }
+        } catch {
+          btn.disabled = false;
+          btn.textContent = orig;
+          (window as any).pdToast?.("Network error.");
+        }
+      });
+    });
+  </script>
+</AppShell>
