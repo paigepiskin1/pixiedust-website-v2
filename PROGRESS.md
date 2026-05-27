@@ -108,6 +108,17 @@ The full old-site functional inventory and the design audit were produced during
 
 ---
 
+## Template examples + per-second pricing (2026-05-27)
+
+- **Set example from results**: editor "Examples" panel lists this template's completed test results;
+  "Use as example" → `POST /api/admin/templates/set-preview` sets `preview_video`/`preview_image`,
+  which renders as the frontend example. VERIFIED.
+- **Per-second video pricing**: migration `0004_pricing.sql` adds `templates.price_per_second` +
+  `durations_json`. `computeCost(…, {duration})` bills `price_per_second × duration` when set, ×
+  quantity × quality. Workspace renders a duration control (from `durations_json`); cost updates live
+  (VERIFIED: 3 cr/sec → 5s=15cr, 10s=30cr). `/api/generate` applies the duration to input + cost; for
+  chains, controls are exposed to step inputs via `{{duration}}`/`{{aspect}}`/`{{quantity}}`.
+
 ## Template authoring tools + multi-step chaining (2026-05-27, post-Phase 9)
 
 - **Replicate-only** provider in the editor (others hidden).

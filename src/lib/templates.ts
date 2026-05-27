@@ -58,6 +58,8 @@ export interface Template {
   fields: TemplateField[];
   steps: TemplateStep[] | null;
   creditCost: number;
+  pricePerSecond: number | null;
+  durations: number[] | null;
   quality: Record<string, number> | null;
   aspects: string[] | null;
   quantities: number[] | null;
@@ -80,7 +82,7 @@ export interface Template {
 interface TemplateRow {
   id: string; title: string; kind: string; type: string; category: string | null;
   provider: string; model: string; input_json: string; fields_json: string; steps_json: string | null;
-  credit_cost: number; quality_json: string | null; aspects_json: string | null; quantities_json: string | null;
+  credit_cost: number; price_per_second: number | null; durations_json: string | null; quality_json: string | null; aspects_json: string | null; quantities_json: string | null;
   engine: string | null; eta: string | null; tags_json: string; tone: string; accent: string | null;
   meta: string | null; subtitle: string | null; description: string | null;
   preview_image: string | null; preview_video: string | null;
@@ -109,6 +111,8 @@ export function rowToTemplate(r: TemplateRow): Template {
     fields: parse<TemplateField[]>(r.fields_json, []),
     steps: r.steps_json ? parse<TemplateStep[]>(r.steps_json, []) : null,
     creditCost: r.credit_cost,
+    pricePerSecond: r.price_per_second ?? null,
+    durations: r.durations_json ? parse<number[]>(r.durations_json, []) : null,
     quality: r.quality_json ? parse<Record<string, number>>(r.quality_json, {}) : null,
     aspects: r.aspects_json ? parse<string[]>(r.aspects_json, []) : null,
     quantities: r.quantities_json ? parse<number[]>(r.quantities_json, []) : null,
@@ -221,11 +225,15 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
   return { input: subst(t.input) as Record<string, unknown>, errors };
 }
 
-/** Server-side cost: credit_cost x quantity x quality multiplier (rounded up). */
-export function computeCost(t: Template, opts: { quality?: string; quantity?: number } = {}): number {
+/**
+ * Server-side cost. Video templates with price_per_second bill per second of
+ * duration; otherwise the flat credit_cost. Then x quantity x quality multiplier.
+ */
+export function computeCost(t: Template, opts: { quality?: string; quantity?: number; duration?: number } = {}): number {
   const qty = Math.max(1, opts.quantity ?? 1);
   const mult = opts.quality && t.quality ? t.quality[opts.quality] ?? 1 : 1;
-  return Math.ceil(t.creditCost * qty * mult);
+  const base = t.pricePerSecond && t.pricePerSecond > 0 && opts.duration ? t.pricePerSecond * opts.duration : t.creditCost;
+  return Math.ceil(base * qty * mult);
 }
 
 /**

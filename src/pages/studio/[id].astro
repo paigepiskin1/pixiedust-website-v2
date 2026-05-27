@@ -16,7 +16,7 @@ const fields = allFields(template);
 const accent = template.accent ?? "var(--pd-lilac)";
 const credits = Astro.locals.user?.credits ?? 0;
 const signedIn = !!Astro.locals.user;
-const baseCost = computeCost(template, { quantity: template.quantities?.[0] ?? 1 });
+const baseCost = computeCost(template, { quantity: template.quantities?.[0] ?? 1, duration: template.durations?.[0] });
 const qualityKeys = template.quality ? Object.keys(template.quality) : [];
 const qualityLabels: Record<string, string> = { std: "Standard", pro: "Pro", cinema: "Cinema" };
 
@@ -24,6 +24,8 @@ const config = {
   id: template.id,
   type: template.type,
   creditCost: template.creditCost,
+  pricePerSecond: template.pricePerSecond,
+  durations: template.durations,
   quality: template.quality,
   credits,
   signedIn,
@@ -95,6 +97,17 @@ const config = {
                 <div class="flex flex-wrap gap-1.5" data-controls="aspect">
                   {template.aspects.map((a, i) => (
                     <button type="button" class="pd-seg rounded-lg font-mono" data-val={a} data-active={i === 0 ? "true" : "false"} style="padding:7px 12px;font-size:11px;cursor:pointer;">{a}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {template.durations && template.durations.length > 0 && (
+              <div>
+                <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Duration{template.pricePerSecond ? ` · ${template.pricePerSecond} cr/sec` : ""}</span>
+                <div class="flex flex-wrap gap-1.5" data-controls="duration">
+                  {template.durations.map((d, i) => (
+                    <button type="button" class="pd-seg rounded-lg font-semibold" data-val={d} data-active={i === 0 ? "true" : "false"} style="padding:7px 14px;font-size:12px;cursor:pointer;">{d}s</button>
                   ))}
                 </div>
               </div>
@@ -194,8 +207,12 @@ const config = {
     function quantity(): number {
       return Number(controlValue("quantity")) || 1;
     }
+    function duration(): number {
+      return Number(controlValue("duration")) || (cfg.durations && cfg.durations[0]) || 0;
+    }
     function cost(): number {
-      return Math.ceil(Number(cfg.creditCost) * quantity() * qualityMult());
+      const base = cfg.pricePerSecond && duration() ? Number(cfg.pricePerSecond) * duration() : Number(cfg.creditCost);
+      return Math.ceil(base * quantity() * qualityMult());
     }
 
     const genBtn = $("#pd-generate") as HTMLButtonElement;
@@ -333,6 +350,7 @@ const config = {
             quality: controlValue("quality") || undefined,
             quantity: quantity(),
             aspect: controlValue("aspect") || undefined,
+            duration: duration() || undefined,
           }),
         });
         const data = await res.json();

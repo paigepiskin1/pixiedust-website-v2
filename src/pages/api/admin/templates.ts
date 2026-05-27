@@ -7,7 +7,7 @@ function json(data: unknown, status = 200) {
 }
 
 const TEXT_COLS = ["id", "title", "kind", "type", "category", "provider", "model", "engine", "eta", "tone", "accent", "meta", "subtitle", "description", "preview_image", "preview_video"];
-const JSON_COLS = ["input_json", "fields_json", "steps_json", "quality_json", "aspects_json", "quantities_json", "tags_json"];
+const JSON_COLS = ["input_json", "fields_json", "steps_json", "quality_json", "aspects_json", "quantities_json", "durations_json", "tags_json"];
 
 export async function POST({ request, locals }: APIContext) {
   if (!isAdmin(locals)) return json({ error: "Forbidden" }, 403);
@@ -43,8 +43,8 @@ export async function POST({ request, locals }: APIContext) {
 
   const cols = [
     ...TEXT_COLS,
-    "input_json", "fields_json", "steps_json", "quality_json", "aspects_json", "quantities_json", "tags_json",
-    "credit_cost", "is_featured", "is_hidden", "sort_order", "updated_at",
+    "input_json", "fields_json", "steps_json", "quality_json", "aspects_json", "quantities_json", "durations_json", "tags_json",
+    "credit_cost", "price_per_second", "is_featured", "is_hidden", "sort_order", "updated_at",
   ];
   const placeholders = cols.map(() => "?").join(",");
   const binds = [
@@ -55,8 +55,10 @@ export async function POST({ request, locals }: APIContext) {
     jsons.quality_json,
     jsons.aspects_json,
     jsons.quantities_json,
+    jsons.durations_json,
     jsons.tags_json ?? "[]",
     Number(d.credit_cost) || 0,
+    d.price_per_second ? Number(d.price_per_second) : null,
     d.is_featured ? 1 : 0,
     d.is_hidden ? 1 : 0,
     Number(d.sort_order) || 0,

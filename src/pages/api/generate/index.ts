@@ -20,7 +20,7 @@ export async function POST({ request, locals }: APIContext) {
   if (!dbUser) return json({ error: "Account not found." }, 401);
   const userId = dbUser.id;
 
-  let body: { templateId?: string; inputs?: Record<string, unknown>; quality?: string; quantity?: number; aspect?: string };
+  let body: { templateId?: string; inputs?: Record<string, unknown>; quality?: string; quantity?: number; aspect?: string; duration?: number };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -37,7 +37,8 @@ export async function POST({ request, locals }: APIContext) {
   if (missing.length) return json({ error: `${missing[0].label} is required`, errors: missing.map((f) => `${f.label} is required`) }, 400);
 
   const qty = Math.max(1, Math.min(Number(body.quantity) || 1, 4));
-  const cost = computeCost(template, { quality: body.quality, quantity: qty });
+  const duration = Number(body.duration) || undefined;
+  const cost = computeCost(template, { quality: body.quality, quantity: qty, duration });
 
   // Limits
   const tier = await getUserTier(db, userId);
@@ -72,8 +73,13 @@ export async function POST({ request, locals }: APIContext) {
       output: null as string | null,
       status: "pending" as string,
     }));
-    const chain = { stepIndex: 0, userInputs: inputs, steps };
-    const step0Input = resolveChainStep(steps[0].input, { user: inputs, outputs: {} }) as Record<string, unknown>;
+    // Make workspace controls available to step inputs via {{duration}}/{{aspect}}/{{quantity}}.
+    const chainInputs: Record<string, unknown> = { ...inputs };
+    if (duration) chainInputs.duration = duration;
+    if (body.aspect) chainInputs.aspect = body.aspect;
+    chainInputs.quantity = qty;
+    const chain = { stepIndex: 0, userInputs: chainInputs, steps };
+    const step0Input = resolveChainStep(steps[0].input, { user: chainInputs, outputs: {} }) as Record<string, unknown>;
 
     await db
       .prepare(
@@ -101,6 +107,7 @@ export async function POST({ request, locals }: APIContext) {
   const { input } = resolveInput(template, inputs);
   if (body.aspect && "aspect_ratio" in input) input.aspect_ratio = body.aspect;
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
+  if (duration && "duration" in input) input.duration = duration;
 
   await db
     .prepare(
