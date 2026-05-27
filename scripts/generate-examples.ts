@@ -36,10 +36,13 @@ async function main() {
   const cookie = setCookies.map((c: string) => c.split(";")[0]).join("; ");
   const authH = { "Content-Type": "application/json", Cookie: cookie, Authorization: `Bearer ${TOKEN}` };
 
-  // 2. List templates lacking an example
+  // 2. List templates to process. FORCE=1 regenerates a fresh example for EVERY
+  // template (even ones whose preview was carried over from the old site);
+  // otherwise only those still missing an example.
+  const FORCE = process.env.FORCE === "1";
   const list = await (await fetch(`${BASE}/api/admin/templates`, { headers: { Authorization: `Bearer ${TOKEN}` } })).json();
-  const todo = (list.templates as any[]).filter((t) => t.id.startsWith(PREFIX) && !t.has_example);
-  console.log(`${todo.length} template(s) without an example (prefix "${PREFIX}").`);
+  const todo = (list.templates as any[]).filter((t) => t.id.startsWith(PREFIX) && (FORCE || !t.has_example));
+  console.log(`${todo.length} template(s) to process (prefix "${PREFIX}", force=${FORCE}).`);
 
   let done = 0, failed = 0;
   for (const t of todo) {

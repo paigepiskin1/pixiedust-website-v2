@@ -13,6 +13,8 @@ export interface HeroSlide {
   cta: string;
   cr: number;
   href: string;
+  previewImage?: string;
+  previewVideo?: string;
 }
 
 export const HERO_SLIDES: HeroSlide[] = [

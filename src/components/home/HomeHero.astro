@@ -2,18 +2,32 @@
 import Media from "../ui/Media.astro";
 import Pill from "../ui/Pill.astro";
 import CreditChip from "../ui/CreditChip.astro";
-import { HERO_SLIDES } from "../../lib/content";
+import { HERO_SLIDES, type HeroSlide } from "../../lib/content";
+
+interface Props {
+  // Real, generated slides (with preview media). When provided they replace the
+  // placeholder gradient slides so the hero plays actual template previews.
+  slides?: HeroSlide[];
+}
+const { slides } = Astro.props;
+const HERO = slides && slides.length ? slides : HERO_SLIDES;
 ---
 
 <div id="pd-hero" class="relative mb-8 overflow-hidden rounded-[24px]" style="height:460px;background:var(--pd-bg2);">
   {
-    HERO_SLIDES.map((s, idx) => (
+    HERO.map((s, idx) => (
       <div
         class="pd-hero-slide absolute inset-0 transition-opacity duration-[800ms]"
         data-idx={idx}
         style={`opacity:${idx === 0 ? 1 : 0};pointer-events:${idx === 0 ? "auto" : "none"};`}
       >
-        <Media tone={s.tone} angle={130} />
+        {s.previewVideo ? (
+          <video src={s.previewVideo} muted loop playsinline autoplay preload="metadata" class="pd-autoplay absolute inset-0 h-full w-full object-cover" />
+        ) : s.previewImage ? (
+          <img src={s.previewImage} alt={s.title} class="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <Media tone={s.tone} angle={130} />
+        )}
         <div class="absolute inset-0" style="background:linear-gradient(110deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0) 100%);" />
         <div class="absolute inset-0" style="background:linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.6) 100%);" />
         <div class="absolute inset-x-7 top-[22px] flex justify-between">
@@ -49,7 +63,7 @@ import { HERO_SLIDES } from "../../lib/content";
   }
   <div id="pd-hero-pips" class="absolute bottom-7 right-7 z-[2] flex gap-1.5">
     {
-      HERO_SLIDES.map((_, idx) => (
+      HERO.map((_, idx) => (
         <button
           type="button"
           class="pd-hero-pip"

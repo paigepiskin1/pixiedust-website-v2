@@ -9,19 +9,46 @@ import FeatureBanner from "../components/home/FeatureBanner.astro";
 import { listTemplates, templateToRail } from "../lib/templates";
 
 const db = Astro.locals.runtime.env.DB;
-const [trending, presets, beauty] = await Promise.all([
+const [trending, presets, beauty, videoPool] = await Promise.all([
   listTemplates(db, { featured: true, limit: 8 }),
   listTemplates(db, { kind: "preset", limit: 8 }),
   listTemplates(db, { kind: "beauty", limit: 8 }),
+  listTemplates(db, { kinds: ["i2v", "video", "motion", "cinema"], limit: 40 }),
 ]);
-const trendingCards = trending.map(templateToRail);
+
+// Surface templates that actually have a generated preview video first, so the
+// hero and trending rail play real motion (the featured query alone is ordered
+// by sort_order/title and often buries the video ones past the limit).
+const videoTemplates = videoPool.filter((t) => t.previewVideo);
+
+// Trending rail = video-preview templates first, then the rest of featured.
+const trendingMerged = [...videoTemplates, ...trending].filter(
+  (t, i, arr) => arr.findIndex((x) => x.id === t.id) === i
+).slice(0, 8);
+const trendingCards = trendingMerged.map(templateToRail);
 const presetCards = presets.map(templateToRail);
 const beautyCards = beauty.map(templateToRail);
+
+// Real hero slides from the video-preview templates so the hero plays actual
+// generated motion. Falls back to curated gradient slides inside HomeHero.
+import type { HeroSlide } from "../lib/content";
+const heroSlides: HeroSlide[] = videoTemplates.slice(0, 5).map((t) => ({
+  tone: "lilac",
+  kicker: t.category || t.kind || "Featured",
+  title: t.title,
+  hot: "Trending",
+  dur: t.eta || "video",
+  cta: "Try template",
+  cr: t.creditCost ?? 0,
+  href: `/studio/${t.id}`,
+  previewImage: t.previewImage ?? undefined,
+  previewVideo: t.previewVideo ?? undefined,
+}));
 ---
 
 <AppShell title="PixieDust — Home" credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
-    <HomeHero />
+    <HomeHero slides={heroSlides} />
 
     <section class="mb-9">
       <RailHead title="Start a project" sub="Pick a tool" accent="var(--pd-teal)" />

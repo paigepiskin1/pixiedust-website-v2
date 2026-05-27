@@ -47,4 +47,45 @@ const { title, description, credits = 47 } = Astro.props;
       })
       .catch(() => {});
   </script>
+
+  <script is:inline>
+    // Preview videos play automatically while on-screen and pause when scrolled
+    // away (keeps many rail/grid videos from all decoding at once). Re-scans on
+    // navigation so dynamically rendered cards are covered too.
+    (function () {
+      function bind() {
+        var vids = document.querySelectorAll("video.pd-autoplay:not([data-pd-bound])");
+        if (!vids.length) return;
+        var io =
+          "IntersectionObserver" in window
+            ? new IntersectionObserver(
+                function (entries) {
+                  entries.forEach(function (en) {
+                    var v = en.target;
+                    if (en.isIntersecting) {
+                      var p = v.play();
+                      if (p && p.catch) p.catch(function () {});
+                    } else {
+                      v.pause();
+                    }
+                  });
+                },
+                { rootMargin: "100px", threshold: 0.1 }
+              )
+            : null;
+        vids.forEach(function (v) {
+          v.setAttribute("data-pd-bound", "1");
+          v.muted = true; // required for autoplay in most browsers
+          if (io) io.observe(v);
+          else {
+            var p = v.play();
+            if (p && p.catch) p.catch(function () {});
+          }
+        });
+      }
+      bind();
+      document.addEventListener("astro:page-load", bind);
+      window.addEventListener("load", bind);
+    })();
+  </script>
 </Base>
