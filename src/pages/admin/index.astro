@@ -1,0 +1,50 @@
+---
+export const prerender = false;
+import AdminShell from "../../layouts/AdminShell.astro";
+import { isAdmin } from "../../lib/admin";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const stats = await db
+  .prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM templates) AS templates,
+       (SELECT COUNT(*) FROM templates WHERE is_hidden=1) AS hidden,
+       (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS users,
+       (SELECT COUNT(*) FROM generations) AS generations,
+       (SELECT COUNT(*) FROM generations WHERE status='completed') AS completed,
+       (SELECT IFNULL(SUM(balance),0) FROM users) AS credits_out`
+  )
+  .first<Record<string, number>>();
+
+const cards = [
+  { label: "Templates", value: stats?.templates ?? 0, hint: `${stats?.hidden ?? 0} hidden` },
+  { label: "Users", value: stats?.users ?? 0, hint: "active accounts" },
+  { label: "Generations", value: stats?.generations ?? 0, hint: `${stats?.completed ?? 0} completed` },
+  { label: "Credits outstanding", value: stats?.credits_out ?? 0, hint: "across all balances" },
+];
+---
+
+<AdminShell title="Admin · Dashboard" tab="dashboard">
+  <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Dashboard</h1>
+  <p class="mt-1 text-ink-3" style="font-size:13.5px;">Overview of the PixieDust catalog and accounts.</p>
+
+  <div class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+    {
+      cards.map((c) => (
+        <div class="rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;">{c.label}</div>
+          <div class="mt-1.5 font-display font-semibold text-ink" style="font-size:30px;letter-spacing:-0.6px;">{c.value}</div>
+          <div class="mt-1 text-ink-3" style="font-size:11.5px;">{c.hint}</div>
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="mt-6 flex flex-wrap gap-3">
+    <a href="/admin/templates" class="rounded-xl font-bold" style="padding:11px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">Manage templates →</a>
+    <a href="/admin/users" class="rounded-xl font-semibold text-ink" style="padding:11px 18px;border:0.5px solid var(--pd-hairline2);font-size:13px;">Users →</a>
+    <a href="/admin/content" class="rounded-xl font-semibold text-ink" style="padding:11px 18px;border:0.5px solid var(--pd-hairline2);font-size:13px;">Content →</a>
+  </div>
+</AdminShell>

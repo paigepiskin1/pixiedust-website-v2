@@ -1,0 +1,147 @@
+---
+export const prerender = false;
+import AdminShell from "../../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../../lib/admin";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const { id } = Astro.params;
+const isNew = id === "new";
+const db = Astro.locals.runtime.env.DB;
+
+interface Row {
+  [k: string]: unknown;
+}
+let row: Row | null = null;
+if (!isNew) {
+  row = await db.prepare("SELECT * FROM templates WHERE id = ?").bind(id).first<Row>();
+  if (!row) return Astro.redirect("/admin/templates");
+}
+
+const v = (k: string, d = "") => (row && row[k] != null ? String(row[k]) : d);
+const DEF_INPUT = '{\n  "prompt": "{{prompt}}",\n  "num_outputs": 1\n}';
+const DEF_FIELDS = '[\n  { "key": "prompt", "type": "textarea", "label": "Prompt", "required": true }\n]';
+const KINDS = ["preset", "shoot", "cinema", "i2v", "fashion-video", "game-video", "motion", "beauty", "fashion", "avatar", "ad", "motion-upload"];
+const TONES = ["teal", "lilac", "mint", "pink", "noir", "dusk", "ice", "amber"];
+const PROVIDERS = ["replicate", "fal", "alibaba", "openai"];
+
+const inp = "width:100%;padding:10px 12px;border-radius:10px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:13px;outline:none;";
+const mono = inp + "font-family:var(--font-mono);font-size:12px;line-height:1.5;";
+const lbl = "display:block;margin-bottom:5px;font-family:var(--font-mono);font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;";
+const card = "padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;margin-bottom:16px;";
+const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--pd-ink);letter-spacing:-0.3px;margin-bottom:14px;";
+---
+
+<AdminShell title={isNew ? "Admin · New template" : `Admin · ${v("title")}`} tab="templates">
+  <div class="mb-5 flex items-center justify-between gap-4">
+    <h1 class="font-display font-medium text-ink" style="font-size:28px;letter-spacing:-0.6px;">{isNew ? "New template" : v("title")}</h1>
+    <a href="/admin/templates" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">← All templates</a>
+  </div>
+
+  <form id="pd-tpl-form" class="max-w-3xl">
+    <input type="hidden" name="_isNew" value={String(isNew)} />
+
+    <div style={card}>
+      <div style={h3}>Basics</div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label><span style={lbl}>Slug / id</span><input name="id" value={v("id")} placeholder="preset-kodak-portra" readonly={!isNew} style={inp + (isNew ? "" : "opacity:0.6;")} /></label>
+        <label><span style={lbl}>Title</span><input name="title" value={v("title")} style={inp} /></label>
+        <label><span style={lbl}>Kind</span><select name="kind" style={inp}>{KINDS.map((k) => <option value={k} selected={v("kind", "preset") === k}>{k}</option>)}</select></label>
+        <label><span style={lbl}>Type</span><select name="type" style={inp}><option value="image" selected={v("type", "image") === "image"}>image</option><option value="video" selected={v("type") === "video"}>video</option></select></label>
+        <label><span style={lbl}>Category</span><input name="category" value={v("category")} placeholder="Film" style={inp} /></label>
+        <label><span style={lbl}>Credit cost</span><input name="credit_cost" type="number" min="0" value={v("credit_cost", "2")} style={inp} /></label>
+      </div>
+    </div>
+
+    <div style={card}>
+      <div class="flex items-center justify-between" style="margin-bottom:14px;">
+        <div style={h3 + "margin:0;"}>Provider payload</div>
+        <button type="button" id="pd-scaffold" class="rounded-lg font-semibold" style="padding:7px 12px;font-size:11px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;">Scaffold fields from placeholders</button>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label><span style={lbl}>Provider</span><select name="provider" style={inp}>{PROVIDERS.map((p) => <option value={p} selected={v("provider", "replicate") === p}>{p}</option>)}</select></label>
+        <label><span style={lbl}>Model</span><input name="model" value={v("model")} placeholder="black-forest-labs/flux-schnell" style={inp} /></label>
+      </div>
+      <label class="mt-3 block"><span style={lbl}>input_json — provider params (use placeholders like prompt)</span><textarea name="input_json" rows="6" style={mono}>{v("input_json", DEF_INPUT)}</textarea></label>
+      <label class="mt-3 block"><span style={lbl}>fields_json — user input definitions</span><textarea name="fields_json" rows="6" style={mono}>{v("fields_json", DEF_FIELDS)}</textarea></label>
+      <label class="mt-3 block"><span style={lbl}>steps_json — multi-step builder (optional, null for single-step)</span><textarea name="steps_json" rows="3" style={mono}>{v("steps_json")}</textarea></label>
+    </div>
+
+    <div style={card}>
+      <div style={h3}>Controls & display</div>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <label><span style={lbl}>quality_json</span><input name="quality_json" value={v("quality_json", '{"std":1,"pro":1.5,"cinema":2.5}')} style={mono} /></label>
+        <label><span style={lbl}>aspects_json</span><input name="aspects_json" value={v("aspects_json", '["1:1","16:9","9:16"]')} style={mono} /></label>
+        <label><span style={lbl}>quantities_json</span><input name="quantities_json" value={v("quantities_json", "[1,2,4]")} style={mono} /></label>
+        <label><span style={lbl}>Engine</span><input name="engine" value={v("engine")} placeholder="Flux Schnell" style={inp} /></label>
+        <label><span style={lbl}>ETA</span><input name="eta" value={v("eta")} placeholder="~10s" style={inp} /></label>
+        <label><span style={lbl}>Tone</span><select name="tone" style={inp}>{TONES.map((t) => <option value={t} selected={v("tone", "lilac") === t}>{t}</option>)}</select></label>
+        <label><span style={lbl}>Accent (css var)</span><input name="accent" value={v("accent", "var(--pd-lilac)")} style={inp} /></label>
+        <label><span style={lbl}>Meta</span><input name="meta" value={v("meta")} placeholder="0:08 / 24 shots" style={inp} /></label>
+        <label><span style={lbl}>tags_json</span><input name="tags_json" value={v("tags_json", "[]")} style={mono} /></label>
+        <label class="sm:col-span-3"><span style={lbl}>Subtitle</span><input name="subtitle" value={v("subtitle")} style={inp} /></label>
+        <label class="sm:col-span-3"><span style={lbl}>Description</span><textarea name="description" rows="2" style={inp}>{v("description")}</textarea></label>
+        <label><span style={lbl}>Preview image URL</span><input name="preview_image" value={v("preview_image")} style={inp} /></label>
+        <label><span style={lbl}>Preview video URL</span><input name="preview_video" value={v("preview_video")} style={inp} /></label>
+        <label><span style={lbl}>Sort order</span><input name="sort_order" type="number" value={v("sort_order", "0")} style={inp} /></label>
+      </div>
+      <div class="mt-3 flex gap-5">
+        <label class="flex items-center gap-2 text-ink" style="font-size:13px;"><input type="checkbox" name="is_featured" checked={v("is_featured") === "1"} /> Featured</label>
+        <label class="flex items-center gap-2 text-ink" style="font-size:13px;"><input type="checkbox" name="is_hidden" checked={v("is_hidden") === "1"} /> Hidden</label>
+      </div>
+    </div>
+
+    <div id="pd-tpl-msg" class="mb-3 hidden rounded-lg" style="padding:9px 12px;font-size:12.5px;"></div>
+    <div class="flex gap-2">
+      <button type="submit" class="rounded-xl font-bold" style="padding:12px 22px;background:var(--pd-lilac);color:#0A0A0B;font-size:13.5px;cursor:pointer;">{isNew ? "Create template" : "Save changes"}</button>
+      <a href="/admin/templates" class="rounded-xl font-semibold text-ink" style="padding:12px 22px;border:0.5px solid var(--pd-hairline2);font-size:13.5px;">Cancel</a>
+    </div>
+  </form>
+
+  <script>
+    const form = document.getElementById("pd-tpl-form") as HTMLFormElement;
+    const msg = document.getElementById("pd-tpl-msg")!;
+    const jsonFields = ["input_json", "fields_json", "steps_json", "quality_json", "aspects_json", "quantities_json", "tags_json"];
+
+    function show(text: string, ok: boolean) {
+      msg.classList.remove("hidden");
+      msg.style.background = ok ? "color-mix(in srgb, var(--pd-mint) 12%, transparent)" : "color-mix(in srgb, var(--pd-pink) 12%, transparent)";
+      msg.style.color = ok ? "var(--pd-mint)" : "var(--pd-pink)";
+      msg.textContent = text;
+    }
+
+    // Scaffold fields[] from {{placeholders}} in input_json
+    document.getElementById("pd-scaffold")!.addEventListener("click", () => {
+      const inputEl = form.elements.namedItem("input_json") as HTMLTextAreaElement;
+      const fieldsEl = form.elements.namedItem("fields_json") as HTMLTextAreaElement;
+      const matches = Array.from(inputEl.value.matchAll(/\{\{(\w+)(\*?)\}\}/g));
+      const seen = new Set<string>();
+      const guess = (k: string) => (/(prompt|description|caption)/i.test(k) ? "textarea" : /(image|photo|file|img)/i.test(k) ? "file" : /(num|count|qty|strength|steps|scale)/i.test(k) ? "number" : "text");
+      const fields = matches
+        .filter((m) => !seen.has(m[1]) && seen.add(m[1]))
+        .map((m) => ({ key: m[1], type: guess(m[1]), label: m[1].replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), required: m[2] === "*" }));
+      fieldsEl.value = JSON.stringify(fields, null, 2);
+      show(`Scaffolded ${fields.length} field(s) — review types/labels.`, true);
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data: Record<string, unknown> = {};
+      for (const el of Array.from(form.elements) as HTMLInputElement[]) {
+        if (!el.name || el.name === "_isNew") continue;
+        if (el.type === "checkbox") data[el.name] = el.checked ? 1 : 0;
+        else data[el.name] = el.value;
+      }
+      // validate JSON fields
+      for (const f of jsonFields) {
+        const raw = String(data[f] ?? "").trim();
+        if (!raw) continue;
+        try { JSON.parse(raw); } catch { return show(`${f} is not valid JSON.`, false); }
+      }
+      const res = await fetch("/api/admin/templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const out = await res.json();
+      if (res.ok) { show("Saved. Redirecting…", true); setTimeout(() => (window.location.href = "/admin/templates"), 500); }
+      else show(out.error || "Save failed.", false);
+    });
+  </script>
+</AdminShell>

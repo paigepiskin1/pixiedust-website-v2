@@ -1,0 +1,77 @@
+---
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+interface Row {
+  id: string; title: string; kind: string; type: string;
+  credit_cost: number; is_featured: number; is_hidden: number; sort_order: number;
+}
+const { results } = await db
+  .prepare("SELECT id, title, kind, type, credit_cost, is_featured, is_hidden, sort_order FROM templates ORDER BY sort_order ASC, title ASC")
+  .all<Row>();
+const rows = results ?? [];
+const cell = "padding:11px 12px;font-size:12.5px;color:var(--pd-ink);border-bottom:0.5px solid var(--pd-hairline);";
+const head = "padding:8px 12px;font-family:var(--font-mono);font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;text-align:left;border-bottom:0.5px solid var(--pd-hairline2);";
+---
+
+<AdminShell title="Admin · Templates" tab="templates">
+  <div class="flex items-end justify-between gap-4">
+    <div>
+      <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Templates</h1>
+      <p class="mt-1 text-ink-3" style="font-size:13.5px;">{rows.length} templates drive the catalog + workspace.</p>
+    </div>
+    <a href="/admin/templates/edit/new" class="shrink-0 rounded-xl font-bold" style="padding:11px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">+ New template</a>
+  </div>
+
+  <div class="mt-6 overflow-x-auto rounded-2xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+    <table style="width:100%;border-collapse:collapse;min-width:720px;">
+      <thead>
+        <tr>
+          <th style={head}>Title</th><th style={head}>Kind</th><th style={head}>Type</th>
+          <th style={head}>Cost</th><th style={head}>Flags</th><th style={head}>Order</th><th style={head}></th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          rows.map((r) => (
+            <tr class="pd-trow" data-id={r.id}>
+              <td style={cell}><a href={`/admin/templates/edit/${r.id}`} class="font-semibold" style="color:var(--pd-ink);">{r.title}</a><div class="font-mono" style="font-size:9.5px;color:var(--pd-ink4);">{r.id}</div></td>
+              <td style={cell}>{r.kind}</td>
+              <td style={cell}>{r.type}</td>
+              <td style={cell}>{r.credit_cost} cr</td>
+              <td style={cell}>
+                {r.is_featured ? <span style="color:var(--pd-amber);font-size:11px;">★ featured </span> : ""}
+                {r.is_hidden ? <span style="color:var(--pd-pink);font-size:11px;">hidden</span> : <span style="color:var(--pd-mint);font-size:11px;">live</span>}
+              </td>
+              <td style={cell}>{r.sort_order}</td>
+              <td style={`${cell}text-align:right;white-space:nowrap;`}>
+                <a href={`/admin/templates/edit/${r.id}`} class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink2);letter-spacing:0.5px;">Edit</a>
+                <button type="button" class="pd-del font-mono uppercase" data-id={r.id} style="margin-left:12px;font-size:10px;color:var(--pd-pink);letter-spacing:0.5px;background:none;border:none;cursor:pointer;">Delete</button>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    document.querySelectorAll<HTMLElement>(".pd-del").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id!;
+        if (!confirm(`Delete template "${id}"? This cannot be undone.`)) return;
+        const res = await fetch("/api/admin/templates/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+        if (res.ok) document.querySelector(`.pd-trow[data-id="${id}"]`)?.remove();
+        else alert("Delete failed.");
+      });
+    });
+  </script>
+</AdminShell>

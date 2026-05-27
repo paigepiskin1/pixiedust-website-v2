@@ -61,7 +61,7 @@ Carry over the old dynamic-placeholder template model, improved:
 | 5 | Data model + template system (D1) | ✅ Done |
 | 6 | Generation pipeline (Worker → SyncNode → Bunny) | ✅ Done |
 | 7 | User features (gallery, account) | ✅ Done |
-| 8 | Admin backend (templates, users, content, moderation) | ⬜ |
+| 8 | Admin backend (templates, users, content, moderation) | ✅ Done |
 | 9 | Monetization (Stripe subs + credit packs, ledger, audit) | ⬜ |
 | 10 | Migration (user accounts + balances) | ⬜ |
 | 11 | Deploy + hardening | ⬜ |
@@ -136,6 +136,17 @@ The full old-site functional inventory and the design audit were produced during
   `Toast` (in `src/components/ui/`), shared nav model `src/lib/nav.ts`. MPA approach: nav uses real
   `<a>` links, active state from `Astro.url.pathname`. Sidebar collapse + theme persist to
   localStorage, restored pre-paint in `Base.astro`. Verified desktop/collapsed/mobile in both themes.
+- **2026-05-27** — Phase 8 done. Admin backend (gated by `locals.user.isAdmin`, `AdminShell` chrome).
+  `/admin` dashboard (template/user/generation/credit stats). `/admin/templates` list + editor
+  (`/admin/templates/edit/[id]`, new+edit) covering the full schema incl. input_json/fields_json/
+  steps_json with JSON validation + a "scaffold fields from placeholders" helper. `/admin/users`
+  (balance adjust → ledger + audit, admin toggle). `/admin/content` moderation grid (all users) +
+  delete. Endpoints under `/api/admin/*` (templates save/delete, users balance/role, generations
+  delete) all admin-guarded + `admin_audit` logged (`src/lib/admin.ts`). Verified as claude.admin:
+  gating, dashboard stats, balance adjust (990→1040), template create+delete round-trip, content
+  grid shows all 4 generations. Dropped the old Telegram inbox / email-export. Note: the sign-in
+  page's `busy` guard sticks if a submit is fired repeatedly before completion — reload to reset
+  (minor; consider resetting busy on a settled promise later).
 - **2026-05-27** — Phase 7 done. Real **Gallery** (`/gallery`, SSR gated): reads the user's
   completed generations from D1 (joined to templates for titles), renders the actual image/video
   grid with tabs (All/Images/Video) and a full **lightbox** (big media, prev/next, download via

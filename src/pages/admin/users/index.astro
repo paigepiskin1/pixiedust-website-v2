@@ -1,0 +1,88 @@
+---
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+interface Row {
+  uid: string; email: string | null; name: string | null; username: string | null;
+  balance: number; is_admin: number; created: string;
+}
+const { results } = await db
+  .prepare("SELECT uid, email, name, username, balance, is_admin, datetime(created_at) AS created FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC")
+  .all<Row>();
+const rows = results ?? [];
+const cell = "padding:11px 12px;font-size:12.5px;color:var(--pd-ink);border-bottom:0.5px solid var(--pd-hairline);vertical-align:middle;";
+const head = "padding:8px 12px;font-family:var(--font-mono);font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;text-align:left;border-bottom:0.5px solid var(--pd-hairline2);";
+const mini = "padding:6px 9px;border-radius:8px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:12px;outline:none;";
+---
+
+<AdminShell title="Admin · Users" tab="users">
+  <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Users</h1>
+  <p class="mt-1 text-ink-3" style="font-size:13.5px;">{rows.length} accounts. Adjust credits (logged to the ledger) or toggle admin.</p>
+
+  <div class="mt-6 overflow-x-auto rounded-2xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+    <table style="width:100%;border-collapse:collapse;min-width:820px;">
+      <thead>
+        <tr><th style={head}>User</th><th style={head}>Balance</th><th style={head}>Adjust credits</th><th style={head}>Admin</th><th style={head}>Joined</th></tr>
+      </thead>
+      <tbody>
+        {
+          rows.map((r) => (
+            <tr data-uid={r.uid}>
+              <td style={cell}>
+                <div class="font-semibold" style="color:var(--pd-ink);">{r.name ?? "—"}</div>
+                <div class="font-mono" style="font-size:10px;color:var(--pd-ink3);">{r.email}{r.username ? ` · @${r.username}` : ""}</div>
+              </td>
+              <td style={cell}><span class="pd-bal font-semibold" style="color:var(--pd-amber);">{r.balance}</span> cr</td>
+              <td style={cell}>
+                <div class="flex items-center gap-1.5">
+                  <input class="pd-delta" type="number" placeholder="±" style={mini + "width:64px;" } />
+                  <input class="pd-reason" type="text" placeholder="reason" style={mini + "width:120px;"} />
+                  <button type="button" class="pd-apply font-semibold" style="padding:6px 12px;border-radius:8px;background:var(--pd-lilac);color:#0A0A0B;font-size:11.5px;cursor:pointer;border:none;">Apply</button>
+                </div>
+              </td>
+              <td style={cell}>
+                <button type="button" class="pd-role font-mono uppercase" data-on={r.is_admin} style={`padding:5px 10px;border-radius:999px;font-size:9.5px;letter-spacing:0.5px;cursor:pointer;border:0.5px solid ${r.is_admin ? "transparent" : "var(--pd-hairline2)"};background:${r.is_admin ? "var(--pd-lilac)" : "transparent"};color:${r.is_admin ? "#0A0A0B" : "var(--pd-ink2)"};`}>{r.is_admin ? "admin" : "user"}</button>
+              </td>
+              <td style={cell}><span class="font-mono" style="font-size:10px;color:var(--pd-ink3);">{r.created}</span></td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    function rowUid(el: HTMLElement): string {
+      return (el.closest("tr") as HTMLElement).dataset.uid!;
+    }
+    document.querySelectorAll<HTMLElement>(".pd-apply").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const tr = btn.closest("tr") as HTMLElement;
+        const delta = Number((tr.querySelector(".pd-delta") as HTMLInputElement).value);
+        const reason = (tr.querySelector(".pd-reason") as HTMLInputElement).value.trim();
+        if (!delta) return alert("Enter a non-zero delta.");
+        const res = await fetch("/api/admin/users/balance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid: tr.dataset.uid, delta, reason }) });
+        const out = await res.json();
+        if (res.ok) {
+          (tr.querySelector(".pd-bal") as HTMLElement).textContent = String(out.balance);
+          (tr.querySelector(".pd-delta") as HTMLInputElement).value = "";
+          (tr.querySelector(".pd-reason") as HTMLInputElement).value = "";
+          (window as any).pdToast?.(`Balance → ${out.balance} cr`, { accent: "var(--pd-amber)" });
+        } else alert(out.error || "Failed");
+      });
+    });
+    document.querySelectorAll<HTMLElement>(".pd-role").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const next = btn.dataset.on === "1" ? 0 : 1;
+        if (!confirm(`Set this user to ${next ? "admin" : "user"}?`)) return;
+        const res = await fetch("/api/admin/users/role", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid: rowUid(btn), is_admin: next }) });
+        if (res.ok) location.reload();
+        else alert("Failed");
+      });
+    });
+  </script>
+</AdminShell>

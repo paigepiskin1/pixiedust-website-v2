@@ -1,0 +1,64 @@
+---
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+interface Row {
+  id: string; output_url: string | null; type: string; status: string; kind: string;
+  created: string; email: string | null;
+}
+const { results } = await db
+  .prepare(
+    `SELECT g.id, g.output_url, g.type, g.status, g.kind, datetime(g.created_at) AS created, u.email
+     FROM generations g JOIN users u ON u.id = g.user_id
+     ORDER BY g.created_at DESC LIMIT 60`
+  )
+  .all<Row>();
+const rows = results ?? [];
+---
+
+<AdminShell title="Admin · Content" tab="content">
+  <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Content</h1>
+  <p class="mt-1 text-ink-3" style="font-size:13.5px;">Latest {rows.length} generations across all users. Remove anything that violates the AUP.</p>
+
+  {
+    rows.length === 0 ? (
+      <div class="mt-6 rounded-2xl text-center text-ink-3" style="padding:48px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:13px;">No generations yet.</div>
+    ) : (
+      <div class="mt-6 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+        {rows.map((r) => (
+          <div class="pd-ccard relative overflow-hidden rounded-2xl" data-id={r.id} style="aspect-ratio:1/1.15;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+            {r.output_url && r.status === "completed" ? (
+              r.type === "video" ? (
+                <video src={r.output_url} muted playsinline preload="metadata" class="h-full w-full object-cover" />
+              ) : (
+                <img src={r.output_url} loading="lazy" alt="" class="h-full w-full object-cover" />
+              )
+            ) : (
+              <div class="flex h-full w-full items-center justify-center font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">{r.status}</div>
+            )}
+            <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 p-2" style="background:linear-gradient(180deg,transparent,rgba(0,0,0,0.8));">
+              <span class="truncate font-mono" style="font-size:9px;color:rgba(255,255,255,0.85);">{r.email}</span>
+              <button type="button" class="pd-cdel shrink-0 font-mono uppercase" data-id={r.id} style="font-size:9px;color:var(--pd-pink);background:none;border:none;cursor:pointer;letter-spacing:0.5px;">Del</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  <script>
+    document.querySelectorAll<HTMLElement>(".pd-cdel").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id!;
+        if (!confirm("Delete this generation? (moderation)")) return;
+        const res = await fetch("/api/admin/generations/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+        if (res.ok) document.querySelector(`.pd-ccard[data-id="${id}"]`)?.remove();
+        else alert("Delete failed.");
+      });
+    });
+  </script>
+</AdminShell>
