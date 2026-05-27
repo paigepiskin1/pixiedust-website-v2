@@ -8,12 +8,12 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "astro": "astro",
-    "db:migrate": "wrangler d1 migrations apply pixiedust --local",
-    "db:seed": "wrangler d1 execute pixiedust --local --file=seed/seed.sql && wrangler d1 execute pixiedust --local --file=seed/migrate-templates.sql && wrangler d1 execute pixiedust --local --file=seed/seed-previews.sql && wrangler d1 execute pixiedust --local --command=\"INSERT OR IGNORE INTO users (uid,email,name,balance,is_admin,is_adult) VALUES ('2P84xTEyuXQoPUIknbZkDS40JdB2','claude.tester@pixiedust.dev','Claude Tester',1000,0,1),('7RkzBfyW7pW0cGhTV8exuhCXI6I3','claude.admin@pixiedust.dev','Claude Admin',1000,1,1);\"",
-    "db:reset": "npm run db:migrate && npm run db:seed",
-    "db:export-previews": "CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=15149dc8d99998b6c96a67c2cf52ad7c node scripts/export-previews.mjs",
-    "deploy": "astro build && wrangler pages deploy dist --project-name=pixiedust-sys --commit-dirty=true"
+    "deploy": "npm run build && node scripts/dev.mjs wrangler pages deploy dist --project-name=pixiedust-sys --commit-dirty=true",
+    "db:migrate": "node scripts/dev.mjs wrangler d1 migrations apply pixiedust --remote",
+    "db:export-previews": "node scripts/dev.mjs node scripts/export-previews.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply pixiedust --local",
+    "db:seed:local": "wrangler d1 execute pixiedust --local --file=seed/seed.sql && wrangler d1 execute pixiedust --local --file=seed/migrate-templates.sql && wrangler d1 execute pixiedust --local --file=seed/seed-previews.sql && wrangler d1 execute pixiedust --local --command=\"INSERT OR IGNORE INTO users (uid,email,name,balance,is_admin,is_adult) VALUES ('2P84xTEyuXQoPUIknbZkDS40JdB2','claude.tester@pixiedust.dev','Claude Tester',1000,0,1),('7RkzBfyW7pW0cGhTV8exuhCXI6I3','claude.admin@pixiedust.dev','Claude Admin',1000,1,1);\"",
+    "db:reset:local": "npm run db:migrate:local && npm run db:seed:local"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.13",
