@@ -28,6 +28,7 @@ export interface TemplateField {
   step?: number;
   accept?: string;
   placeholder?: string;
+  multiple?: boolean;
 }
 
 export interface TemplateStep {
