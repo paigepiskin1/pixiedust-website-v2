@@ -466,6 +466,90 @@ const config = {
       return (e || "Generation failed") + " — you weren't charged.";
     }
 
+    // ── Lightbox ──
+    let lbEl: HTMLElement | null = null;
+    let lbList: string[] = [];
+    let lbCur = 0;
+    let lbIsVideo = false;
+
+    function buildLb() {
+      if (lbEl) return;
+      lbEl = document.createElement("div");
+      lbEl.style.cssText = "display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);align-items:center;justify-content:center;cursor:zoom-out;";
+      lbEl.innerHTML =
+        '<div id="pd-lb-wrap" style="position:relative;cursor:default;display:flex;align-items:center;justify-content:center;">' +
+          '<div id="pd-lb-media" style="display:flex;align-items:center;justify-content:center;"></div>' +
+        '</div>' +
+        '<div id="pd-lb-dl" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);"></div>' +
+        '<button id="pd-lb-close" style="position:fixed;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" aria-label="Close">✕</button>' +
+        '<button id="pd-lb-prev" style="position:fixed;left:14px;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;">‹</button>' +
+        '<button id="pd-lb-next" style="position:fixed;right:14px;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;">›</button>';
+      document.body.appendChild(lbEl);
+
+      document.getElementById("pd-lb-wrap")!.addEventListener("click", e => e.stopPropagation());
+      lbEl.addEventListener("click", closeLb);
+      document.getElementById("pd-lb-close")!.addEventListener("click", closeLb);
+      document.getElementById("pd-lb-prev")!.addEventListener("click", e => { e.stopPropagation(); lbGo(lbCur - 1); });
+      document.getElementById("pd-lb-next")!.addEventListener("click", e => { e.stopPropagation(); lbGo(lbCur + 1); });
+      document.addEventListener("keydown", e => {
+        if (!lbEl || lbEl.style.display !== "flex") return;
+        if (e.key === "Escape") closeLb();
+        if (e.key === "ArrowLeft") lbGo(lbCur - 1);
+        if (e.key === "ArrowRight") lbGo(lbCur + 1);
+      });
+    }
+
+    function lbGo(idx: number) {
+      buildLb();
+      lbCur = Math.max(0, Math.min(idx, lbList.length - 1));
+      const url = lbList[lbCur];
+      const mediaEl = document.getElementById("pd-lb-media")!;
+      const dlEl = document.getElementById("pd-lb-dl")!;
+      const prevBtn = document.getElementById("pd-lb-prev") as HTMLButtonElement;
+      const nextBtn = document.getElementById("pd-lb-next") as HTMLButtonElement;
+
+      // Pause any previous video
+      mediaEl.querySelector("video")?.pause();
+      mediaEl.innerHTML = "";
+
+      if (lbIsVideo) {
+        const v = document.createElement("video");
+        v.src = url; v.controls = true; v.autoplay = true; v.playsInline = true; v.loop = true;
+        v.style.cssText = "max-width:min(94vw,1080px);max-height:86vh;border-radius:14px;display:block;";
+        mediaEl.appendChild(v);
+      } else {
+        const img = document.createElement("img");
+        img.src = url;
+        img.style.cssText = "max-width:min(94vw,1200px);max-height:86vh;border-radius:14px;display:block;object-fit:contain;";
+        mediaEl.appendChild(img);
+      }
+
+      dlEl.innerHTML = "";
+      const a = document.createElement("a");
+      a.href = url; a.download = "";
+      a.textContent = "↓ Download";
+      a.style.cssText = "padding:8px 18px;border-radius:10px;background:rgba(255,255,255,.13);backdrop-filter:blur(6px);border:0.5px solid rgba(255,255,255,.2);color:#fff;font-size:12.5px;text-decoration:none;display:inline-block;";
+      dlEl.appendChild(a);
+
+      prevBtn.style.display = lbList.length > 1 ? "flex" : "none";
+      nextBtn.style.display = lbList.length > 1 ? "flex" : "none";
+      (prevBtn as HTMLElement).style.opacity = lbCur > 0 ? "1" : "0.3";
+      (nextBtn as HTMLElement).style.opacity = lbCur < lbList.length - 1 ? "1" : "0.3";
+
+      lbEl!.style.display = "flex";
+      document.body.style.overflow = "hidden";
+    }
+
+    function openLb(urls: string[], startIdx = 0, video = false) {
+      lbList = urls; lbIsVideo = video;
+      lbGo(startIdx);
+    }
+
+    function closeLb() {
+      if (lbEl) { lbEl.style.display = "none"; lbEl.querySelector("video")?.pause(); }
+      document.body.style.overflow = "";
+    }
+
     // Each Generate click spawns an independent job tile that polls on its own,
     // so users can queue many generations in parallel (async). The button is
     // never disabled.
@@ -497,31 +581,47 @@ const config = {
       (tile.firstElementChild as HTMLElement).textContent = msg;
     }
 
-    function tileResult(tile: HTMLElement, outputs: string[]) {
+    function tileResult(tile: HTMLElement, outputs: string[], genId?: string) {
       tile.innerHTML = "";
+      tile.style.cursor = "zoom-in";
       const wrap = document.createElement("div");
       wrap.style.cssText = `display:grid;gap:4px;width:100%;height:100%;grid-template-columns:repeat(${outputs.length > 1 ? 2 : 1},1fr);`;
-      outputs.forEach((url) => {
+      outputs.forEach((url, i) => {
+        const cell = document.createElement("div");
+        cell.style.cssText = "position:relative;overflow:hidden;cursor:zoom-in;";
         const el = isVideo ? document.createElement("video") : document.createElement("img");
         el.src = url;
         if (isVideo) {
           const v = el as HTMLVideoElement;
-          v.controls = true;
           v.playsInline = true;
           v.muted = true;
           v.loop = true;
           v.autoplay = true;
         }
-        el.style.cssText = "width:100%;height:100%;object-fit:cover;";
-        wrap.appendChild(el);
+        el.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+        cell.appendChild(el);
+        cell.addEventListener("click", () => openLb(outputs, i, isVideo));
+        wrap.appendChild(cell);
       });
       tile.appendChild(wrap);
+
+      // Expand icon (top-right)
+      const expandBtn = document.createElement("button");
+      expandBtn.type = "button";
+      expandBtn.title = "View fullscreen";
+      expandBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 1h3v3M10 1 6.5 4.5M4 10H1V7M1 10l3.5-3.5"/></svg>`;
+      expandBtn.style.cssText = "position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
+      expandBtn.addEventListener("click", e => { e.stopPropagation(); openLb(outputs, 0, isVideo); });
+      tile.appendChild(expandBtn);
+
+      // Download (uses protected endpoint when genId available, else direct CDN)
       if (outputs[0]) {
         const dl = document.createElement("a");
-        dl.href = outputs[0];
-        dl.setAttribute("download", "");
-        dl.textContent = "Download";
-        dl.style.cssText = "position:absolute;right:8px;bottom:8px;padding:5px 10px;border-radius:8px;background:rgba(10,10,11,.72);backdrop-filter:blur(8px);color:#fff;font-size:10.5px;text-decoration:none;";
+        dl.href = genId ? `/api/download?id=${encodeURIComponent(genId)}` : outputs[0];
+        if (!genId) dl.setAttribute("download", "");
+        dl.title = "Download";
+        dl.textContent = "↓";
+        dl.style.cssText = "position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center;z-index:1;";
         tile.appendChild(dl);
       }
     }
@@ -541,7 +641,7 @@ const config = {
         if (data.steps > 1 && data.step) tileStage(tile, `Step ${data.step}/${data.steps}…`, Math.min(12 + tick * 10, 92));
         else tileStage(tile, stages[Math.min(tick, stages.length - 1)] + "…", Math.min(12 + tick * 14, 92));
         if (data.status === "completed") {
-          tileResult(tile, data.outputs || []);
+          tileResult(tile, data.outputs || [], id);
           return;
         }
         if (data.status === "failed") {
