@@ -9,7 +9,7 @@ const db = Astro.locals.runtime.env.DB;
 const items = (await listTemplates(db, { kind: "fashion" })).map(templateToCard);
 ---
 
-<AppShell title="Fashion Try-on — PixieDust" credits={Astro.locals.user?.credits ?? 47}>
+<AppShell title="Virtual AI Fashion Try-on — PixieDust" description="See how any outfit looks on you with AI. Virtual try-on for clothes, accessories, and full looks — no fitting room needed." credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <PageHeader
       kicker="Wear anything · 2 cr"

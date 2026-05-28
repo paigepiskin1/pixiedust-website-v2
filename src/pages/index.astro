@@ -47,7 +47,12 @@ const heroSlides: HeroSlide[] = videoTemplates.slice(0, 5).map((t) => ({
 }));
 ---
 
-<AppShell title="PixieDust — Home" credits={Astro.locals.user?.credits ?? 47}>
+<AppShell
+  title="PixieDust — AI Image & Video Generator"
+  description="Turn your ideas into stunning AI-generated images and videos in seconds. 150+ templates, no design skills needed. Try free."
+  ogType="website"
+  credits={Astro.locals.user?.credits ?? 47}
+>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <HomeHero slides={heroSlides} />
 

@@ -30,7 +30,7 @@ const usd = (c: number) => "$" + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
 const feats = (s: string) => { try { return JSON.parse(s) as string[]; } catch { return []; } };
 ---
 
-<AppShell title="Credits & plans — PixieDust" credits={user?.credits ?? 47}>
+<AppShell title="Credits & Plans — PixieDust" description="Flexible credit plans for PixieDust AI. Start free and scale as you create — pay only for what you generate." credits={user?.credits ?? 47}>
   {toppedUp && <SparkleBurst client:only="react" />}
   <div class="mx-auto w-full" style="max-width:1100px;padding:28px;">
     <PageHeader kicker="Billing · credits power every generation" title="Credits & plans" sub="Subscribe for a monthly allotment + discounted packs, or top up anytime. One credit ledger across the studio." />

@@ -8,16 +8,29 @@ import Toast from "../components/ui/Toast.astro";
 interface Props {
   title?: string;
   description?: string;
+  ogImage?: string;
+  ogType?: string;
+  noindex?: boolean;
+  jsonLd?: string;
   credits?: number;
 }
-const { title, description } = Astro.props;
+const { title, description, ogImage, ogType, jsonLd } = Astro.props;
+
+// Auto-noindex private/gated sections — defence in depth alongside robots.txt
+const path = Astro.url.pathname;
+const autoNoindex =
+  Astro.props.noindex ??
+  (path.startsWith("/admin") ||
+   path.startsWith("/studio") ||
+   path.startsWith("/account") ||
+   path.startsWith("/auth"));
 // Read the signed-in user server-side so the shell renders the real account on
 // first paint (no flash of the logged-out default on navigation).
 const user = Astro.locals.user ?? null;
 const credits = user?.credits ?? Astro.props.credits ?? 47;
 ---
 
-<Base title={title} description={description}>
+<Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd}>
   <div class="flex min-h-screen">
     <Sidebar credits={credits} user={user} />
     <div class="flex min-w-0 flex-1 flex-col">

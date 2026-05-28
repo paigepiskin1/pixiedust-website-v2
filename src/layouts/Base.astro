@@ -4,12 +4,59 @@ import "../styles/global.css";
 interface Props {
   title?: string;
   description?: string;
+  /** Full URL to a 1200×630 share image. Defaults to /og-default.png */
+  ogImage?: string;
+  /** "website" | "article" — defaults to "website" */
+  ogType?: string;
+  /** Pass true for admin/account/studio pages to suppress indexing */
+  noindex?: boolean;
+  /** Optional extra JSON-LD object (stringified) to inject alongside the base schema */
+  jsonLd?: string;
 }
 
 const {
   title = "PixieDust",
   description = "Your pocket creative studio, in your browser.",
+  ogImage,
+  ogType = "website",
+  noindex = false,
+  jsonLd,
 } = Astro.props;
+
+const SITE = "https://pixiedustapp.com";
+const canonicalURL = new URL(Astro.url.pathname, SITE).href;
+const resolvedOgImage = ogImage ?? `${SITE}/og-default.png`;
+
+// Base WebSite + WebApplication JSON-LD — always present on every page
+const baseJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE}/#organization`,
+      name: "PixieDust",
+      url: SITE,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE}/favicon.svg`,
+      },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE}/#website`,
+      url: SITE,
+      name: "PixieDust",
+      description: "AI-powered creative studio — generate images and videos in seconds.",
+      publisher: { "@id": `${SITE}/#organization` },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: { "@type": "EntryPoint", urlTemplate: `${SITE}/explore?q={search_term_string}` },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    ...(jsonLd ? [JSON.parse(jsonLd)] : []),
+  ],
+};
 ---
 
 <!doctype html>
@@ -17,9 +64,38 @@ const {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Primary meta -->
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+    {noindex && <meta name="robots" content="noindex,nofollow" />}
+
+    <!-- Open Graph -->
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={resolvedOgImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="PixieDust" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@pixiedustapp" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={resolvedOgImage} />
+
+    <!-- Icons + theme -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#7c3aed" />
+
+    <!-- JSON-LD structured data -->
+    <script type="application/ld+json" set:html={JSON.stringify(baseJsonLd)} />
 
     <!-- Restore persisted theme + sidebar state before paint to avoid a flash. -->
     <script is:inline>
