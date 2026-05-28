@@ -2,6 +2,9 @@
 // admins can see what went out and whether it succeeded. Uses the Mailgun
 // HTTP API (Basic auth: "api:<sending-key>") — no SDK, works on Workers.
 import type { D1Database } from "@cloudflare/workers-types";
+import { getSetting } from "./app-settings";
+import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_HTML, renderWelcomeEmail } from "./welcome-email-default";
+import type { DbUser } from "./users";
 
 export interface MailgunEnv {
   MAILGUN_API_KEY: string;
@@ -126,4 +129,44 @@ export async function emailLogStats(db: D1Database): Promise<EmailLogStats> {
     error: row?.error ?? 0,
     queued: row?.queued ?? 0,
   };
+}
+
+/**
+ * Send a welcome email to a newly-registered user, then mark welcome_sent_at
+ * on the users row so we never double-send. No-ops if already sent or no email.
+ */
+export async function sendWelcomeEmail(
+  env: MailgunEnv,
+  db: D1Database,
+  user: DbUser
+): Promise<void> {
+  if (!user.email || user.welcome_sent_at) return;
+
+  // Load subject + HTML from admin-editable settings; fall back to defaults.
+  const [subjectSetting, htmlSetting] = await Promise.all([
+    getSetting(db, "welcome_email_subject"),
+    getSetting(db, "welcome_email_html"),
+  ]);
+  const subject = subjectSetting || DEFAULT_WELCOME_SUBJECT;
+  const rawHtml = (!htmlSetting || htmlSetting === "<!-- DEFAULT -->") ? DEFAULT_WELCOME_HTML : htmlSetting;
+  const html = renderWelcomeEmail(rawHtml, {
+    name: user.name,
+    email: user.email,
+    credits: user.balance,
+  });
+
+  // Mark sent first to prevent duplicate sends on retried requests.
+  await db
+    .prepare("UPDATE users SET welcome_sent_at = datetime('now') WHERE uid = ?")
+    .bind(user.uid)
+    .run();
+
+  // Fire and forget — don't block the sign-in response on email delivery.
+  sendEmail(env, db, {
+    to: user.email,
+    subject,
+    html,
+    template: "welcome",
+    userUid: user.uid,
+  }).catch((err) => console.error("[welcome-email] send error:", err));
 }

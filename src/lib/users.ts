@@ -17,6 +17,7 @@ export interface DbUser {
   last_login: string | null;
   deleted_at: string | null;
   stripe_customer_id: string | null;
+  welcome_sent_at: string | null;
 }
 
 /** Shape exposed to the client (no internal-only fields leak meaningfully). */

@@ -1,0 +1,152 @@
+---
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+import { getSetting } from "../../../lib/app-settings";
+import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_HTML } from "../../../lib/welcome-email-default";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const [subjectRaw, htmlRaw] = await Promise.all([
+  getSetting(db, "welcome_email_subject"),
+  getSetting(db, "welcome_email_html"),
+]);
+const initSubject = subjectRaw || DEFAULT_WELCOME_SUBJECT;
+const initHtml = (!htmlRaw || htmlRaw === "<!-- DEFAULT -->") ? DEFAULT_WELCOME_HTML : htmlRaw;
+---
+
+<AdminShell title="Admin · Welcome Email" tab="email">
+  <div style="display:flex;flex-direction:column;height:calc(100vh - var(--pd-topbar-h, 56px));">
+
+    <!-- Toolbar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;border-bottom:0.5px solid var(--pd-hairline);flex-shrink:0;flex-wrap:wrap;">
+      <div>
+        <h1 class="font-display font-medium text-ink" style="font-size:20px;letter-spacing:-0.4px;margin:0;">Welcome Email</h1>
+        <p style="margin:2px 0 0;font-size:12.5px;color:var(--pd-ink3);">Sent once per user on their first sign-in. Supports <code style="font-size:11px;background:var(--pd-bg3);padding:1px 5px;border-radius:4px;">{"{{name}}"}</code>, <code style="font-size:11px;background:var(--pd-bg3);padding:1px 5px;border-radius:4px;">{"{{email}}"}</code>, <code style="font-size:11px;background:var(--pd-bg3);padding:1px 5px;border-radius:4px;">{"{{credits}}"}</code></p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="test-addr" type="email" placeholder="test@example.com" style="height:34px;padding:0 12px;border-radius:8px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink);font-size:13px;width:200px;" />
+        <button id="btn-test" style="height:34px;padding:0 16px;border-radius:8px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);font-size:13px;cursor:pointer;white-space:nowrap;">Send test ✉️</button>
+        <button id="btn-reset" style="height:34px;padding:0 16px;border-radius:8px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink3);font-size:13px;cursor:pointer;white-space:nowrap;">Reset default</button>
+        <button id="btn-save" style="height:34px;padding:0 20px;border-radius:8px;background:var(--pd-violet);border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Save changes</button>
+      </div>
+    </div>
+
+    <!-- Subject line -->
+    <div style="padding:12px 24px;border-bottom:0.5px solid var(--pd-hairline);flex-shrink:0;display:flex;align-items:center;gap:10px;">
+      <label style="font-size:12px;color:var(--pd-ink3);font-weight:600;white-space:nowrap;min-width:60px;">Subject</label>
+      <input id="subject-input" type="text" value={initSubject} style="flex:1;height:34px;padding:0 12px;border-radius:8px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink);font-size:13px;" />
+    </div>
+
+    <!-- Split pane: editor | preview -->
+    <div style="display:flex;flex:1;overflow:hidden;min-height:0;">
+
+      <!-- HTML editor -->
+      <div style="flex:1;display:flex;flex-direction:column;border-right:0.5px solid var(--pd-hairline);min-width:0;">
+        <div style="padding:8px 16px;font-size:11px;color:var(--pd-ink3);letter-spacing:0.5px;text-transform:uppercase;font-weight:600;border-bottom:0.5px solid var(--pd-hairline);flex-shrink:0;">HTML Source</div>
+        <textarea
+          id="html-editor"
+          spellcheck="false"
+          style="flex:1;resize:none;padding:16px;background:var(--pd-bg);color:var(--pd-ink2);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;border:none;outline:none;tab-size:2;overflow-y:auto;"
+        >{initHtml}</textarea>
+      </div>
+
+      <!-- Live preview -->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:#0d0d12;">
+        <div style="padding:8px 16px;font-size:11px;color:var(--pd-ink3);letter-spacing:0.5px;text-transform:uppercase;font-weight:600;border-bottom:0.5px solid var(--pd-hairline);flex-shrink:0;background:var(--pd-bg);">Preview</div>
+        <iframe
+          id="preview-frame"
+          sandbox="allow-same-origin"
+          style="flex:1;border:none;width:100%;background:#0d0d12;"
+        ></iframe>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Status toast -->
+  <div id="status-toast" style="position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:10px;background:var(--pd-violet);color:#fff;font-size:13px;font-weight:500;opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:999;"></div>
+</AdminShell>
+
+<script>
+  const editor = document.getElementById("html-editor") as HTMLTextAreaElement;
+  const preview = document.getElementById("preview-frame") as HTMLIFrameElement;
+  const subjectInput = document.getElementById("subject-input") as HTMLInputElement;
+  const toast = document.getElementById("status-toast") as HTMLElement;
+
+  // Live preview update
+  function updatePreview() {
+    const doc = preview.contentDocument || preview.contentWindow?.document;
+    if (!doc) return;
+    doc.open();
+    doc.write(editor.value);
+    doc.close();
+  }
+
+  // Debounced preview refresh
+  let debounce: ReturnType<typeof setTimeout>;
+  editor.addEventListener("input", () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(updatePreview, 300);
+  });
+
+  // Tab key inserts spaces instead of leaving the textarea
+  editor.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const s = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.value = editor.value.substring(0, s) + "  " + editor.value.substring(end);
+      editor.selectionStart = editor.selectionEnd = s + 2;
+    }
+  });
+
+  // Initial preview render
+  updatePreview();
+
+  function showToast(msg: string, ok = true) {
+    toast.textContent = msg;
+    toast.style.background = ok ? "var(--pd-violet)" : "var(--pd-pink)";
+    toast.style.opacity = "1";
+    setTimeout(() => { toast.style.opacity = "0"; }, 3000);
+  }
+
+  // Save
+  document.getElementById("btn-save")!.addEventListener("click", async () => {
+    const res = await fetch("/api/admin/email/welcome", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject: subjectInput.value, html: editor.value }),
+    });
+    if (res.ok) showToast("✓ Saved");
+    else showToast("✗ Save failed", false);
+  });
+
+  // Send test
+  document.getElementById("btn-test")!.addEventListener("click", async () => {
+    const addr = (document.getElementById("test-addr") as HTMLInputElement).value.trim();
+    if (!addr) { showToast("Enter a test email address", false); return; }
+    const res = await fetch("/api/admin/email/welcome", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject: subjectInput.value, html: editor.value, sendTestTo: addr }),
+    });
+    if (res.ok) showToast(`✓ Test email sent to ${addr}`);
+    else showToast("✗ Send failed", false);
+  });
+
+  // Reset to default
+  document.getElementById("btn-reset")!.addEventListener("click", async () => {
+    if (!confirm("Reset to the default template? This will overwrite your changes.")) return;
+    const res = await fetch("/api/admin/email/welcome");
+    if (!res.ok) return;
+    // Force reload default by posting empty html sentinel
+    await fetch("/api/admin/email/welcome", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ html: "<!-- DEFAULT -->" }),
+    });
+    window.location.reload();
+  });
+</script>

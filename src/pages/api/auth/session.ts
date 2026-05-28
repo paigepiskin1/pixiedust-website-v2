@@ -3,6 +3,7 @@ import type { APIContext } from "astro";
 import { verifyIdToken } from "../../../lib/firebase-verify";
 import { upsertUser, toPublicUser } from "../../../lib/users";
 import { createSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from "../../../lib/session";
+import { sendWelcomeEmail } from "../../../lib/mailgun";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -40,6 +41,8 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
   try {
     const claims = await verifyIdToken(idToken);
     const user = await upsertUser(env.DB, claims);
+    // Fire welcome email once per user (non-blocking — doesn't delay sign-in)
+    sendWelcomeEmail(env, env.DB, user).catch(() => {});
     const sid = await createSession(env.SESSIONS, claims.uid);
     cookies.set(SESSION_COOKIE, sid, {
       httpOnly: true,
