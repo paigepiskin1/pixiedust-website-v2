@@ -56,8 +56,12 @@ export async function pollStatus(apiKey: string, provider: string, jobId: string
         ? `${BASE}/alibaba/status?${q}`
         : `${BASE}/prediction-status?${q}`;
 
-  // status endpoints accept the api key on the query string for GET
-  const res = await fetch(`${url}&apiKey=${encodeURIComponent(apiKey)}`);
+  // SyncNode requires the key on the query string for GET status endpoints.
+  // We also send it as a header so migration to header-only auth is seamless
+  // if their API adds support for it in future.
+  const res = await fetch(`${url}&apiKey=${encodeURIComponent(apiKey)}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
   const data = (await res.json().catch(() => ({}))) as Record<string, any>;
 
   const rs = data.replicate_status || data.task_status || data.status;

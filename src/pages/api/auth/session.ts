@@ -31,6 +31,7 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
     });
     return json({ user: toPublicUser(user) });
   } catch (err) {
-    return json({ error: (err as Error).message || "Authentication failed" }, 401);
+    console.error("[session] auth error:", err);
+    return json({ error: "Authentication failed" }, 401);
   }
 }

@@ -18,11 +18,21 @@ export function isAdmin(locals: App.Locals): boolean {
  * `Authorization: Bearer <ADMIN_API_TOKEN>` (so Claude Code / scripts can drive
  * the Template API headlessly). Returns the acting admin uid (or null).
  */
+function safeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
+
 export function adminActor(request: Request, locals: App.Locals, token: string | undefined): string | null {
   if (locals.user?.isAdmin) return locals.user.uid;
   const auth = request.headers.get("authorization") || "";
   const m = /^Bearer\s+(.+)$/i.exec(auth);
-  if (m && token && m[1] === token) return "api-token";
+  if (m && token && safeEqual(m[1], token)) return "api-token";
   return null;
 }
 
