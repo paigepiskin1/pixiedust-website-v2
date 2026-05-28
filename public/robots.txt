@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /studio/
+Disallow: /account/
+Disallow: /auth/
+
+Sitemap: https://pixiedustapp.com/sitemap.xml

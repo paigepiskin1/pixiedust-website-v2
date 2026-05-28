@@ -105,7 +105,10 @@ export async function POST({ request, locals }: APIContext) {
 
   // ─── Single step ───
   const { input } = resolveInput(template, inputs);
-  if (body.aspect && "aspect_ratio" in input) input.aspect_ratio = body.aspect;
+  // Prefer the explicit aspect selection; fall back to the template's first
+  // defined aspect so aspect_ratio is never sent as an empty string.
+  const effectiveAspect = body.aspect || template.aspects?.[0] || null;
+  if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
   if (duration && "duration" in input) input.duration = duration;
 
