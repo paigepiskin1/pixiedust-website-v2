@@ -2,11 +2,12 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 export const ADMIN_NAV = [
-  { k: "dashboard", name: "Dashboard", href: "/admin" },
-  { k: "templates", name: "Templates", href: "/admin/templates" },
-  { k: "users", name: "Users", href: "/admin/users" },
-  { k: "content", name: "Content", href: "/admin/content" },
-  { k: "email", name: "Email", href: "/admin/email" },
+  { k: "dashboard",     name: "Dashboard",     href: "/admin" },
+  { k: "templates",     name: "Templates",     href: "/admin/templates" },
+  { k: "users",         name: "Users",         href: "/admin/users" },
+  { k: "content",       name: "Content",       href: "/admin/content" },
+  { k: "email",         name: "Email log",     href: "/admin/email" },
+  { k: "welcome-email", name: "Welcome Email", href: "/admin/email/welcome" },
 ];
 
 export function isAdmin(locals: App.Locals): boolean {
