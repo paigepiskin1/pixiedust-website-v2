@@ -9,9 +9,10 @@ const db = Astro.locals.runtime.env.DB;
 interface Row {
   id: string; title: string; kind: string; type: string;
   credit_cost: number; is_featured: number; is_hidden: number; sort_order: number;
+  preview_image: string | null; preview_video: string | null;
 }
 const { results } = await db
-  .prepare("SELECT id, title, kind, type, credit_cost, is_featured, is_hidden, sort_order FROM templates ORDER BY sort_order ASC, title ASC")
+  .prepare("SELECT id, title, kind, type, credit_cost, is_featured, is_hidden, sort_order, preview_image, preview_video FROM templates ORDER BY sort_order ASC, title ASC")
   .all<Row>();
 const rows = results ?? [];
 const cell = "padding:11px 12px;font-size:12.5px;color:var(--pd-ink);border-bottom:0.5px solid var(--pd-hairline);";
@@ -32,7 +33,8 @@ const head = "padding:8px 12px;font-family:var(--font-mono);font-size:9.5px;colo
       <thead>
         <tr>
           <th style={head}>Title</th><th style={head}>Kind</th><th style={head}>Type</th>
-          <th style={head}>Cost</th><th style={head}>Flags</th><th style={head}>Order</th><th style={head}></th>
+          <th style={head}>Cost</th><th style={head}>Flags</th><th style={head}>Order</th>
+          <th style={head}>Preview</th><th style={head}></th>
         </tr>
       </thead>
       <tbody>
@@ -48,6 +50,29 @@ const head = "padding:8px 12px;font-family:var(--font-mono);font-size:9.5px;colo
                 {r.is_hidden ? <span style="color:var(--pd-pink);font-size:11px;">hidden</span> : <span style="color:var(--pd-mint);font-size:11px;">live</span>}
               </td>
               <td style={cell}>{r.sort_order}</td>
+              <td style={`${cell}padding:6px 12px;`}>
+                {r.preview_video ? (
+                  <video
+                    src={r.preview_video}
+                    muted
+                    autoplay
+                    loop
+                    playsinline
+                    style="width:72px;height:52px;object-fit:cover;border-radius:7px;background:var(--pd-bg3);display:block;"
+                  />
+                ) : r.preview_image ? (
+                  <img
+                    src={r.preview_image}
+                    alt=""
+                    loading="lazy"
+                    style="width:72px;height:52px;object-fit:cover;border-radius:7px;background:var(--pd-bg3);display:block;"
+                  />
+                ) : (
+                  <div style="width:72px;height:52px;border-radius:7px;background:var(--pd-bg3);border:0.5px dashed var(--pd-hairline);display:flex;align-items:center;justify-content:center;">
+                    <span style="font-size:18px;opacity:0.3;">✨</span>
+                  </div>
+                )}
+              </td>
               <td style={`${cell}text-align:right;white-space:nowrap;`}>
                 <a href={`/admin/templates/edit/${r.id}`} class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink2);letter-spacing:0.5px;">Edit</a>
                 <button type="button" class="pd-del font-mono uppercase" data-id={r.id} style="margin-left:12px;font-size:10px;color:var(--pd-pink);letter-spacing:0.5px;background:none;border:none;cursor:pointer;">Delete</button>
