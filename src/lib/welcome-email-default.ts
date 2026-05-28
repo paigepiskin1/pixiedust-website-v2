@@ -25,9 +25,8 @@ export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
   <!-- Header gradient -->
   <tr>
     <td style="background:linear-gradient(135deg,#7c3aed 0%,#a855f7 50%,#ec4899 100%);padding:48px 40px 40px;text-align:center;">
-      <!-- Logo mark -->
-      <div style="display:inline-block;width:56px;height:56px;background:rgba(255,255,255,0.15);border-radius:16px;line-height:56px;font-size:28px;margin-bottom:20px;">✨</div>
-      <h1 style="margin:0;color:#ffffff;font-size:32px;font-weight:700;letter-spacing:-0.5px;line-height:1.2;">PixieDust</h1>
+      <!-- Logo -->
+      <img src="https://pixiecdn.b-cdn.net/brand/logo-white-880.png" alt="PixieDust" width="220" height="48" style="display:inline-block;width:220px;height:auto;margin-bottom:20px;" />
       <p style="margin:8px 0 0;color:rgba(255,255,255,0.8);font-size:15px;font-weight:400;">Your AI creative studio is ready</p>
     </td>
   </tr>
