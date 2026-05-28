@@ -23,3 +23,6 @@ dist/
 .claude/
 
 .dev.vars
+
+# Never commit GitHub Actions workflows — deploy is Cloudflare-only via wrangler pages deploy
+.github/
