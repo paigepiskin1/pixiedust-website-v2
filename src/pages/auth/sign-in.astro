@@ -185,6 +185,57 @@ const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$
     }
   </style>
 
+  <!-- Carousel + mode toggle isolated from Firebase imports so they always wire up -->
+  <script is:inline>
+    (function () {
+      function init() {
+        var slides = Array.from(document.querySelectorAll(".pd-auth-slide"));
+        var pips = Array.from(document.querySelectorAll(".pd-auth-pip"));
+        var slideData = [
+          { kicker: "Motion · trending", title: "Snakes wrapped,<br>in 8 seconds.", cred: "428k creators · this week" },
+          { kicker: "Photoshoot · 24 shots", title: "A full editorial,<br>no set rental.", cred: "Used by 12 of TIME’s 100" },
+          { kicker: "Cinema · Kling Pro", title: "Main character<br>energy on tap.", cred: "186k cinematic scenes / week" },
+          { kicker: "Fashion try-on", title: "Wear the wardrobe.<br>Keep your face.", cred: "2 cr · works in seconds" },
+        ];
+        var kickerEl = document.getElementById("pd-auth-kicker");
+        var titleEl = document.getElementById("pd-auth-title");
+        var credEl = document.getElementById("pd-auth-cred");
+        var si = 0;
+        function showSlide(n) {
+          si = ((n % slides.length) + slides.length) % slides.length;
+          slides.forEach(function (s, i) { s.style.opacity = i === si ? "1" : "0"; });
+          pips.forEach(function (p, i) {
+            p.style.width = i === si ? "22px" : "6px";
+            p.style.background = i === si ? "#fff" : "rgba(255,255,255,0.35)";
+          });
+          if (kickerEl) kickerEl.textContent = slideData[si].kicker;
+          if (titleEl) titleEl.innerHTML = slideData[si].title;
+          if (credEl) credEl.textContent = slideData[si].cred;
+        }
+        pips.forEach(function (p, i) { p.addEventListener("click", function () { showSlide(i); }); });
+        if (slides.length) setInterval(function () { showSlide(si + 1); }, 4500);
+
+        var form = document.getElementById("pd-auth-form");
+        function applyMode() {
+          var mode = form.dataset.mode;
+          document.querySelectorAll("[data-when]").forEach(function (el) {
+            el.classList.toggle("hidden", el.dataset.when !== mode);
+          });
+          var passEl = document.getElementById("pd-password");
+          if (passEl) passEl.setAttribute("autocomplete", mode === "signup" ? "new-password" : "current-password");
+        }
+        document.getElementById("pd-toggle").addEventListener("click", function () {
+          form.dataset.mode = form.dataset.mode === "signup" ? "login" : "signup";
+          var errEl = document.getElementById("pd-auth-error");
+          if (errEl) errEl.classList.add("hidden");
+          applyMode();
+        });
+        applyMode();
+      }
+      if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", init); } else { init(); }
+    })();
+  </script>
+
   <script>
     import {
       signInWithGoogle,
@@ -200,52 +251,8 @@ const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$
     const rawRedirect = params.get("redirect") || "/";
     const redirect = rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/";
 
-    // ── editorial carousel ──
-    const slides = Array.from(document.querySelectorAll<HTMLElement>(".pd-auth-slide"));
-    const pips = Array.from(document.querySelectorAll<HTMLElement>(".pd-auth-pip"));
-    const slideData = [
-      { kicker: "Motion · trending", title: "Snakes wrapped,\nin 8 seconds.", cred: "428k creators · this week" },
-      { kicker: "Photoshoot · 24 shots", title: "A full editorial,\nno set rental.", cred: "Used by 12 of TIME’s 100" },
-      { kicker: "Cinema · Kling Pro", title: "Main character\nenergy on tap.", cred: "186k cinematic scenes / week" },
-      { kicker: "Fashion try-on", title: "Wear the wardrobe.\nKeep your face.", cred: "2 cr · works in seconds" },
-    ];
-    const kickerEl = document.getElementById("pd-auth-kicker")!;
-    const titleEl = document.getElementById("pd-auth-title")!;
-    const credEl = document.getElementById("pd-auth-cred")!;
-    let si = 0;
-    function showSlide(n: number) {
-      si = (n + slides.length) % slides.length;
-      slides.forEach((s, i) => (s.style.opacity = i === si ? "1" : "0"));
-      pips.forEach((p, i) => {
-        p.style.width = i === si ? "22px" : "6px";
-        p.style.background = i === si ? "#fff" : "rgba(255,255,255,0.35)";
-      });
-      kickerEl.textContent = slideData[si].kicker;
-      titleEl.innerHTML = slideData[si].title.replace(/\n/g, "<br>");
-      credEl.textContent = slideData[si].cred;
-    }
-    pips.forEach((p, i) => p.addEventListener("click", () => showSlide(i)));
-    if (slides.length) setInterval(() => showSlide(si + 1), 4500);
-
-    // ── mode toggle (signup | login) ──
-    const form = document.getElementById("pd-auth-form")!;
-    function applyMode() {
-      const mode = form.dataset.mode;
-      document.querySelectorAll<HTMLElement>("[data-when]").forEach((el) => {
-        el.classList.toggle("hidden", el.dataset.when !== mode);
-      });
-      (document.getElementById("pd-password") as HTMLInputElement).setAttribute(
-        "autocomplete",
-        mode === "signup" ? "new-password" : "current-password"
-      );
-    }
-    document.getElementById("pd-toggle")!.addEventListener("click", () => {
-      form.dataset.mode = form.dataset.mode === "signup" ? "login" : "signup";
-      hideError();
-      applyMode();
-    });
-
     // ── helpers ──
+    const form = document.getElementById("pd-auth-form")!;
     const errEl = document.getElementById("pd-auth-error")!;
     const submitBtn = document.getElementById("pd-submit") as HTMLButtonElement;
     const emailEl = document.getElementById("pd-email") as HTMLInputElement;
@@ -321,6 +328,5 @@ const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$
       }
     });
 
-    applyMode();
   </script>
 </Base>
