@@ -22,6 +22,8 @@ interface Env {
   MAILGUN_DOMAIN: string;
   MAILGUN_FROM: string;
   MAILGUN_FEEDBACK_TO: string;
+  CLICKY_SITE_ID: string;
+  CLICKY_SITEKEY: string;
 }
 
 declare namespace App {

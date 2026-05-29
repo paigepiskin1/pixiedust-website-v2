@@ -1,0 +1,123 @@
+---
+export const prerender = false;
+import AdminShell from "../../layouts/AdminShell.astro";
+import { isAdmin } from "../../lib/admin";
+import { clickyStats, clickyVisitors, type ClickyItem } from "../../lib/clicky";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const env = Astro.locals.runtime.env;
+
+// Range for the breakdown lists (the stat cards always show all periods).
+const RANGES: Record<string, string> = {
+  today: "Today",
+  yesterday: "Yesterday",
+  "last-7-days": "Last 7 days",
+  "last-30-days": "Last 30 days",
+  "last-365-days": "Last year",
+};
+const range = (Astro.url.searchParams.get("range") || "last-7-days") in RANGES
+  ? Astro.url.searchParams.get("range") || "last-7-days"
+  : "last-7-days";
+
+const configured = !!env.CLICKY_SITE_ID && !!env.CLICKY_SITEKEY;
+
+// Visitor totals across all periods + the breakdown lists for the chosen range.
+const [today, yesterday, week, month, year, lists] = configured
+  ? await Promise.all([
+      clickyVisitors(env, "today"),
+      clickyVisitors(env, "yesterday"),
+      clickyVisitors(env, "last-7-days"),
+      clickyVisitors(env, "last-30-days"),
+      clickyVisitors(env, "last-365-days"),
+      clickyStats(env, ["traffic-sources", "pages", "links-domains"], range, 10),
+    ])
+  : [0, 0, 0, 0, 0, {} as Record<string, ClickyItem[]>];
+
+const cards = [
+  { label: "Today", value: today },
+  { label: "Yesterday", value: yesterday },
+  { label: "Last 7 days", value: week },
+  { label: "Last 30 days", value: month },
+  { label: "Last year", value: year },
+];
+
+const sources = lists["traffic-sources"] ?? [];
+const pages = lists["pages"] ?? [];
+const referrers = lists["links-domains"] ?? [];
+
+const fmt = (n: number) => n.toLocaleString();
+const cardStyle = "background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;padding:18px;";
+
+function cleanPage(it: ClickyItem): string {
+  if (it.url) {
+    try { return new URL(it.url).pathname || "/"; } catch { /* fall through */ }
+  }
+  return it.title || "—";
+}
+---
+
+<AdminShell title="Analytics — PixieDust Admin" tab="analytics">
+  <div class="mb-5 flex items-end justify-between gap-4">
+    <div>
+      <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.6px;">Traffic</h1>
+      <p class="mt-1 text-ink-3" style="font-size:13px;">Live from Clicky · visitors, sources, top pages & referrers.</p>
+    </div>
+    <a href="https://clicky.com/stats/home?site_id=101479986" target="_blank" rel="noopener" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">Open in Clicky ↗</a>
+  </div>
+
+  {!configured && (
+    <div style="background:color-mix(in srgb,var(--pd-pink) 12%,transparent);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);border-radius:14px;padding:14px 16px;font-size:13px;">
+      Clicky isn’t configured — set <code>CLICKY_SITE_ID</code> and <code>CLICKY_SITEKEY</code>.
+    </div>
+  )}
+
+  <!-- Visitor stat cards -->
+  <div class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+    {cards.map((c) => (
+      <div style={cardStyle}>
+        <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.7px;">{c.label}</div>
+        <div class="mt-1.5 font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.5px;">{fmt(c.value)}</div>
+        <div class="text-ink-4" style="font-size:10.5px;">visitors</div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Range selector for the breakdown lists -->
+  <div class="mt-7 mb-3 flex items-center gap-2">
+    <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Breakdown</span>
+    <div class="flex flex-wrap gap-1.5">
+      {Object.entries(RANGES).map(([k, label]) => (
+        <a href={`/admin/analytics?range=${k}`} class="rounded-lg font-semibold" style={`padding:6px 11px;font-size:11.5px;text-decoration:none;border:0.5px solid var(--pd-hairline2);${k === range ? "background:var(--pd-ink);color:var(--pd-bg);border-color:transparent;" : "background:var(--pd-bg);color:var(--pd-ink2);"}`}>{label}</a>
+      ))}
+    </div>
+  </div>
+
+  <!-- Three breakdown columns -->
+  <div class="grid gap-4" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+    {[
+      { title: "Traffic sources", items: sources, render: (it: ClickyItem) => it.title || "—" },
+      { title: "Top pages", items: pages, render: cleanPage },
+      { title: "Top referrers", items: referrers, render: (it: ClickyItem) => it.title || "—" },
+    ].map((col) => (
+      <div style={cardStyle}>
+        <div class="mb-3 font-semibold text-ink" style="font-size:13px;">{col.title}</div>
+        {col.items.length === 0 ? (
+          <div class="text-ink-4" style="font-size:12px;">No data for this period.</div>
+        ) : (
+          <div class="flex flex-col gap-2">
+            {col.items.map((it) => (
+              <div class="flex items-center gap-2">
+                <span class="min-w-0 flex-1 truncate text-ink-2" style="font-size:12px;" title={col.render(it)}>{col.render(it)}</span>
+                {it.value_percent != null && (
+                  <span class="font-mono text-ink-4" style="font-size:10px;">{it.value_percent}%</span>
+                )}
+                <span class="font-mono font-semibold text-ink" style="font-size:11.5px;min-width:42px;text-align:right;">{fmt(it.value)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    ))}
+  </div>
+</AdminShell>

@@ -3,6 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 export const ADMIN_NAV = [
   { k: "dashboard",     name: "Dashboard",     href: "/admin" },
+  { k: "analytics",     name: "Analytics",     href: "/admin/analytics" },
   { k: "templates",     name: "Templates",     href: "/admin/templates" },
   { k: "users",         name: "Users",         href: "/admin/users" },
   { k: "content",       name: "Content",       href: "/admin/content" },
