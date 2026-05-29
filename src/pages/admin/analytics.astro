@@ -58,12 +58,9 @@ function cleanPage(it: ClickyItem): string {
 ---
 
 <AdminShell title="Analytics — PixieDust Admin" tab="analytics">
-  <div class="mb-5 flex items-end justify-between gap-4">
-    <div>
-      <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.6px;">Traffic</h1>
-      <p class="mt-1 text-ink-3" style="font-size:13px;">Live from Clicky · visitors, sources, top pages & referrers.</p>
-    </div>
-    <a href="https://clicky.com/stats/home?site_id=101479986" target="_blank" rel="noopener" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">Open in Clicky ↗</a>
+  <div class="mb-5">
+    <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.6px;">Traffic</h1>
+    <p class="mt-1 text-ink-3" style="font-size:13px;">Live from Clicky · visitors, sources, top pages & referrers.</p>
   </div>
 
   {!configured && (
