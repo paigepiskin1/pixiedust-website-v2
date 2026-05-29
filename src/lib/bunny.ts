@@ -20,3 +20,27 @@ export async function uploadToBunny(env: BunnyEnv, path: string, body: ArrayBuff
   }
   return `${env.BUNNY_PULL_ZONE_URL.replace(/\/$/, "")}/${path}`;
 }
+
+/**
+ * Best-effort delete of a Bunny storage object. Accepts a full pull-zone URL or
+ * a raw storage path. Returns true on success (or 404). Never throws — CDN
+ * cleanup should not block the DB delete.
+ */
+export async function deleteFromBunny(env: BunnyEnv, urlOrPath: string): Promise<boolean> {
+  let path = (urlOrPath || "").split("?")[0];
+  const pull = env.BUNNY_PULL_ZONE_URL.replace(/\/$/, "");
+  if (path.startsWith(pull + "/")) path = path.slice(pull.length + 1);
+  else if (/^https?:\/\//.test(path)) {
+    try { path = new URL(path).pathname.replace(/^\//, ""); } catch { return false; }
+  }
+  if (!path) return false;
+  try {
+    const res = await fetch(`${STORAGE_HOST}/${env.BUNNY_STORAGE_ZONE}/${path}`, {
+      method: "DELETE",
+      headers: { AccessKey: env.BUNNY_API_KEY },
+    });
+    return res.ok || res.status === 404;
+  } catch {
+    return false;
+  }
+}
