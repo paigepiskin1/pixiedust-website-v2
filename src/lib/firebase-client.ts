@@ -35,9 +35,16 @@ export async function establishSession(user: User): Promise<void> {
     body: JSON.stringify({ idToken }),
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Could not start session");
+    const data = (await res.json().catch(() => ({}))) as { error?: string; needVerify?: boolean };
+    const err = new Error(data.error || "Could not start session") as Error & { needVerify?: boolean };
+    err.needVerify = !!data.needVerify;
+    throw err;
   }
+}
+
+/** Resend the Firebase verification email to a signed-in (unverified) user. */
+export async function sendVerification(user: User): Promise<void> {
+  await sendEmailVerification(user).catch(() => {});
 }
 
 export async function signUpWithEmail(email: string, password: string, name?: string): Promise<User> {

@@ -12,6 +12,8 @@ export interface FirebaseClaims {
   name?: string;
   picture?: string;
   emailVerified: boolean;
+  /** "password" | "google.com" | "apple.com" | ... */
+  signInProvider?: string;
 }
 
 interface JwkCache {
@@ -97,5 +99,6 @@ export async function verifyIdToken(token: string): Promise<FirebaseClaims> {
     name: p.name,
     picture: p.picture,
     emailVerified: !!p.email_verified,
+    signInProvider: p.firebase?.sign_in_provider,
   };
 }

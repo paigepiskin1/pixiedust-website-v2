@@ -41,6 +41,18 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
 
   try {
     const claims = await verifyIdToken(idToken);
+
+    // Require a verified email for NEW password sign-ups. OAuth providers
+    // (Google/Apple) are already verified, so they're exempt. Existing accounts
+    // are grandfathered (we only block before a D1 row exists) so nobody
+    // currently using the app is locked out.
+    if (claims.signInProvider === "password" && !claims.emailVerified) {
+      const existing = await getUserByUid(env.DB, claims.uid);
+      if (!existing) {
+        return json({ error: "Please verify your email — we just sent you a link. Click it, then sign in.", needVerify: true }, 403);
+      }
+    }
+
     const { user, isNew } = await upsertUser(env.DB, claims);
 
     // Disabled accounts cannot sign in.

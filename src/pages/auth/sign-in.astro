@@ -244,6 +244,7 @@ const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$
       signInWithEmailPassword,
       resetPassword,
       establishSession,
+      sendVerification,
       authErrorMessage,
     } from "../../lib/firebase-client";
 
@@ -307,7 +308,19 @@ const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$
         if (!email || !password) throw new Error("Enter your email and password.");
         const mode = form.dataset.mode;
         const user = mode === "signup" ? await signUpWithEmail(email, password) : await signInWithEmailPassword(email, password);
-        await establishSession(user);
+        try {
+          await establishSession(user);
+        } catch (err) {
+          if ((err as { needVerify?: boolean })?.needVerify) {
+            // signUpWithEmail already sent one; resend on a returning sign-in attempt.
+            if (mode !== "signup") await sendVerification(user);
+            showError(`Almost there — verify your email to continue. We sent a link to ${email}. Click it, then sign in.`);
+            submitBtn.style.opacity = "1";
+            submitBtn.style.cursor = "pointer";
+            return;
+          }
+          throw err;
+        }
         go();
       })
     );
