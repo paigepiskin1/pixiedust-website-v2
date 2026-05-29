@@ -46,6 +46,27 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
     // New user who arrived via an invite link → grant referral credits once.
     let finalUser = user;
     if (isNew) {
+      // First-touch acquisition attribution (captured client-side into pd_attr).
+      const attrRaw = cookies.get("pd_attr")?.value;
+      if (attrRaw) {
+        try {
+          let attr: Record<string, string>;
+          try { attr = JSON.parse(attrRaw); } catch { attr = JSON.parse(decodeURIComponent(attrRaw)); }
+          let source: string | null = attr.utm_source || null;
+          if (!source && attr.referrer) {
+            try { source = new URL(attr.referrer).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
+          }
+          if (!source && attr.gclid) source = "google_ads";
+          if (!source && attr.fbclid) source = "facebook";
+          if (!source && attr.ttclid) source = "tiktok";
+          await env.DB
+            .prepare("UPDATE users SET signup_source = ?, signup_attribution = ? WHERE uid = ?")
+            .bind(source, JSON.stringify(attr).slice(0, 1000), user.uid)
+            .run();
+        } catch { /* attribution is best-effort, never block sign-in */ }
+        cookies.delete("pd_attr", { path: "/" });
+      }
+
       const ref = cookies.get("pd_ref")?.value;
       if (ref) {
         const granted = await redeemReferral(env.DB, user, ref).catch(() => 0);

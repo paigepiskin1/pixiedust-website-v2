@@ -104,11 +104,28 @@ const baseJsonLd = {
           var el = document.documentElement;
           if (localStorage.getItem("pd-web-theme") === "light") el.setAttribute("data-theme", "light");
           if (localStorage.getItem("pd-web-sidebar") === "collapsed") el.setAttribute("data-sidebar", "collapsed");
+          var qp = new URLSearchParams(location.search);
           // Capture an invite code (?ref=CODE) into a cookie so it survives the
           // sign-in redirect; the session endpoint reads it to grant referral credits.
-          var ref = new URLSearchParams(location.search).get("ref");
+          var ref = qp.get("ref");
           if (ref && /^[a-z0-9]{4,16}$/i.test(ref)) {
             document.cookie = "pd_ref=" + encodeURIComponent(ref) + ";path=/;max-age=" + 60 * 60 * 24 * 60 + ";samesite=lax";
+          }
+          // First-touch acquisition attribution: capture utm_* / ad-click ids /
+          // external referrer once, persist 90d. The session endpoint stores it
+          // on the user row when the account is first created.
+          var attr = {};
+          ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid", "ttclid"].forEach(function (k) {
+            var v = qp.get(k);
+            if (v) attr[k] = v.slice(0, 128);
+          });
+          var rf = document.referrer || "";
+          var external = rf && rf.indexOf(location.host) === -1;
+          var attrSet = document.cookie.split("; ").some(function (c) { return c.indexOf("pd_attr=") === 0; });
+          if (!attrSet && (Object.keys(attr).length || external)) {
+            if (external) attr.referrer = rf.slice(0, 256);
+            attr.landing = location.pathname.slice(0, 128);
+            document.cookie = "pd_attr=" + encodeURIComponent(JSON.stringify(attr)) + ";path=/;max-age=" + 60 * 60 * 24 * 90 + ";samesite=lax";
           }
         } catch (e) {}
       })();
