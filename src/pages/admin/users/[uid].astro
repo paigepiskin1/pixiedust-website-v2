@@ -24,6 +24,7 @@ const loginRows = logins.results ?? [];
 const genRows = gens.results ?? [];
 const disabled = !!u.disabled_at;
 const displayName = u.name || (u.email ? u.email.split("@")[0] : "User");
+const stripeCustomerId = u.stripe_customer_id || sub?.stripe_customer_id || null;
 
 const card = "background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;padding:18px;";
 const head = "padding:7px 10px;font-family:var(--font-mono);font-size:9px;color:var(--pd-ink3);letter-spacing:0.6px;text-transform:uppercase;text-align:left;border-bottom:0.5px solid var(--pd-hairline2);";
@@ -82,11 +83,17 @@ const stats = [
   <div class="mt-3 grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));">
     <div style={card}>
       <div class="mb-2 font-semibold text-ink" style="font-size:13px;">Billing</div>
-      <div class="mb-3" style="font-size:12px;color:var(--pd-ink2);">
+      <div class="mb-2" style="font-size:12px;color:var(--pd-ink2);">
         {sub
-          ? <span>Plan <b style="color:var(--pd-ink);">{sub.tier_id}</b> · {sub.status}{sub.period_end ? ` · renews ${sub.period_end.slice(0,10)}` : ""}{sub.stripe_customer_id ? ` · ${sub.stripe_customer_id}` : ""}</span>
+          ? <span>Plan <b style="color:var(--pd-ink);">{sub.tier_id}</b> · {sub.status}{sub.period_end ? ` · renews ${sub.period_end.slice(0,10)}` : ""}</span>
           : <span class="text-ink-4">No subscription (free / pay-as-you-go).</span>}
       </div>
+      {stripeCustomerId && (
+        <div class="mb-3 flex items-center gap-2" style="font-size:11px;">
+          <span class="font-mono text-ink-3">{stripeCustomerId}</span>
+          <a href={`https://dashboard.stripe.com/customers/${stripeCustomerId}`} target="_blank" rel="noopener" class="font-mono uppercase" style="font-size:9.5px;letter-spacing:0.4px;color:var(--pd-lilac);text-decoration:none;">View in Stripe ↗</a>
+        </div>
+      )}
       <div style="max-height:300px;overflow-y:auto;">
         <table style="width:100%;border-collapse:collapse;">
           <thead><tr><th style={head}>When</th><th style={head}>Δ</th><th style={head}>Balance</th><th style={head}>Reason</th></tr></thead>
