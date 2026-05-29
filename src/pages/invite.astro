@@ -1,0 +1,102 @@
+---
+export const prerender = false;
+import AppShell from "../layouts/AppShell.astro";
+import PageHeader from "../components/ui/PageHeader.astro";
+import { getInviteStats, REWARD_CREDITS } from "../lib/referrals";
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect("/auth/sign-in?redirect=/invite");
+
+const db = Astro.locals.runtime.env.DB;
+const stats = await getInviteStats(db, user.uid);
+const link = `${Astro.url.origin}/?ref=${stats.code}`;
+
+const invited = await db
+  .prepare(
+    "SELECT invitee_email, reward_credits, created_at FROM referrals WHERE inviter_uid = ? ORDER BY created_at DESC"
+  )
+  .bind(user.uid)
+  .all<{ invitee_email: string | null; reward_credits: number; created_at: string }>();
+const rows = invited.results ?? [];
+
+const cardStyle = "background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;padding:22px;";
+function maskEmail(e: string | null): string {
+  if (!e) return "A friend";
+  const [name, domain] = e.split("@");
+  if (!domain) return e;
+  const shown = name.length <= 2 ? name[0] : name.slice(0, 2);
+  return `${shown}${"•".repeat(Math.max(1, name.length - 2))}@${domain}`;
+}
+function fmtDate(s: string): string {
+  try { return new Date(s.replace(" ", "T") + "Z").toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+  catch { return s; }
+}
+---
+
+<AppShell title="Invite friends — PixieDust" credits={user.credits}>
+  <div class="mx-auto w-full" style="max-width:760px;padding:28px;">
+    <PageHeader
+      kicker="Referrals"
+      title="Invite friends"
+      sub={`Share your link — each friend who joins gets ${REWARD_CREDITS} free credits. You can invite up to ${stats.max} people.`}
+    />
+
+    <!-- Share link -->
+    <div style={cardStyle}>
+      <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;">Your invite link</div>
+      <div class="mt-2 flex gap-2">
+        <input id="pd-inv-link" readonly value={link} class="min-w-0 flex-1 rounded-[10px] text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13px;" />
+        <button id="pd-inv-copy" type="button" class="rounded-[10px] font-bold" style="padding:11px 18px;background:var(--pd-ink);color:var(--pd-bg);border:none;font-size:13px;cursor:pointer;white-space:nowrap;">Copy</button>
+      </div>
+
+      <!-- Usage -->
+      <div class="mt-4">
+        <div class="flex items-center justify-between" style="font-size:12px;color:var(--pd-ink2);">
+          <span>{stats.used} of {stats.max} invites used</span>
+          <span class="text-ink-3">{stats.remaining} left</span>
+        </div>
+        <div class="mt-1.5 overflow-hidden rounded-full" style="height:6px;background:var(--pd-hairline2);">
+          <div style={`height:100%;width:${Math.round((stats.used / stats.max) * 100)}%;background:var(--pd-mint);border-radius:999px;transition:width .4s;`}></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invited list -->
+    <div class="mt-4" style={cardStyle}>
+      <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;">People you've invited</div>
+      {rows.length === 0 ? (
+        <div class="mt-3 text-ink-3" style="font-size:13px;">No one yet — share your link to start earning. Friends get their credits the moment they join.</div>
+      ) : (
+        <div class="mt-3 flex flex-col gap-2">
+          {rows.map((r) => (
+            <div class="flex items-center justify-between rounded-xl" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline);">
+              <div class="flex items-center gap-2.5">
+                <div class="flex size-7 items-center justify-center rounded-full" style="background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);font-size:12px;color:var(--pd-ink2);">✓</div>
+                <span class="text-ink" style="font-size:13px;">{maskEmail(r.invitee_email)}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="font-semibold" style="font-size:12px;color:var(--pd-mint);">+{r.reward_credits} cr</span>
+                <span class="text-ink-4" style="font-size:11px;">{fmtDate(r.created_at)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+
+  <script is:inline>
+    (function () {
+      var copy = document.getElementById("pd-inv-copy");
+      var inp = document.getElementById("pd-inv-link");
+      if (copy && inp) {
+        copy.addEventListener("click", function () {
+          inp.select();
+          var done = function () { copy.textContent = "Copied!"; setTimeout(function () { copy.textContent = "Copy"; }, 1500); };
+          if (navigator.clipboard) navigator.clipboard.writeText(inp.value).then(done, function () { document.execCommand("copy"); done(); });
+          else { document.execCommand("copy"); done(); }
+        });
+      }
+    })();
+  </script>
+</AppShell>

@@ -12,7 +12,8 @@ export type IconName =
   | "shirt"
   | "beauty"
   | "sparkle"
-  | "ad";
+  | "ad"
+  | "gift";
 
 export interface NavItem {
   href: string;
@@ -34,6 +35,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/", name: "Home", icon: "home" },
       { href: "/trending", name: "Trending", icon: "trending" },
       { href: "/gallery", name: "My creations", icon: "gallery" },
+      { href: "/invite", name: "Invite friends", icon: "gift", accent: "--pd-mint" },
     ],
   },
   {
