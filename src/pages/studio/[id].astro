@@ -23,6 +23,9 @@ const signedIn = !!Astro.locals.user;
 const baseCost = computeCost(template, { quantity: template.quantities?.[0] ?? 1, duration: template.durations?.[0] });
 const qualityKeys = template.quality ? Object.keys(template.quality) : [];
 const qualityLabels: Record<string, string> = { std: "Standard", pro: "Pro", cinema: "Cinema" };
+// Default to the base tier (multiplier 1) so the standard option is preselected
+// regardless of key order; fall back to the first key.
+const defaultQualityKey = qualityKeys.find((k) => template.quality![k] === 1) ?? qualityKeys[0];
 
 // Small proportional preview box (max 18px) for an "W:H" aspect ratio.
 function aspectBox(a: string): { w: number; h: number } {
@@ -137,8 +140,8 @@ const config = {
               <div>
                 <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Quality</span>
                 <div class="flex flex-wrap gap-1.5" data-controls="quality">
-                  {qualityKeys.map((q, i) => (
-                    <button type="button" class="pd-seg rounded-lg font-semibold" data-val={q} data-mult={template.quality![q]} data-active={i === 0 ? "true" : "false"} style="padding:7px 12px;font-size:11.5px;cursor:pointer;">
+                  {qualityKeys.map((q) => (
+                    <button type="button" class="pd-seg rounded-lg font-semibold" data-val={q} data-mult={template.quality![q]} data-active={q === defaultQualityKey ? "true" : "false"} style="padding:7px 12px;font-size:11.5px;cursor:pointer;">
                       {qualityLabels[q] ?? q}
                       {template.quality![q] !== 1 && <span style="opacity:0.55;font-weight:400;margin-left:4px;">×{template.quality![q]}</span>}
                     </button>

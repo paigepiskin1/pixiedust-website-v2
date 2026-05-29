@@ -111,6 +111,12 @@ export async function POST({ request, locals }: APIContext) {
   if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
   if (duration && "duration" in input) input.duration = duration;
+  // Map the selected quality to the model's native resolution param. Quality
+  // keys for resolution-capable models are the real values (e.g. "720p", "2K");
+  // the regex guard prevents abstract tiers (std/pro/cinema) from leaking through.
+  if (body.quality && "resolution" in input && /^(\d+p|\d+k)$/i.test(body.quality)) {
+    input.resolution = body.quality;
+  }
 
   await db
     .prepare(
