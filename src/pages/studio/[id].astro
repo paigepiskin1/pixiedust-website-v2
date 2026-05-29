@@ -237,6 +237,13 @@ const config = {
 
     let credits: number = Number(cfg.credits) || 0;
 
+    // Bunny Optimizer serves an optimized image by default; `?format=source`
+    // fetches the original, full-quality file for downloads.
+    function sourceUrl(u: string): string {
+      if (!u || !/\.b-cdn\.net\//.test(u)) return u;
+      return u + (u.includes("?") ? "&" : "?") + "format=source";
+    }
+
     function controlValue(group: string): string | null {
       const wrap = root.querySelector(`[data-controls="${group}"]`);
       if (!wrap) return null;
@@ -385,7 +392,7 @@ const config = {
 
       dlEl.innerHTML = "";
       const a = document.createElement("a");
-      a.href = url; a.download = "";
+      a.href = sourceUrl(url); a.download = "";
       a.textContent = "↓ Download";
       a.style.cssText = "padding:8px 18px;border-radius:10px;background:rgba(255,255,255,.13);backdrop-filter:blur(6px);border:0.5px solid rgba(255,255,255,.2);color:#fff;font-size:12.5px;text-decoration:none;display:inline-block;";
       dlEl.appendChild(a);
@@ -476,7 +483,7 @@ const config = {
       // Download (uses protected endpoint when genId available, else direct CDN)
       if (outputs[0]) {
         const dl = document.createElement("a");
-        dl.href = genId ? `/api/download?id=${encodeURIComponent(genId)}` : outputs[0];
+        dl.href = genId ? `/api/download?id=${encodeURIComponent(genId)}` : sourceUrl(outputs[0]);
         if (!genId) dl.setAttribute("download", "");
         dl.title = "Download";
         dl.textContent = "↓";

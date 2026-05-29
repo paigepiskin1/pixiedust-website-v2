@@ -25,7 +25,13 @@ export async function GET({ request, locals }: APIContext) {
 
   if (!row) return new Response(null, { status: 404 });
 
-  const upstream = await fetch(row.output_url);
+  // Bunny Optimizer serves an optimized image by default; `?format=source`
+  // returns the original, full-quality file. Append it for Bunny CDN URLs only.
+  const sourceUrl = /\.b-cdn\.net\//.test(row.output_url)
+    ? row.output_url + (row.output_url.includes("?") ? "&" : "?") + "format=source"
+    : row.output_url;
+
+  const upstream = await fetch(sourceUrl);
   if (!upstream.ok) return new Response(null, { status: 502 });
 
   const ext = row.type === "video" ? "mp4" : "jpg";
