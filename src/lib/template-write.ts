@@ -40,7 +40,7 @@ export async function saveTemplate(db: D1Database, d: Record<string, any>): Prom
   const cols = [
     ...TEXT_COLS,
     ...JSON_COLS,
-    "credit_cost", "price_per_second", "is_featured", "is_hidden", "sort_order", "updated_at",
+    "credit_cost", "price_per_second", "is_featured", "is_hidden", "is_admin_only", "sort_order", "updated_at",
   ];
   const binds = [
     ...TEXT_COLS.map((c) => val(c)),
@@ -56,6 +56,7 @@ export async function saveTemplate(db: D1Database, d: Record<string, any>): Prom
     d.price_per_second ? Number(d.price_per_second) : null,
     d.is_featured ? 1 : 0,
     d.is_hidden ? 1 : 0,
+    d.is_admin_only ? 1 : 0,
     Number(d.sort_order) || 0,
     new Date().toISOString().replace("T", " ").slice(0, 19),
   ];

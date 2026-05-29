@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminShell from "../../../../layouts/AdminShell.astro";
+import FieldPanel from "../../../../components/FieldPanel.astro";
 import { isAdmin } from "../../../../lib/admin";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
@@ -45,6 +46,8 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
 ---
 
 <AdminShell title={isNew ? "Admin · New template" : `Admin · ${v("title")}`} tab="templates">
+  {/* Loads shared field panel JS globals (pdRenderFields, pdInitFieldPanel, pdCollectFieldValues) */}
+  <FieldPanel fields={[]} />
   <div class="mb-5 flex items-center justify-between gap-4">
     <h1 class="font-display font-medium text-ink" style="font-size:28px;letter-spacing:-0.6px;">{isNew ? "New template" : v("title")}</h1>
     <div class="flex items-center gap-4">
@@ -55,7 +58,11 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
     </div>
   </div>
 
-  <form id="pd-tpl-form" class="max-w-3xl">
+  <style>
+    @media (max-width: 1100px) { #pd-editor-grid { grid-template-columns: 1fr !important; } }
+  </style>
+  <div id="pd-editor-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:24px;align-items:start;">
+  <form id="pd-tpl-form">
     <input type="hidden" name="_isNew" value={String(isNew)} />
 
     <div style={card}>
@@ -105,7 +112,7 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         {examples.length === 0 ? (
           <div class="text-ink-4" style="font-size:12px;">No results yet — open the studio and generate a few.</div>
         ) : (
-          <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          <div class="pd-examples-grid grid grid-cols-3 gap-2 sm:grid-cols-4">
             {examples.map((ex) => (
               <div class="relative overflow-hidden rounded-xl" style="aspect-ratio:1;background:var(--pd-bg);border:0.5px solid var(--pd-hairline);">
                 {ex.type === "video" ? (
@@ -141,9 +148,35 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         <label><span style={lbl}>Preview video URL</span><input name="preview_video" value={v("preview_video")} style={inp} /></label>
         <label><span style={lbl}>Sort order</span><input name="sort_order" type="number" value={v("sort_order", "0")} style={inp} /></label>
       </div>
-      <div class="mt-3 flex gap-5">
-        <label class="flex items-center gap-2 text-ink" style="font-size:13px;"><input type="checkbox" name="is_featured" checked={v("is_featured") === "1"} /> Featured</label>
-        <label class="flex items-center gap-2 text-ink" style="font-size:13px;"><input type="checkbox" name="is_hidden" checked={v("is_hidden") === "1"} /> Hidden</label>
+      <!-- Visibility status — single-select radio group -->
+      <div class="mt-4">
+        <div style={lbl + "margin-bottom:8px;"}>Visibility</div>
+        <div class="flex flex-wrap gap-3" id="pd-visibility-group">
+          {[
+            { val: "normal",     label: "Normal",     desc: "Live for all users",       color: "var(--pd-mint)" },
+            { val: "featured",   label: "Featured",   desc: "Promoted in catalog",       color: "var(--pd-amber)" },
+            { val: "hidden",     label: "Hidden",     desc: "Not shown publicly",        color: "var(--pd-pink)" },
+            { val: "admin_only", label: "Admin only", desc: "Only admins can access it", color: "var(--pd-lilac)" },
+          ].map(({ val, label, desc, color }) => {
+            const current =
+              v("is_admin_only") === "1" ? "admin_only" :
+              v("is_hidden") === "1"     ? "hidden" :
+              v("is_featured") === "1"   ? "featured" : "normal";
+            return (
+              <label style={`display:flex;align-items:center;gap:9px;padding:9px 14px;border-radius:11px;cursor:pointer;border:1.5px solid ${current === val ? color : "var(--pd-hairline)"};background:${current === val ? `color-mix(in srgb,${color} 10%,transparent)` : "var(--pd-bg)"};transition:border-color .15s,background .15s;`}>
+                <input type="radio" name="pd_status" value={val} checked={current === val} style="accent-color:var(--pd-lilac);" />
+                <span>
+                  <span style={`display:block;font-size:13px;font-weight:600;color:${color};`}>{label}</span>
+                  <span style="display:block;font-size:11px;color:var(--pd-ink3);margin-top:1px;">{desc}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        {/* Hidden fields written by JS before submit */}
+        <input type="hidden" name="is_featured"   id="pd-is-featured" />
+        <input type="hidden" name="is_hidden"     id="pd-is-hidden" />
+        <input type="hidden" name="is_admin_only" id="pd-is-admin-only" />
       </div>
     </div>
 
@@ -153,6 +186,39 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       <a href="/admin/templates" class="rounded-xl font-semibold text-ink" style="padding:12px 22px;border:0.5px solid var(--pd-hairline2);font-size:13.5px;">Cancel</a>
     </div>
   </form>
+
+  {/* ── Right column: sticky test panel ─────────────────────────────────── */}
+  <div style="position:sticky;top:88px;">
+    <div id="pd-test-panel" style={card + "border-color:var(--pd-lilac);opacity:0.95;margin-bottom:0;"}>
+      <div class="flex items-center justify-between" style="margin-bottom:0;">
+        <div style={h3 + "margin:0;"}>▶ Test generation</div>
+        <button type="button" id="pd-test-toggle" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;background:none;border:none;cursor:pointer;">collapse ↑</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--pd-ink3);margin:6px 0 14px;">Uses the current provider / model / input_json from the form — no save needed.</p>
+
+      <div id="pd-test-fields" class="grid gap-3" style="margin-bottom:14px;">
+        <!-- rendered dynamically from fields_json -->
+        <div style="color:var(--pd-ink3);font-size:12px;">Fill in fields_json and they'll appear here.</div>
+      </div>
+
+      <div class="flex items-center gap-3 flex-wrap">
+        <button type="button" id="pd-test-run" class="rounded-xl font-bold" style="padding:10px 20px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;cursor:pointer;border:none;">Run test ▶</button>
+        <span id="pd-test-status" style="font-size:12px;color:var(--pd-ink3);"></span>
+      </div>
+
+      <!-- Result area -->
+      <div id="pd-test-result" class="mt-4 hidden">
+        <div class="font-mono uppercase" style="font-size:9px;color:var(--pd-ink3);letter-spacing:0.7px;margin-bottom:8px;">Output</div>
+        <div id="pd-test-media" style="border-radius:14px;overflow:hidden;background:var(--pd-bg3);"></div>
+        <div class="mt-3 flex gap-2 flex-wrap">
+          <button type="button" id="pd-test-use-preview" class="rounded-lg font-semibold" style="padding:7px 12px;font-size:11px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;">Use as preview</button>
+          <button type="button" id="pd-test-use-example" class="rounded-lg font-semibold" style="padding:7px 12px;font-size:11px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;">Use as example</button>
+          <a id="pd-test-open" href="#" target="_blank" class="rounded-lg font-semibold" style="padding:7px 12px;font-size:11px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);">Open ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>{/* end #pd-editor-grid */}
 
   <script>
     const form = document.getElementById("pd-tpl-form") as HTMLFormElement;
@@ -246,11 +312,38 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       }
     });
 
+    // ── Visibility radio — live border/bg update + encode to hidden fields ──
+    function applyVisualToRadio(radio: HTMLInputElement) {
+      const colors: Record<string, string> = {
+        normal: "var(--pd-mint)", featured: "var(--pd-amber)",
+        hidden: "var(--pd-pink)", admin_only: "var(--pd-lilac)",
+      };
+      document.querySelectorAll<HTMLLabelElement>("#pd-visibility-group label").forEach((lbl) => {
+        const r = lbl.querySelector("input[type=radio]") as HTMLInputElement;
+        const c = colors[r.value] ?? "var(--pd-mint)";
+        const active = r.checked;
+        lbl.style.borderColor = active ? c : "var(--pd-hairline)";
+        lbl.style.background  = active ? `color-mix(in srgb,${c} 10%,transparent)` : "var(--pd-bg)";
+      });
+    }
+    document.querySelectorAll<HTMLInputElement>('input[name="pd_status"]').forEach((r) => {
+      r.addEventListener("change", () => applyVisualToRadio(r));
+    });
+
+    function encodeVisibility() {
+      const status = (form.querySelector('input[name="pd_status"]:checked') as HTMLInputElement)?.value ?? "normal";
+      (document.getElementById("pd-is-featured")   as HTMLInputElement).value = status === "featured"   ? "1" : "0";
+      (document.getElementById("pd-is-hidden")     as HTMLInputElement).value = status === "hidden"     ? "1" : "0";
+      (document.getElementById("pd-is-admin-only") as HTMLInputElement).value = status === "admin_only" ? "1" : "0";
+    }
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      encodeVisibility();
       const data: Record<string, unknown> = {};
       for (const el of Array.from(form.elements) as HTMLInputElement[]) {
-        if (!el.name || el.name === "_isNew") continue;
+        if (!el.name || el.name === "_isNew" || el.name === "pd_status") continue;
+        if (el.type === "radio") continue;
         if (el.type === "checkbox") data[el.name] = el.checked ? 1 : 0;
         else data[el.name] = el.value;
       }
@@ -264,6 +357,294 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       const out = await res.json();
       if (res.ok) { show("Saved. Redirecting…", true); setTimeout(() => (window.location.href = "/admin/templates"), 500); }
       else show(out.error || "Save failed.", false);
+    });
+
+    // ── Inline test panel ────────────────────────────────────────────────────
+    const testFields  = document.getElementById("pd-test-fields")!;
+    const testStatus  = document.getElementById("pd-test-status")!;
+    const testResult  = document.getElementById("pd-test-result")!;
+    const testMedia   = document.getElementById("pd-test-media")!;
+    const testOpen    = document.getElementById("pd-test-open") as HTMLAnchorElement;
+    const testUseBtn  = document.getElementById("pd-test-use-preview")!;
+
+    // File URLs for the test panel — managed by shared pdInitFieldPanel
+    const testFileUrls: Record<string, any> = {};
+
+    function renderTestFields() {
+      const raw = (form.elements.namedItem("fields_json") as HTMLTextAreaElement)?.value ?? "";
+      let fields: any[] = [];
+      try { fields = JSON.parse(raw); } catch { /* invalid json */ }
+      // Use shared renderer from FieldPanel component
+      (window as any).pdRenderFields?.(testFields, fields);
+      // Wire file upload handlers on newly generated elements
+      (window as any).pdInitFieldPanel?.(testFields, testFileUrls);
+    }
+
+    // Re-render whenever fields_json changes (debounced)
+    const fieldsTA = form.elements.namedItem("fields_json") as HTMLTextAreaElement;
+    let renderTimer: ReturnType<typeof setTimeout>;
+    fieldsTA?.addEventListener("input", () => { clearTimeout(renderTimer); renderTimer = setTimeout(renderTestFields, 400); });
+    // Initial render — wait for FieldPanel script to load
+    if ((window as any).pdRenderFields) {
+      renderTestFields();
+    } else {
+      window.addEventListener("load", renderTestFields, { once: true });
+    }
+
+    // Collapse toggle
+    let testExpanded = true;
+    document.getElementById("pd-test-toggle")!.addEventListener("click", () => {
+      testExpanded = !testExpanded;
+      const body = document.getElementById("pd-test-panel")!;
+      const btn  = document.getElementById("pd-test-toggle")!;
+      // hide everything below the header
+      Array.from(body.children).slice(2).forEach((el) => {
+        (el as HTMLElement).style.display = testExpanded ? "" : "none";
+      });
+      btn.textContent = testExpanded ? "collapse ↑" : "expand ↓";
+    });
+
+    // Run test
+    let testType: "image" | "video" = "image";
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    function setTestStatus(msg: string, color = "var(--pd-ink3)") {
+      testStatus.textContent = msg;
+      testStatus.style.color = color;
+    }
+
+    // ── Client-side chain-step resolver (mirrors resolveChainStep on server) ──
+    function resolveStepInput(obj: unknown, user: Record<string, unknown>, outputs: Record<string, string>): unknown {
+      const sub = (v: unknown): unknown => {
+        if (typeof v === "string") {
+          const exact = v.match(/^\{\{([\w.]+)\*?\}\}$/);
+          if (exact) {
+            const tok = exact[1];
+            if (tok.includes(".")) return outputs[tok.split(".")[0]] ?? "";
+            return user[tok] ?? "";
+          }
+          return v.replace(/\{\{([\w.]+)\*?\}\}/g, (_, tok: string) => {
+            if (tok.includes(".")) return outputs[tok.split(".")[0]] ?? "";
+            const u = user[tok];
+            return u != null ? String(u) : "";
+          });
+        }
+        if (Array.isArray(v)) return v.map(sub);
+        if (v && typeof v === "object") {
+          const o: Record<string, unknown> = {};
+          for (const [k, val] of Object.entries(v as Record<string, unknown>)) o[k] = sub(val);
+          return o;
+        }
+        return v;
+      };
+      return sub(obj);
+    }
+
+    // ── Poll a single job until done, returns output URL or null on failure ──
+    function pollJob(jobId: string, provider: string, label: string): Promise<string | null> {
+      return new Promise((resolve) => {
+        let elapsed = 0;
+        const timer = setInterval(async () => {
+          elapsed += 4;
+          try {
+            const pr = await fetch(`/api/admin/templates/test-status?jobId=${encodeURIComponent(jobId)}&provider=${encodeURIComponent(provider)}`);
+            const pd = await pr.json();
+            if (pd.status === "completed" && pd.output_url) {
+              clearInterval(timer);
+              setTestStatus(`${label} done in ~${elapsed}s ✓`, "var(--pd-mint)");
+              resolve(pd.output_url);
+            } else if (pd.status === "failed") {
+              clearInterval(timer);
+              setTestStatus(`${label} failed: ${pd.error || "unknown"}`, "var(--pd-pink)");
+              resolve(null);
+            } else {
+              setTestStatus(`${label} running… ${elapsed}s`, "var(--pd-amber)");
+            }
+          } catch { setTestStatus(`${label} polling error — retrying…`, "var(--pd-amber)"); }
+        }, 4000);
+        // store so the cancel-on-rerun can clear it
+        pollTimer = timer;
+      });
+    }
+
+    document.getElementById("pd-test-run")!.addEventListener("click", async () => {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      testResult.classList.add("hidden");
+      testMedia.innerHTML = "";
+
+      const provider   = (form.elements.namedItem("provider") as HTMLSelectElement)?.value ?? "replicate";
+      const model      = (form.elements.namedItem("model") as HTMLInputElement)?.value?.trim();
+      const input_json = (form.elements.namedItem("input_json") as HTMLTextAreaElement)?.value?.trim();
+      const stepsRaw   = (form.elements.namedItem("steps_json") as HTMLTextAreaElement)?.value?.trim();
+      const tplType    = (form.elements.namedItem("type") as HTMLSelectElement)?.value ?? "image";
+      testType = tplType as "image" | "video";
+
+      const field_values: Record<string, any> = (window as any).pdCollectFieldValues?.(testFields, testFileUrls) ?? {};
+
+      // Parse steps_json — if present and non-empty, run as a chain
+      let steps: any[] | null = null;
+      try { if (stepsRaw) steps = JSON.parse(stepsRaw); } catch { /* invalid JSON, fall through to single */ }
+
+      if (steps && Array.isArray(steps) && steps.length > 0) {
+        // ── Multi-step chain ───────────────────────────────────────────────
+        const stepOutputs: Record<string, string> = {};
+        let finalUrl: string | null = null;
+
+        for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          const stepId = step.id || `step${i}`;
+          const label  = steps.length === 1 ? "Running…" : `Step ${i + 1}/${steps.length}`;
+
+          setTestStatus(`${label}: submitting…`, "var(--pd-lilac)");
+
+          // Resolve this step's input with user field values + prior outputs
+          const resolved = resolveStepInput(step.input ?? {}, field_values, stepOutputs);
+
+          try {
+            const r = await fetch("/api/admin/templates/test-run", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              // Send pre-resolved input as JSON string; no further substitution needed
+              body: JSON.stringify({
+                provider: step.provider ?? provider,
+                model: step.model,
+                input_json: JSON.stringify(resolved),
+                field_values: {},
+              }),
+            });
+            const d = await r.json();
+            if (!r.ok) { setTestStatus(`${label}: ${d.error || "submit failed"}`, "var(--pd-pink)"); return; }
+
+            const outUrl = await pollJob(d.jobId, d.provider, label);
+            if (!outUrl) return; // error already shown
+
+            stepOutputs[stepId] = outUrl;
+            finalUrl = outUrl;
+          } catch (e: any) {
+            setTestStatus(e.message || "Network error.", "var(--pd-pink)");
+            return;
+          }
+        }
+
+        if (finalUrl) {
+          setTestStatus(`All ${steps.length} step${steps.length > 1 ? "s" : ""} done ✓`, "var(--pd-mint)");
+          showTestResult(finalUrl);
+        }
+
+      } else {
+        // ── Single step ────────────────────────────────────────────────────
+        if (!model) return setTestStatus("Set a model first.", "var(--pd-pink)");
+        if (!input_json) return setTestStatus("Add input_json first.", "var(--pd-pink)");
+
+        setTestStatus("Submitting…", "var(--pd-lilac)");
+        try {
+          const r = await fetch("/api/admin/templates/test-run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider, model, input_json, field_values }),
+          });
+          const d = await r.json();
+          if (!r.ok) return setTestStatus(d.error || "Submit failed.", "var(--pd-pink)");
+          const outUrl = await pollJob(d.jobId, d.provider, "Running…");
+          if (outUrl) showTestResult(outUrl);
+        } catch (e: any) {
+          setTestStatus(e.message || "Network error.", "var(--pd-pink)");
+        }
+      }
+    });
+
+    function showTestResult(url: string) {
+      testOpen.href = url;
+      testResult.classList.remove("hidden");
+      const isVideo = testType === "video" || /\.(mp4|webm|mov)(\?|$)/i.test(url);
+      if (isVideo) {
+        testMedia.innerHTML = `<video src="${url}" controls autoplay muted loop playsinline style="width:100%;border-radius:14px;display:block;max-height:400px;object-fit:contain;"></video>`;
+      } else {
+        testMedia.innerHTML = `<img src="${url}" alt="test result" style="width:100%;border-radius:14px;display:block;max-height:400px;object-fit:contain;" />`;
+      }
+      // Store url for "use as preview" button
+      testUseBtn.dataset.url  = url;
+      testUseBtn.dataset.type = isVideo ? "video" : "image";
+    }
+
+    testUseBtn.addEventListener("click", async () => {
+      const url  = testUseBtn.dataset.url ?? "";
+      const type = testUseBtn.dataset.type ?? "image";
+      const idEl = form.elements.namedItem("id") as HTMLInputElement;
+      const id   = idEl?.value?.trim();
+      if (!url) return;
+      if (id) {
+        // Template already exists — persist to DB
+        const r = await fetch("/api/admin/templates/set-preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, url, type }),
+        });
+        const d = await r.json();
+        if (r.ok) {
+          setField(d.field, url);
+          setTestStatus("Set as preview ✓", "var(--pd-mint)");
+          (window as any).pdToast?.("Preview saved", { accent: "var(--pd-mint)" });
+        } else setTestStatus(d.error || "Failed.", "var(--pd-pink)");
+      } else {
+        // New template — just fill the form field
+        const col = type === "video" ? "preview_video" : "preview_image";
+        setField(col, url);
+        setTestStatus("Preview URL filled in form ✓", "var(--pd-mint)");
+      }
+    });
+
+    // Use as example — insert into generations table so it appears in the Examples section
+    const testUseExampleBtn = document.getElementById("pd-test-use-example")!;
+    testUseExampleBtn.addEventListener("click", async () => {
+      const url  = testUseBtn.dataset.url ?? "";
+      const type = testUseBtn.dataset.type ?? "image";
+      const idEl = form.elements.namedItem("id") as HTMLInputElement;
+      const template_id = idEl?.value?.trim();
+      if (!url) return;
+      if (!template_id) {
+        setTestStatus("Save the template first before setting an example.", "var(--pd-amber)");
+        return;
+      }
+      const provider = (form.elements.namedItem("provider") as HTMLSelectElement)?.value ?? "replicate";
+      const model    = (form.elements.namedItem("model") as HTMLInputElement)?.value?.trim() ?? "";
+      testUseExampleBtn.style.opacity = "0.5";
+      const r = await fetch("/api/admin/templates/save-example", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id, url, type, provider, model }),
+      });
+      testUseExampleBtn.style.opacity = "1";
+      const d = await r.json();
+      if (r.ok) {
+        setTestStatus("Saved as example ✓", "var(--pd-mint)");
+        (window as any).pdToast?.("Example saved — reload to see it in the grid", { accent: "var(--pd-mint)" });
+        // Dynamically add to examples grid so admin sees it immediately
+        const grid = document.querySelector(".pd-examples-grid") as HTMLElement | null;
+        if (grid) {
+          const el = document.createElement("div");
+          el.className = "relative overflow-hidden rounded-xl";
+          el.style.cssText = "aspect-ratio:1;background:var(--pd-bg);border:0.5px solid var(--pd-hairline);";
+          const isVid = type === "video";
+          el.innerHTML = isVid
+            ? `<video src="${url}" muted loop playsinline preload="metadata" class="h-full w-full object-cover"></video>`
+            : `<img src="${url}" loading="lazy" alt="" class="h-full w-full object-cover" />`;
+          const useBtn = document.createElement("button");
+          useBtn.type = "button";
+          useBtn.className = "pd-use-example absolute inset-x-0 bottom-0 font-mono uppercase";
+          useBtn.dataset.url = url;
+          useBtn.dataset.type = type;
+          useBtn.style.cssText = "padding:5px;background:rgba(10,10,11,0.7);color:#fff;border:none;cursor:pointer;font-size:9px;letter-spacing:0.4px;";
+          useBtn.textContent = "Use as example";
+          useBtn.addEventListener("click", async () => {
+            const res = await fetch("/api/admin/templates/set-preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: template_id, url, type }) });
+            const dd = await res.json();
+            if (res.ok) { setField(dd.field, url); (window as any).pdToast?.("Example saved", { accent: "var(--pd-mint)" }); }
+          });
+          el.appendChild(useBtn);
+          grid.prepend(el);
+        }
+      } else setTestStatus(d.error || "Failed.", "var(--pd-pink)");
     });
   </script>
 </AdminShell>

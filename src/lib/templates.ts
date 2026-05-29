@@ -76,6 +76,7 @@ export interface Template {
   previewVideo: string | null;
   isFeatured: boolean;
   isHidden: boolean;
+  isAdminOnly: boolean;
   isAdult: boolean;
   sortOrder: number;
 }
@@ -87,7 +88,7 @@ interface TemplateRow {
   engine: string | null; eta: string | null; tags_json: string; tone: string; accent: string | null;
   meta: string | null; subtitle: string | null; description: string | null;
   preview_image: string | null; preview_video: string | null;
-  is_featured: number; is_hidden: number; is_adult: number; sort_order: number;
+  is_featured: number; is_hidden: number; is_admin_only: number; is_adult: number; sort_order: number;
 }
 
 function parse<T>(s: string | null, fallback: T): T {
@@ -129,6 +130,7 @@ export function rowToTemplate(r: TemplateRow): Template {
     previewVideo: r.preview_video,
     isFeatured: r.is_featured === 1,
     isHidden: r.is_hidden === 1,
+    isAdminOnly: r.is_admin_only === 1,
     isAdult: r.is_adult === 1,
     sortOrder: r.sort_order,
   };
@@ -140,6 +142,7 @@ export interface ListOpts {
   category?: string;
   featured?: boolean;
   includeHidden?: boolean;
+  isAdmin?: boolean;
   limit?: number;
 }
 
@@ -147,6 +150,7 @@ export async function listTemplates(db: D1Database, opts: ListOpts = {}): Promis
   const where: string[] = [];
   const binds: unknown[] = [];
   if (!opts.includeHidden) where.push("is_hidden = 0");
+  if (!opts.isAdmin) where.push("is_admin_only = 0");
   if (opts.kind) {
     where.push("kind = ?");
     binds.push(opts.kind);

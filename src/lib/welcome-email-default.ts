@@ -25,9 +25,18 @@ export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
   <!-- Header gradient -->
   <tr>
     <td style="background:linear-gradient(135deg,#7c3aed 0%,#a855f7 50%,#ec4899 100%);padding:48px 40px 40px;text-align:center;">
-      <!-- Logo -->
-      <img src="https://pixiecdn.b-cdn.net/brand/logo-white-880.png" alt="PixieDust" width="220" height="48" style="display:inline-block;width:220px;height:auto;margin-bottom:20px;" />
-      <p style="margin:8px 0 0;color:rgba(255,255,255,0.8);font-size:15px;font-weight:400;">Your AI creative studio is ready</p>
+      <!-- Logo: icon + wordmark inline -->
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 20px;">
+        <tr>
+          <td style="vertical-align:middle;padding-right:10px;">
+            <img src="https://pixiecdn.b-cdn.net/brand/logo-icon-256.png" alt="" width="40" height="40" style="display:block;width:40px;height:40px;border-radius:11px;" />
+          </td>
+          <td style="vertical-align:middle;">
+            <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">PixieDust</span>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:0;color:rgba(255,255,255,0.8);font-size:15px;font-weight:400;">Your AI creative studio is ready</p>
     </td>
   </tr>
 

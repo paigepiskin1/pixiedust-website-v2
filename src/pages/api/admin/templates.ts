@@ -12,7 +12,7 @@ export async function GET({ request, locals }: APIContext) {
   const env = locals.runtime.env;
   if (!adminActor(request, locals, env.ADMIN_API_TOKEN)) return json({ error: "Forbidden" }, 403);
   const { results } = await env.DB.prepare(
-    "SELECT id, title, kind, type, credit_cost, is_featured, is_hidden, (preview_image IS NOT NULL OR preview_video IS NOT NULL) AS has_example FROM templates ORDER BY sort_order, title"
+    "SELECT id, title, kind, type, credit_cost, is_featured, is_hidden, is_admin_only, (preview_image IS NOT NULL OR preview_video IS NOT NULL) AS has_example FROM templates ORDER BY sort_order, title"
   ).all();
   return json({ templates: results ?? [] });
 }

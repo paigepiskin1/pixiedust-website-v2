@@ -8,11 +8,11 @@ if (!isAdmin(Astro.locals)) return Astro.redirect("/");
 const db = Astro.locals.runtime.env.DB;
 interface Row {
   id: string; title: string; kind: string; type: string;
-  credit_cost: number; is_featured: number; is_hidden: number; sort_order: number;
+  credit_cost: number; is_featured: number; is_hidden: number; is_admin_only: number; sort_order: number;
   preview_image: string | null; preview_video: string | null;
 }
 const { results } = await db
-  .prepare("SELECT id, title, kind, type, credit_cost, is_featured, is_hidden, sort_order, preview_image, preview_video FROM templates ORDER BY sort_order ASC, title ASC")
+  .prepare("SELECT id, title, kind, type, credit_cost, is_featured, is_hidden, is_admin_only, sort_order, preview_image, preview_video FROM templates ORDER BY sort_order ASC, title ASC")
   .all<Row>();
 const rows = results ?? [];
 const cell = "padding:11px 12px;font-size:12.5px;color:var(--pd-ink);border-bottom:0.5px solid var(--pd-hairline);";
@@ -46,8 +46,14 @@ const head = "padding:8px 12px;font-family:var(--font-mono);font-size:9.5px;colo
               <td style={cell}>{r.type}</td>
               <td style={cell}>{r.credit_cost} cr</td>
               <td style={cell}>
-                {r.is_featured ? <span style="color:var(--pd-amber);font-size:11px;">★ featured </span> : ""}
-                {r.is_hidden ? <span style="color:var(--pd-pink);font-size:11px;">hidden</span> : <span style="color:var(--pd-mint);font-size:11px;">live</span>}
+                {r.is_admin_only === 1
+                  ? <span style="display:inline-block;padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:600;background:color-mix(in srgb,var(--pd-lilac) 15%,transparent);color:var(--pd-lilac);">Admin only</span>
+                  : r.is_hidden === 1
+                    ? <span style="display:inline-block;padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:600;background:color-mix(in srgb,var(--pd-pink) 15%,transparent);color:var(--pd-pink);">Hidden</span>
+                    : r.is_featured === 1
+                      ? <span style="display:inline-block;padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:600;background:color-mix(in srgb,var(--pd-amber) 15%,transparent);color:var(--pd-amber);">★ Featured</span>
+                      : <span style="display:inline-block;padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:600;background:color-mix(in srgb,var(--pd-mint) 15%,transparent);color:var(--pd-mint);">Live</span>
+                }
               </td>
               <td style={cell}>{r.sort_order}</td>
               <td style={`${cell}padding:6px 12px;`}>
