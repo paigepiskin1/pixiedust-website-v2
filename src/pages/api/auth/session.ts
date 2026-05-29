@@ -1,9 +1,10 @@
 export const prerender = false;
 import type { APIContext } from "astro";
 import { verifyIdToken } from "../../../lib/firebase-verify";
-import { upsertUser, toPublicUser } from "../../../lib/users";
+import { upsertUser, toPublicUser, getUserByUid } from "../../../lib/users";
 import { createSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from "../../../lib/session";
 import { sendWelcomeEmail } from "../../../lib/mailgun";
+import { redeemReferral } from "../../../lib/referrals";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -40,9 +41,21 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
 
   try {
     const claims = await verifyIdToken(idToken);
-    const user = await upsertUser(env.DB, claims);
+    const { user, isNew } = await upsertUser(env.DB, claims);
+
+    // New user who arrived via an invite link → grant referral credits once.
+    let finalUser = user;
+    if (isNew) {
+      const ref = cookies.get("pd_ref")?.value;
+      if (ref) {
+        const granted = await redeemReferral(env.DB, user, ref).catch(() => 0);
+        cookies.delete("pd_ref", { path: "/" });
+        if (granted) finalUser = (await getUserByUid(env.DB, user.uid)) ?? user;
+      }
+    }
+
     // Fire welcome email once per user (non-blocking — doesn't delay sign-in)
-    sendWelcomeEmail(env, env.DB, user).catch(() => {});
+    sendWelcomeEmail(env, env.DB, finalUser).catch(() => {});
     const sid = await createSession(env.SESSIONS, claims.uid);
     cookies.set(SESSION_COOKIE, sid, {
       httpOnly: true,
@@ -51,7 +64,7 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
       path: "/",
       maxAge: SESSION_TTL_SECONDS,
     });
-    return json({ user: toPublicUser(user) });
+    return json({ user: toPublicUser(finalUser) });
   } catch (err) {
     console.error("[session] auth error:", err);
     return json({ error: "Authentication failed" }, 401);

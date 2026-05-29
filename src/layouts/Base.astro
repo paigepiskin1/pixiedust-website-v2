@@ -104,6 +104,12 @@ const baseJsonLd = {
           var el = document.documentElement;
           if (localStorage.getItem("pd-web-theme") === "light") el.setAttribute("data-theme", "light");
           if (localStorage.getItem("pd-web-sidebar") === "collapsed") el.setAttribute("data-sidebar", "collapsed");
+          // Capture an invite code (?ref=CODE) into a cookie so it survives the
+          // sign-in redirect; the session endpoint reads it to grant referral credits.
+          var ref = new URLSearchParams(location.search).get("ref");
+          if (ref && /^[a-z0-9]{4,16}$/i.test(ref)) {
+            document.cookie = "pd_ref=" + encodeURIComponent(ref) + ";path=/;max-age=" + 60 * 60 * 24 * 60 + ";samesite=lax";
+          }
         } catch (e) {}
       })();
     </script>

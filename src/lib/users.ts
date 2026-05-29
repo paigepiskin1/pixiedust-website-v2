@@ -52,8 +52,12 @@ export async function getUserByUid(db: D1Database, uid: string): Promise<DbUser 
     .first<DbUser>();
 }
 
-/** Create the user on first sign-in, or refresh profile fields on return. */
-export async function upsertUser(db: D1Database, claims: FirebaseClaims): Promise<DbUser> {
+/**
+ * Create the user on first sign-in, or refresh profile fields on return.
+ * `isNew` is true only when this call created the row (used to grant referrals).
+ */
+export async function upsertUser(db: D1Database, claims: FirebaseClaims): Promise<{ user: DbUser; isNew: boolean }> {
+  const existing = await getUserByUid(db, claims.uid);
   await db
     .prepare(
       `INSERT INTO users (uid, email, name, avatar_url, email_verified, last_login)
@@ -70,5 +74,5 @@ export async function upsertUser(db: D1Database, claims: FirebaseClaims): Promis
 
   const user = await getUserByUid(db, claims.uid);
   if (!user) throw new Error("User upsert failed");
-  return user;
+  return { user, isNew: !existing };
 }

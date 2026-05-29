@@ -21,6 +21,14 @@ const baseCost = computeCost(template, { quantity: template.quantities?.[0] ?? 1
 const qualityKeys = template.quality ? Object.keys(template.quality) : [];
 const qualityLabels: Record<string, string> = { std: "Standard", pro: "Pro", cinema: "Cinema" };
 
+// Small proportional preview box (max 18px) for an "W:H" aspect ratio.
+function aspectBox(a: string): { w: number; h: number } {
+  const [w, h] = a.split(":").map(Number);
+  const max = 18;
+  if (!w || !h) return { w: max, h: max };
+  return w >= h ? { w: max, h: Math.max(6, Math.round((max * h) / w)) } : { w: Math.max(6, Math.round((max * w) / h)), h: max };
+}
+
 function formatAccept(accept: string | undefined): string {
   if (!accept) return "";
   return accept.split(",").map(s => {
@@ -88,9 +96,15 @@ const config = {
               <div>
                 <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Aspect ratio</span>
                 <div class="flex flex-wrap gap-1.5" data-controls="aspect">
-                  {template.aspects.map((a, i) => (
-                    <button type="button" class="pd-seg rounded-lg font-mono" data-val={a} data-active={i === 0 ? "true" : "false"} style="padding:7px 12px;font-size:11px;cursor:pointer;">{a}</button>
-                  ))}
+                  {template.aspects.map((a, i) => {
+                    const b = aspectBox(a);
+                    return (
+                      <button type="button" class="pd-seg inline-flex items-center gap-1.5 rounded-lg font-mono" data-val={a} data-active={i === 0 ? "true" : "false"} style="padding:6px 11px;font-size:11px;cursor:pointer;">
+                        <span style={`display:inline-block;width:${b.w}px;height:${b.h}px;border:1.5px solid currentColor;border-radius:2px;opacity:0.65;`}></span>
+                        <span>{a}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
