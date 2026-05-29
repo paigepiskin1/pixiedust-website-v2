@@ -1,0 +1,193 @@
+---
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+import { getUserByUid } from "../../../lib/users";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const { uid } = Astro.params;
+const db = Astro.locals.runtime.env.DB;
+const u = uid ? await getUserByUid(db, uid) : null;
+if (!u) return Astro.redirect("/admin/users");
+
+const [ledger, logins, gens, sub, agg] = await Promise.all([
+  db.prepare("SELECT delta, balance_after, reason, note, actor, datetime(created_at) AS ts FROM credit_ledger WHERE user_id = ? ORDER BY id DESC LIMIT 40").bind(u.id).all<any>(),
+  db.prepare("SELECT ip, country, user_agent, datetime(created_at) AS ts FROM login_events WHERE user_id = ? ORDER BY id DESC LIMIT 30").bind(u.id).all<any>(),
+  db.prepare("SELECT id, type, status, output_url, thumbnail_url, model, credits_charged, datetime(created_at) AS ts FROM generations WHERE user_id = ? ORDER BY created_at DESC LIMIT 30").bind(u.id).all<any>(),
+  db.prepare("SELECT s.tier_id, s.status, s.stripe_customer_id, s.stripe_subscription_id, datetime(s.current_period_end) AS period_end FROM subscriptions s WHERE s.user_id = ?").bind(u.id).first<any>(),
+  db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed, IFNULL(SUM(credits_charged),0) AS spent FROM generations WHERE user_id = ?").bind(u.id).first<any>(),
+]);
+
+const ledgerRows = ledger.results ?? [];
+const loginRows = logins.results ?? [];
+const genRows = gens.results ?? [];
+const disabled = !!u.disabled_at;
+const displayName = u.name || (u.email ? u.email.split("@")[0] : "User");
+
+const card = "background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;padding:18px;";
+const head = "padding:7px 10px;font-family:var(--font-mono);font-size:9px;color:var(--pd-ink3);letter-spacing:0.6px;text-transform:uppercase;text-align:left;border-bottom:0.5px solid var(--pd-hairline2);";
+const cell = "padding:8px 10px;font-size:11.5px;color:var(--pd-ink2);border-bottom:0.5px solid var(--pd-hairline);vertical-align:top;";
+const mini = "padding:7px 10px;border-radius:9px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:12.5px;outline:none;";
+const stats = [
+  { k: "Balance", v: `${u.balance} cr` },
+  { k: "Creations", v: String(agg?.total ?? 0) },
+  { k: "Completed", v: String(agg?.completed ?? 0) },
+  { k: "Credits spent", v: String(agg?.spent ?? 0) },
+];
+---
+
+<AdminShell title={`Admin · ${displayName}`} tab="users">
+  <a href="/admin/users" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">← All users</a>
+
+  <!-- Header -->
+  <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2.5">
+        <h1 class="font-display font-medium text-ink" style="font-size:28px;letter-spacing:-0.6px;">{displayName}</h1>
+        {u.is_admin === 1 && <span class="font-mono uppercase" style="font-size:9px;letter-spacing:0.5px;background:var(--pd-lilac);color:#0A0A0B;border-radius:999px;padding:3px 9px;">admin</span>}
+        {disabled && <span id="pd-disabled-badge" class="font-mono uppercase" style="font-size:9px;letter-spacing:0.5px;background:var(--pd-pink);color:#fff;border-radius:999px;padding:3px 9px;">disabled</span>}
+      </div>
+      <div class="mt-1 font-mono" style="font-size:11px;color:var(--pd-ink3);">{u.email}{u.username ? ` · @${u.username}` : ""}</div>
+      <div class="mt-0.5 font-mono" style="font-size:10px;color:var(--pd-ink4);">{u.uid}</div>
+      <div class="mt-1 font-mono" style="font-size:10px;color:var(--pd-ink4);">Joined {u.created_at?.slice(0, 10)} · last login {u.last_login?.slice(0, 16)?.replace("T", " ") ?? "—"}</div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2" data-uid={u.uid} data-self={u.uid === Astro.locals.user!.uid ? "1" : "0"}>
+      <button id="pd-role" type="button" data-on={u.is_admin} class="font-semibold" style="padding:8px 13px;border-radius:10px;font-size:12px;cursor:pointer;border:0.5px solid var(--pd-hairline2);background:transparent;color:var(--pd-ink2);">{u.is_admin ? "Revoke admin" : "Make admin"}</button>
+      <button id="pd-disable" type="button" data-on={disabled ? 1 : 0} class="font-semibold" style={`padding:8px 13px;border-radius:10px;font-size:12px;cursor:pointer;border:none;color:#fff;background:${disabled ? "var(--pd-mint)" : "var(--pd-pink)"};`}>{disabled ? "Enable account" : "Disable account"}</button>
+    </div>
+  </div>
+
+  <!-- Stat row -->
+  <div class="mt-5 grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">
+    {stats.map((s) => (
+      <div style={card}>
+        <div class="font-mono uppercase" style="font-size:9px;color:var(--pd-ink4);letter-spacing:0.6px;">{s.k}</div>
+        <div class="mt-1 font-display font-semibold text-ink" style="font-size:22px;">{s.v}</div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Adjust credits -->
+  <div class="mt-3" style={card}>
+    <div class="font-semibold text-ink" style="font-size:13px;">Adjust credits</div>
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      <input id="pd-delta" type="number" placeholder="± amount" style={mini + "width:110px;"} />
+      <input id="pd-reason" type="text" placeholder="reason (logged)" style={mini + "width:200px;"} />
+      <button id="pd-apply" type="button" class="font-semibold" style="padding:8px 14px;border-radius:10px;background:var(--pd-lilac);color:#0A0A0B;font-size:12px;cursor:pointer;border:none;">Apply</button>
+    </div>
+  </div>
+
+  <!-- Billing + Login history -->
+  <div class="mt-3 grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));">
+    <div style={card}>
+      <div class="mb-2 font-semibold text-ink" style="font-size:13px;">Billing</div>
+      <div class="mb-3" style="font-size:12px;color:var(--pd-ink2);">
+        {sub
+          ? <span>Plan <b style="color:var(--pd-ink);">{sub.tier_id}</b> · {sub.status}{sub.period_end ? ` · renews ${sub.period_end.slice(0,10)}` : ""}{sub.stripe_customer_id ? ` · ${sub.stripe_customer_id}` : ""}</span>
+          : <span class="text-ink-4">No subscription (free / pay-as-you-go).</span>}
+      </div>
+      <div style="max-height:300px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr><th style={head}>When</th><th style={head}>Δ</th><th style={head}>Balance</th><th style={head}>Reason</th></tr></thead>
+          <tbody>
+            {ledgerRows.length === 0 ? (
+              <tr><td style={cell} colspan="4"><span class="text-ink-4">No credit history.</span></td></tr>
+            ) : ledgerRows.map((l: any) => (
+              <tr>
+                <td style={cell}><span class="font-mono" style="font-size:10px;color:var(--pd-ink3);">{l.ts?.slice(5, 16)}</span></td>
+                <td style={cell + `color:${l.delta < 0 ? "var(--pd-pink)" : "var(--pd-mint)"};font-weight:600;`}>{l.delta > 0 ? "+" : ""}{l.delta}</td>
+                <td style={cell}>{l.balance_after}</td>
+                <td style={cell}>{l.reason}{l.note ? <span class="text-ink-4"> · {l.note}</span> : null}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style={card}>
+      <div class="mb-2 font-semibold text-ink" style="font-size:13px;">Login history</div>
+      <div style="max-height:336px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr><th style={head}>When</th><th style={head}>IP</th><th style={head}>Country</th><th style={head}>Device</th></tr></thead>
+          <tbody>
+            {loginRows.length === 0 ? (
+              <tr><td style={cell} colspan="4"><span class="text-ink-4">No logins recorded yet (captured from now on).</span></td></tr>
+            ) : loginRows.map((e: any) => (
+              <tr>
+                <td style={cell}><span class="font-mono" style="font-size:10px;color:var(--pd-ink3);">{e.ts?.slice(5, 16)}</span></td>
+                <td style={cell}><span class="font-mono" style="font-size:10.5px;">{e.ip ?? "—"}</span></td>
+                <td style={cell}><span class="font-mono" style="font-size:10.5px;">{e.country ?? "—"}</span></td>
+                <td style={cell}><span class="truncate" style="font-size:10.5px;color:var(--pd-ink3);display:block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title={e.user_agent}>{e.user_agent ?? "—"}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Creations -->
+  <div class="mt-3" style={card}>
+    <div class="mb-3 font-semibold text-ink" style="font-size:13px;">Creations <span class="text-ink-4" style="font-weight:400;">· latest {genRows.length}</span></div>
+    {genRows.length === 0 ? (
+      <div class="text-ink-4" style="font-size:12px;">No creations yet.</div>
+    ) : (
+      <div class="grid gap-2.5" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));">
+        {genRows.map((g: any) => (
+          <a href={g.output_url || "#"} target={g.output_url ? "_blank" : undefined} rel="noopener" style="text-decoration:none;border-radius:12px;overflow:hidden;border:0.5px solid var(--pd-hairline);background:var(--pd-bg);display:block;">
+            <div style="position:relative;height:110px;background:var(--pd-bg3);overflow:hidden;">
+              {g.output_url && g.status === "completed" ? (
+                g.type === "video"
+                  ? <video src={g.output_url} muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;" />
+                  : <img src={g.output_url} loading="lazy" style="width:100%;height:100%;object-fit:cover;" />
+              ) : (
+                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:0.5px;" class={`font-mono uppercase ${g.status === "failed" ? "" : ""}`}><span style={`color:${g.status === "failed" ? "var(--pd-pink)" : "var(--pd-ink4)"};`}>{g.status}</span></div>
+              )}
+              {g.type === "video" && <span style="position:absolute;top:5px;left:5px;padding:1px 5px;border-radius:4px;background:rgba(0,0,0,.6);color:#fff;font-size:8px;">VIDEO</span>}
+            </div>
+            <div style="padding:6px 8px;font-size:9px;" class="font-mono text-ink-4">{g.ts?.slice(5, 10)} · {g.credits_charged}cr</div>
+          </a>
+        ))}
+      </div>
+    )}
+  </div>
+
+  <script>
+    const bar = document.querySelector("[data-uid]") as HTMLElement;
+    const uid = bar.dataset.uid!;
+    const isSelf = bar.dataset.self === "1";
+    const toast = (m: string, accent?: string) => (window as any).pdToast?.(m, accent ? { accent } : undefined);
+
+    document.getElementById("pd-apply")!.addEventListener("click", async () => {
+      const delta = Number((document.getElementById("pd-delta") as HTMLInputElement).value);
+      const reason = (document.getElementById("pd-reason") as HTMLInputElement).value.trim();
+      if (!delta) { toast("Enter a non-zero delta.", "var(--pd-pink)"); return; }
+      const res = await fetch("/api/admin/users/balance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid, delta, reason }) });
+      const out = await res.json();
+      if (res.ok) { toast(`Balance → ${out.balance} cr`, "var(--pd-amber)"); setTimeout(() => location.reload(), 700); }
+      else toast(out.error || "Failed.", "var(--pd-pink)");
+    });
+
+    document.getElementById("pd-role")!.addEventListener("click", async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      const next = btn.dataset.on === "1" ? 0 : 1;
+      if (!await (window as any).pdConfirm(`${next ? "Grant" : "Revoke"} admin for this user?`)) return;
+      const res = await fetch("/api/admin/users/role", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid, is_admin: next }) });
+      if (res.ok) location.reload(); else toast("Failed.", "var(--pd-pink)");
+    });
+
+    const disableBtn = document.getElementById("pd-disable") as HTMLButtonElement;
+    disableBtn.addEventListener("click", async () => {
+      if (isSelf) { toast("You can't disable your own account.", "var(--pd-pink)"); return; }
+      const next = disableBtn.dataset.on !== "1"; // toggle to disabled?
+      const verb = next ? "Disable" : "Enable";
+      if (!await (window as any).pdConfirm(`${verb} this account?${next ? " They'll be signed out and blocked from signing in." : ""}`)) return;
+      const res = await fetch("/api/admin/users/disable", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid, disabled: next }) });
+      const out = await res.json();
+      if (res.ok) { toast(next ? "Account disabled." : "Account enabled.", next ? "var(--pd-pink)" : "var(--pd-mint)"); setTimeout(() => location.reload(), 700); }
+      else toast(out.error || "Failed.", "var(--pd-pink)");
+    });
+  </script>
+</AdminShell>

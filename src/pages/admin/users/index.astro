@@ -33,8 +33,10 @@ const mini = "padding:6px 9px;border-radius:8px;background:var(--pd-bg);border:0
           rows.map((r) => (
             <tr data-uid={r.uid}>
               <td style={cell}>
-                <div class="font-semibold" style="color:var(--pd-ink);">{r.name ?? "—"}</div>
-                <div class="font-mono" style="font-size:10px;color:var(--pd-ink3);">{r.email}{r.username ? ` · @${r.username}` : ""}</div>
+                <a href={`/admin/users/${r.uid}`} class="pd-user-link" style="text-decoration:none;">
+                  <div class="font-semibold" style="color:var(--pd-ink);">{r.name ?? "—"} <span style="font-size:10px;color:var(--pd-lilac);">View →</span></div>
+                  <div class="font-mono" style="font-size:10px;color:var(--pd-ink3);">{r.email}{r.username ? ` · @${r.username}` : ""}</div>
+                </a>
               </td>
               <td style={cell}><span class="pd-bal font-semibold" style="color:var(--pd-amber);">{r.balance}</span> cr</td>
               <td style={cell}>

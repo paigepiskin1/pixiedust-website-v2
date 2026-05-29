@@ -43,6 +43,22 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
     const claims = await verifyIdToken(idToken);
     const { user, isNew } = await upsertUser(env.DB, claims);
 
+    // Disabled accounts cannot sign in.
+    if (user.disabled_at) return json({ error: "This account has been disabled." }, 403);
+
+    // Record the login for the admin login-history view (IP + device).
+    const ip =
+      request.headers.get("CF-Connecting-IP") ||
+      request.headers.get("X-Forwarded-For")?.split(",")[0].trim() ||
+      null;
+    const country = request.headers.get("CF-IPCountry") || null;
+    const ua = request.headers.get("User-Agent")?.slice(0, 400) || null;
+    await env.DB
+      .prepare("INSERT INTO login_events (user_id, uid, ip, country, user_agent) VALUES (?, ?, ?, ?, ?)")
+      .bind(user.id, user.uid, ip, country, ua)
+      .run()
+      .catch(() => {});
+
     // New user who arrived via an invite link → grant referral credits once.
     let finalUser = user;
     if (isNew) {

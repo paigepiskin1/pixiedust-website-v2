@@ -13,7 +13,8 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
       const uid = await readSession(env.SESSIONS, sid);
       if (uid) {
         const u = await getUserByUid(env.DB, uid);
-        if (u) context.locals.user = toPublicUser(u);
+        // Disabled accounts are treated as logged-out everywhere (abuse control).
+        if (u && !u.disabled_at) context.locals.user = toPublicUser(u);
       }
     }
   } catch {
