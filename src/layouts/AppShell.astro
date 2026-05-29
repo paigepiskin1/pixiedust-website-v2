@@ -31,6 +31,7 @@ const credits = user?.credits ?? Astro.props.credits ?? 47;
 ---
 
 <Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd}>
+  <script is:inline set:html={`document.documentElement.setAttribute('data-auth','${user ? "in" : "out"}')`}></script>
   <div class="flex min-h-screen">
     <Sidebar credits={credits} user={user} />
     <div class="flex min-w-0 flex-1 flex-col">

@@ -56,7 +56,7 @@ const config = {
             ) : template.previewImage ? (
               <img src={template.previewImage} alt={template.title} class="h-full w-full object-cover" />
             ) : (
-              <Media tone={template.tone} angle={130} label={template.title} sub={template.engine ?? undefined} />
+              <Media tone={template.tone} angle={130} label={template.title} sub={template.kind ?? undefined} />
             )
           }
         </div>
@@ -68,7 +68,7 @@ const config = {
         {template.subtitle && <div class="mt-1 text-ink-3" style="font-size:12.5px;">{template.subtitle}</div>}
         {template.description && <p class="mt-2 text-ink-2" style="font-size:13px;line-height:1.5;">{template.description}</p>}
         <div class="mt-4 grid grid-cols-2 gap-2">
-          {[["Engine", template.engine], ["ETA", template.eta], ["Cost", `${template.creditCost} cr`], ["Type", template.type]].filter(([, v]) => v).map(([k, v]) => (
+          {[["ETA", template.eta], ["Cost", `${template.creditCost} cr`], ["Type", template.type]].filter(([, v]) => v).map(([k, v]) => (
             <div class="rounded-xl" style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
               <div class="font-mono uppercase" style="font-size:9px;color:var(--pd-ink4);letter-spacing:0.6px;">{k}</div>
               <div class="mt-0.5 font-semibold text-ink" style="font-size:12.5px;">{v}</div>
@@ -133,7 +133,7 @@ const config = {
             <span id="pd-gen-label">Generate · {baseCost} cr</span>
           </button>
           <div class="mt-2 text-center font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.5px;">
-            {template.engine ?? "SyncNode"} · {template.eta ?? "async"}
+            PixieDust · {template.eta ?? "async"}
           </div>
         </div>
       </section>
@@ -483,11 +483,44 @@ const config = {
       }
     }
 
+    // Lightweight sign-in prompt shown when a logged-out visitor tries to generate.
+    let signInModalEl: HTMLElement | null = null;
+    function showSignInModal() {
+      const redirect = "/auth/sign-in?redirect=" + encodeURIComponent(location.pathname);
+      if (!signInModalEl) {
+        signInModalEl = document.createElement("div");
+        signInModalEl.style.cssText = "position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);";
+        signInModalEl.innerHTML =
+          '<div role="dialog" aria-modal="true" style="width:100%;max-width:360px;border-radius:18px;padding:26px 24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.4);">' +
+            '<div style="margin:0 auto 14px;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);">' +
+              '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-lilac)" stroke-width="1.5" stroke-linecap="round"><path d="M10 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M4 16.5a6 6 0 0 1 12 0"/></svg>' +
+            '</div>' +
+            '<div style="font-size:17px;font-weight:600;letter-spacing:-0.3px;color:var(--pd-ink);">Sign in to generate</div>' +
+            '<div style="margin-top:6px;font-size:13px;line-height:1.5;color:var(--pd-ink3);">Create a free account or sign in to start generating with this template.</div>' +
+            '<a id="pd-signin-go" href="' + redirect + '" style="margin-top:18px;display:flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:12px;background:var(--pd-lilac);color:#0A0A0B;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:-0.1px;">Sign in</a>' +
+            '<button id="pd-signin-cancel" type="button" style="margin-top:10px;width:100%;padding:10px;border-radius:12px;background:transparent;border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);font-size:13px;cursor:pointer;">Not now</button>' +
+          '</div>';
+        document.body.appendChild(signInModalEl);
+        signInModalEl.addEventListener("click", (e) => { if (e.target === signInModalEl) hideSignInModal(); });
+        signInModalEl.querySelector<HTMLElement>("#pd-signin-cancel")!.addEventListener("click", hideSignInModal);
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideSignInModal(); });
+      } else {
+        signInModalEl.querySelector<HTMLAnchorElement>("#pd-signin-go")!.href = redirect;
+      }
+      signInModalEl.style.display = "flex";
+      document.body.style.overflow = "hidden";
+    }
+    function hideSignInModal() {
+      if (signInModalEl) signInModalEl.style.display = "none";
+      document.body.style.overflow = "";
+    }
+
     function generate() {
       if (!cfg.signedIn) {
-        window.location.href = "/auth/sign-in?redirect=" + encodeURIComponent(location.pathname);
+        showSignInModal();
         return;
       }
+      const uploading = Number((fieldPanel as any)?._pdUploading || 0);
       if (uploading > 0) {
         showError("Hang on — a file is still uploading.");
         return;
