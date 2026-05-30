@@ -58,6 +58,13 @@ export async function POST({ request, locals }: APIContext) {
 
   const input = sub(parsed) as Record<string, unknown>;
 
+  // Drop params that resolved to an empty string (e.g. an unfilled {{aspect}}).
+  // Sending "" makes some models hard-fail (e.g. nano-banana 502 on empty
+  // aspect_ratio); omitting lets the model use its default instead.
+  if (input && typeof input === "object") {
+    for (const k of Object.keys(input)) if (input[k] === "") delete input[k];
+  }
+
   try {
     const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider, model, input });
     return json({ ok: true, jobId, provider });
