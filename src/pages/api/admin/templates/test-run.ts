@@ -23,14 +23,40 @@ export async function POST({ request, locals }: APIContext) {
   if (!model) return json({ error: "model is required" }, 400);
   if (!input_json) return json({ error: "input_json is required" }, 400);
 
-  // Substitute {{key}} placeholders with field_values
-  let inputStr = typeof input_json === "string" ? input_json : JSON.stringify(input_json);
-  for (const [k, v] of Object.entries(field_values as Record<string, string>)) {
-    inputStr = inputStr.replace(new RegExp(`\\{\\{${k}(\\*?)\\}\\}`, "g"), String(v ?? ""));
+  // Parse first, then walk and substitute — so an exact-match placeholder keeps
+  // the field's real type (arrays for multi-file {{files*}}, numbers, etc.).
+  // Inline placeholders inside a longer string are stringified. Mirrors the
+  // studio's resolveInput so the test matches real generation.
+  let parsed: unknown;
+  try {
+    parsed = typeof input_json === "string" ? JSON.parse(input_json) : input_json;
+  } catch {
+    return json({ error: "input_json is invalid JSON" }, 400);
   }
 
-  let input: Record<string, unknown>;
-  try { input = JSON.parse(inputStr); } catch { return json({ error: "input_json is invalid JSON after substitution" }, 400); }
+  const fields = field_values as Record<string, unknown>;
+  const sub = (v: unknown): unknown => {
+    if (typeof v === "string") {
+      const exact = v.match(/^\{\{(\w+)\*?\}\}$/);
+      if (exact) {
+        const val = fields[exact[1]];
+        return val === undefined ? "" : val; // preserves arrays / numbers / strings
+      }
+      return v.replace(/\{\{(\w+)\*?\}\}/g, (_, k: string) => {
+        const val = fields[k];
+        return val == null ? "" : String(val);
+      });
+    }
+    if (Array.isArray(v)) return v.map(sub);
+    if (v && typeof v === "object") {
+      const o: Record<string, unknown> = {};
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) o[k] = sub(val);
+      return o;
+    }
+    return v;
+  };
+
+  const input = sub(parsed) as Record<string, unknown>;
 
   try {
     const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider, model, input });
