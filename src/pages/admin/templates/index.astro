@@ -81,6 +81,7 @@ const head = "padding:8px 12px;font-family:var(--font-mono);font-size:9.5px;colo
               </td>
               <td style={`${cell}text-align:right;white-space:nowrap;`}>
                 <a href={`/admin/templates/edit/${r.id}`} class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink2);letter-spacing:0.5px;">Edit</a>
+                <button type="button" class="pd-dup font-mono uppercase" data-id={r.id} style="margin-left:12px;font-size:10px;color:var(--pd-lilac);letter-spacing:0.5px;background:none;border:none;cursor:pointer;">Duplicate</button>
                 <button type="button" class="pd-del font-mono uppercase" data-id={r.id} style="margin-left:12px;font-size:10px;color:var(--pd-pink);letter-spacing:0.5px;background:none;border:none;cursor:pointer;">Delete</button>
               </td>
             </tr>
@@ -91,6 +92,26 @@ const head = "padding:8px 12px;font-family:var(--font-mono);font-size:9.5px;colo
   </div>
 
   <script>
+    document.querySelectorAll<HTMLElement>(".pd-dup").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id!;
+        btn.textContent = "Duplicating…";
+        const res = await fetch("/api/admin/templates/duplicate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+        const out = await res.json();
+        if (res.ok) {
+          (window as any).pdToast?.("Duplicated — opening the copy…", { accent: "var(--pd-lilac)" });
+          window.location.href = `/admin/templates/edit/${out.id}`;
+        } else {
+          btn.textContent = "Duplicate";
+          (window as any).pdToast?.(out.error || "Duplicate failed.", { accent: "var(--pd-pink)" });
+        }
+      });
+    });
+
     document.querySelectorAll<HTMLElement>(".pd-del").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id!;
