@@ -543,8 +543,9 @@ const config = {
           credits += per;
           refreshButton();
           if (data.needCredits) {
-            tileFail(tile, "Not enough credits.");
-            setTimeout(() => (window.location.href = "/credits"), 900);
+            tile.remove();
+            (window as any).pdToast?.("You're out of credits — taking you to top up…", { accent: "var(--pd-amber)" });
+            window.location.href = "/credits";
           } else {
             tileFail(tile, friendlyError(data.error || "Could not start generation."));
           }
