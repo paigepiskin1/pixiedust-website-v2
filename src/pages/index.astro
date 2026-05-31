@@ -8,13 +8,15 @@ import CardRail from "../components/home/CardRail.astro";
 import FeatureBanner from "../components/home/FeatureBanner.astro";
 import Reveal from "../components/motion/Reveal.tsx";
 import { listTemplates, templateToRail } from "../lib/templates";
+import { getToolCards } from "../lib/tool-cards";
 
 const db = Astro.locals.runtime.env.DB;
-const [trending, presets, beauty, videoPool] = await Promise.all([
+const [trending, presets, beauty, videoPool, toolMedia] = await Promise.all([
   listTemplates(db, { featured: true, limit: 8 }),
   listTemplates(db, { kind: "preset", limit: 8 }),
   listTemplates(db, { kind: "beauty", limit: 8 }),
   listTemplates(db, { kinds: ["i2v", "video", "motion", "cinema"], limit: 40 }),
+  getToolCards(db),
 ]);
 
 // Surface templates that actually have a generated preview video first, so the
@@ -58,7 +60,7 @@ const heroSlides: HeroSlide[] = videoTemplates.slice(0, 5).map((t) => ({
 
     <section class="mb-9">
       <RailHead title="Start a project" sub="Pick a tool" accent="var(--pd-teal)" />
-      <QuickLaunch />
+      <QuickLaunch media={toolMedia} />
     </section>
 
     <section class="mb-9">

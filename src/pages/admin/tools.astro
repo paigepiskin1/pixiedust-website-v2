@@ -1,0 +1,96 @@
+---
+export const prerender = false;
+import AdminShell from "../../layouts/AdminShell.astro";
+import { isAdmin } from "../../lib/admin";
+import { QUICK_TOOLS } from "../../lib/content";
+import { getToolCards } from "../../lib/tool-cards";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const media = await getToolCards(db);
+const card = "background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;overflow:hidden;";
+---
+
+<AdminShell title="Admin · Home cards" tab="tools">
+  <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Home cards</h1>
+  <p class="mt-1 text-ink-3" style="font-size:13.5px;">Set a background image or video for each "Start a project" tool card. Leave empty to use the default gradient.</p>
+
+  <div class="mt-6 grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">
+    {QUICK_TOOLS.map((t) => {
+      const m = media[t.href];
+      return (
+        <div class="pd-tool" data-href={t.href} style={card}>
+          <div class="pd-tool-preview" style="position:relative;height:150px;background:var(--pd-bg3);overflow:hidden;">
+            {m?.type === "video" ? (
+              <video class="pd-tool-media" src={m.url} muted loop playsinline autoplay preload="metadata" style="width:100%;height:100%;object-fit:cover;" />
+            ) : m?.url ? (
+              <img class="pd-tool-media" src={m.url} alt={t.name} style="width:100%;height:100%;object-fit:cover;" />
+            ) : (
+              <div class="pd-tool-media" style={`width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;color:${t.accent};background:color-mix(in srgb,${t.accent} 14%, var(--pd-bg3));`}>{t.glyph}</div>
+            )}
+            <span class="pd-tool-badge" style="position:absolute;top:8px;left:8px;padding:2px 7px;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font-size:8.5px;letter-spacing:0.5px;text-transform:uppercase;">{m ? m.type : "default"}</span>
+          </div>
+          <div style="padding:12px 14px;">
+            <div class="font-semibold text-ink" style="font-size:13.5px;">{t.name}</div>
+            <div class="font-mono" style="font-size:10px;color:var(--pd-ink4);">{t.href}</div>
+            <div class="mt-2.5 flex items-center gap-2">
+              <label class="pd-tool-upload rounded-lg font-semibold" style="position:relative;padding:7px 12px;font-size:11.5px;background:var(--pd-lilac);color:#0A0A0B;cursor:pointer;overflow:hidden;">
+                <span class="pd-tool-label">Upload</span>
+                <input type="file" accept="image/*,video/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+              </label>
+              <button type="button" class="pd-tool-clear font-mono uppercase" style={`font-size:10px;letter-spacing:0.5px;color:var(--pd-pink);background:none;border:none;cursor:pointer;${m ? "" : "visibility:hidden;"}`}>Remove</button>
+              <span class="pd-tool-status" style="font-size:10.5px;color:var(--pd-ink3);"></span>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  <script>
+    document.querySelectorAll<HTMLElement>(".pd-tool").forEach((cardEl) => {
+      const href = cardEl.dataset.href!;
+      const input = cardEl.querySelector<HTMLInputElement>('input[type="file"]')!;
+      const status = cardEl.querySelector<HTMLElement>(".pd-tool-status")!;
+      const clearBtn = cardEl.querySelector<HTMLButtonElement>(".pd-tool-clear")!;
+      const preview = cardEl.querySelector<HTMLElement>(".pd-tool-preview")!;
+      const badge = cardEl.querySelector<HTMLElement>(".pd-tool-badge")!;
+      const toast = (m: string, accent?: string) => (window as any).pdToast?.(m, accent ? { accent } : undefined);
+
+      function renderMedia(url: string, type: string) {
+        const old = preview.querySelector(".pd-tool-media");
+        const el = type === "video" ? document.createElement("video") : document.createElement("img");
+        el.className = "pd-tool-media";
+        (el as HTMLMediaElement | HTMLImageElement).setAttribute("src", url);
+        el.setAttribute("style", "width:100%;height:100%;object-fit:cover;");
+        if (type === "video") { const v = el as HTMLVideoElement; v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; }
+        old?.replaceWith(el);
+        badge.textContent = type;
+        clearBtn.style.visibility = "visible";
+      }
+
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        status.textContent = "Uploading…";
+        const fd = new FormData(); fd.append("file", file);
+        try {
+          const up = await fetch("/api/upload", { method: "POST", body: fd });
+          const upd = await up.json();
+          if (!up.ok) { status.textContent = upd.error || "Upload failed"; return; }
+          const res = await fetch("/api/admin/tool-cards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ href, url: upd.url, type: upd.kind }) });
+          if (res.ok) { renderMedia(upd.url, upd.kind); status.textContent = ""; toast("Saved.", "var(--pd-mint)"); }
+          else status.textContent = "Save failed";
+        } catch { status.textContent = "Upload failed"; }
+        input.value = "";
+      });
+
+      clearBtn.addEventListener("click", async () => {
+        const res = await fetch("/api/admin/tool-cards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ href, clear: true }) });
+        if (res.ok) { toast("Reverted to default.", "var(--pd-pink)"); setTimeout(() => location.reload(), 500); }
+        else toast("Failed.", "var(--pd-pink)");
+      });
+    });
+  </script>
+</AdminShell>

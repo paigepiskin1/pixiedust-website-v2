@@ -1,18 +1,32 @@
 ---
 import Media from "../ui/Media.astro";
 import { QUICK_TOOLS } from "../../lib/content";
+import type { ToolCardMap } from "../../lib/tool-cards";
+
+interface Props {
+  media?: ToolCardMap;
+}
+const { media = {} } = Astro.props;
 ---
 
 <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
   {
-    QUICK_TOOLS.map((t) => (
+    QUICK_TOOLS.map((t) => {
+      const m = media[t.href];
+      return (
       <a
         href={t.href}
         class="pd-lift group relative flex flex-col justify-between overflow-hidden rounded-[18px] p-[18px]"
         style="height:168px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);isolation:isolate;"
       >
         <div class="absolute inset-0 z-0 transition-transform duration-[400ms] group-hover:scale-[1.04]">
-          <Media tone={t.tone} />
+          {m?.type === "video" ? (
+            <video src={m.url} muted loop playsinline autoplay preload="metadata" data-no-seek class="pd-autoplay h-full w-full object-cover" />
+          ) : m?.url ? (
+            <img src={m.url} alt={t.name} loading="lazy" class="h-full w-full object-cover" />
+          ) : (
+            <Media tone={t.tone} />
+          )}
         </div>
         <div
           class="absolute inset-0 z-0"
@@ -40,6 +54,7 @@ import { QUICK_TOOLS } from "../../lib/content";
           </div>
         </div>
       </a>
-    ))
+      );
+    })
   }
 </div>
