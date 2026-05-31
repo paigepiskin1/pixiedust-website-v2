@@ -29,19 +29,21 @@ const lines = title.split("\n");
 <a
   href={href}
   class="pd-lift relative block w-full overflow-hidden rounded-[24px]"
-  style={`height:${height}px;background:var(--pd-bg2);`}
+  style="background:var(--pd-bg2);"
 >
-  <Media tone={tone} angle={105} />
+  <div class="absolute inset-0"><Media tone={tone} angle={105} /></div>
   <div class="absolute inset-0" style="background:linear-gradient(90deg, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.3) 60%, transparent 100%);"></div>
-  <div class="absolute bottom-7 left-8 top-7 flex max-w-[60%] flex-col justify-between">
+  <!-- Content is in normal flow with a min-height, so the card grows to fit
+       (no clipped CTA on mobile where the title wraps to more lines). -->
+  <div class="relative flex flex-col justify-between" style={`min-height:${height}px;padding:26px 30px;gap:16px;`}>
     <div><Pill color={accent} label={kicker} /></div>
-    <div>
-      <div class="font-display font-medium text-white" style="font-size:32px;letter-spacing:-0.8px;line-height:1.02;">
+    <div style="max-width:min(82%, 560px);">
+      <div class="pd-fb-title font-display font-medium text-white" style="font-size:28px;letter-spacing:-0.7px;line-height:1.05;">
         {lines.map((l, i) => (<>{i > 0 && <br />}{l}</>))}
       </div>
       {
         sub && (
-          <div class="mt-2.5 font-mono uppercase" style="font-size:10.5px;color:rgba(255,255,255,0.6);letter-spacing:0.5px;">
+          <div class="mt-2.5 font-mono uppercase" style="font-size:10.5px;color:rgba(255,255,255,0.6);letter-spacing:0.5px;line-height:1.5;">
             {sub}
           </div>
         )
@@ -60,3 +62,10 @@ const lines = title.split("\n");
     </div>
   </div>
 </a>
+
+<style>
+  /* Roomier title on wider screens; mobile keeps the compact 28px. */
+  @media (min-width: 768px) {
+    .pd-fb-title { font-size: 32px; letter-spacing: -0.8px; }
+  }
+</style>

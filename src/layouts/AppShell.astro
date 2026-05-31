@@ -97,6 +97,7 @@ const credits = user?.credits ?? Astro.props.credits ?? 47;
           // Show a frame a few seconds in (not the often-blank first frame) as
           // the thumbnail/starting point.
           var seek = function () {
+            if ("noSeek" in v.dataset) return; // hero plays from frame 0 (faster first paint)
             if (v.dataset.pdSeeked) return;
             var off = Math.min(3, (v.duration || 0) * 0.25);
             if (off > 0) {

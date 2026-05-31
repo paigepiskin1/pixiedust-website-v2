@@ -22,7 +22,11 @@ const HERO = slides && slides.length ? slides : HERO_SLIDES;
         style={`opacity:${idx === 0 ? 1 : 0};pointer-events:${idx === 0 ? "auto" : "none"};`}
       >
         {s.previewVideo ? (
-          <video src={s.previewVideo} muted loop playsinline autoplay preload="metadata" class="pd-autoplay absolute inset-0 h-full w-full object-cover" />
+          <>
+            {/* Instant gradient backdrop so the hero never flashes black while the video loads. */}
+            <div class="absolute inset-0"><Media tone={s.tone} angle={130} /></div>
+            <video src={s.previewVideo} poster={s.previewImage || undefined} muted loop playsinline autoplay preload={idx === 0 ? "auto" : "metadata"} data-no-seek class="pd-autoplay absolute inset-0 h-full w-full object-cover" />
+          </>
         ) : s.previewImage ? (
           <img src={s.previewImage} alt={s.title} class="absolute inset-0 h-full w-full object-cover" />
         ) : (
