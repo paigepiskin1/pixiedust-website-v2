@@ -153,15 +153,13 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         <div style={lbl + "margin-bottom:8px;"}>Visibility</div>
         <div class="flex flex-wrap gap-3" id="pd-visibility-group">
           {[
-            { val: "normal",     label: "Normal",     desc: "Live for all users",       color: "var(--pd-mint)" },
-            { val: "featured",   label: "Featured",   desc: "Promoted in catalog",       color: "var(--pd-amber)" },
+            { val: "normal",     label: "Live",       desc: "Shown to all users",        color: "var(--pd-mint)" },
             { val: "hidden",     label: "Hidden",     desc: "Not shown publicly",        color: "var(--pd-pink)" },
             { val: "admin_only", label: "Admin only", desc: "Only admins can access it", color: "var(--pd-lilac)" },
           ].map(({ val, label, desc, color }) => {
             const current =
               v("is_admin_only") === "1" ? "admin_only" :
-              v("is_hidden") === "1"     ? "hidden" :
-              v("is_featured") === "1"   ? "featured" : "normal";
+              v("is_hidden") === "1"     ? "hidden" : "normal";
             return (
               <label style={`display:flex;align-items:center;gap:9px;padding:9px 14px;border-radius:11px;cursor:pointer;border:1.5px solid ${current === val ? color : "var(--pd-hairline)"};background:${current === val ? `color-mix(in srgb,${color} 10%,transparent)` : "var(--pd-bg)"};transition:border-color .15s,background .15s;`}>
                 <input type="radio" name="pd_status" value={val} checked={current === val} style="accent-color:var(--pd-lilac);" />
@@ -173,8 +171,17 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
             );
           })}
         </div>
+
+        {/* Featured is independent of visibility — promote in the catalog regardless. */}
+        <label id="pd-featured-label" class="mt-3" style={`display:inline-flex;align-items:center;gap:9px;padding:9px 14px;border-radius:11px;cursor:pointer;border:1.5px solid ${v("is_featured") === "1" ? "var(--pd-amber)" : "var(--pd-hairline)"};background:${v("is_featured") === "1" ? "color-mix(in srgb,var(--pd-amber) 10%,transparent)" : "var(--pd-bg)"};transition:border-color .15s,background .15s;`}>
+          <input type="checkbox" name="is_featured" id="pd-is-featured" checked={v("is_featured") === "1"} style="accent-color:var(--pd-amber);" />
+          <span>
+            <span style="display:block;font-size:13px;font-weight:600;color:var(--pd-amber);">★ Featured</span>
+            <span style="display:block;font-size:11px;color:var(--pd-ink3);margin-top:1px;">Promote in the catalog (works with any visibility)</span>
+          </span>
+        </label>
+
         {/* Hidden fields written by JS before submit */}
-        <input type="hidden" name="is_featured"   id="pd-is-featured" />
         <input type="hidden" name="is_hidden"     id="pd-is-hidden" />
         <input type="hidden" name="is_admin_only" id="pd-is-admin-only" />
       </div>
@@ -332,10 +339,20 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
 
     function encodeVisibility() {
       const status = (form.querySelector('input[name="pd_status"]:checked') as HTMLInputElement)?.value ?? "normal";
-      (document.getElementById("pd-is-featured")   as HTMLInputElement).value = status === "featured"   ? "1" : "0";
       (document.getElementById("pd-is-hidden")     as HTMLInputElement).value = status === "hidden"     ? "1" : "0";
       (document.getElementById("pd-is-admin-only") as HTMLInputElement).value = status === "admin_only" ? "1" : "0";
     }
+
+    // Featured is an independent toggle (any visibility can be featured).
+    const featuredCb = document.getElementById("pd-is-featured") as HTMLInputElement | null;
+    const featuredLabel = document.getElementById("pd-featured-label") as HTMLElement | null;
+    function syncFeatured() {
+      if (!featuredCb || !featuredLabel) return;
+      const on = featuredCb.checked;
+      featuredLabel.style.borderColor = on ? "var(--pd-amber)" : "var(--pd-hairline)";
+      featuredLabel.style.background = on ? "color-mix(in srgb,var(--pd-amber) 10%,transparent)" : "var(--pd-bg)";
+    }
+    featuredCb?.addEventListener("change", syncFeatured);
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
