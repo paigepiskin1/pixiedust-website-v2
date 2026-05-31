@@ -37,6 +37,9 @@ export async function saveTemplate(db: D1Database, d: Record<string, any>): Prom
   }
 
   const val = (k: string) => (d[k] === "" || d[k] === undefined ? null : d[k]);
+  // Robust 0/1 flag: the editor sends string "0"/"1" (and "0" is truthy!), the
+  // AI path sends booleans. Treat only true/1/"1" as set.
+  const flag = (v: unknown) => (v === 1 || v === "1" || v === true ? 1 : 0);
   const cols = [
     ...TEXT_COLS,
     ...JSON_COLS,
@@ -54,9 +57,9 @@ export async function saveTemplate(db: D1Database, d: Record<string, any>): Prom
     jsons.tags_json ?? "[]",
     Number(d.credit_cost) || 0,
     d.price_per_second ? Number(d.price_per_second) : null,
-    d.is_featured ? 1 : 0,
-    d.is_hidden ? 1 : 0,
-    d.is_admin_only ? 1 : 0,
+    flag(d.is_featured),
+    flag(d.is_hidden),
+    flag(d.is_admin_only),
     Number(d.sort_order) || 0,
     new Date().toISOString().replace("T", " ").slice(0, 19),
   ];
