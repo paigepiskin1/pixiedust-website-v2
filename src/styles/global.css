@@ -47,11 +47,25 @@
 /* Auth-state toggles (set on <html data-auth="in|out">). Used by the topbar
    Upgrade/Sign-in swap and any other element that differs by auth state. */
 .pd-auth-in,
-.pd-auth-out {
+.pd-auth-out,
+.pd-plan-free,
+.pd-plan-paid {
   display: none !important;
 }
-html[data-auth="in"] .pd-auth-in,
+html[data-auth="in"] .pd-auth-in {
+  display: inline-flex !important;
+}
 html[data-auth="out"] .pd-auth-out {
+  display: inline-flex !important;
+}
+/* Topbar CTA reflects the plan: Free → Upgrade, paid → plan badge.
+   Default (logged in, plan not yet hydrated) shows Upgrade. */
+html[data-auth="in"][data-plan="free"] .pd-plan-free,
+html[data-auth="in"]:not([data-plan]) .pd-plan-free {
+  display: inline-flex !important;
+}
+html[data-auth="in"][data-plan="plus"] .pd-plan-paid,
+html[data-auth="in"][data-plan="studio"] .pd-plan-paid {
   display: inline-flex !important;
 }
 

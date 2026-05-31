@@ -26,6 +26,18 @@ export async function getUserTier(db: D1Database, userId: number): Promise<Tier>
   return free ?? FREE_FALLBACK;
 }
 
+/** The user's current plan (active subscription), defaulting to free. */
+export async function getUserPlan(db: D1Database, userId: number): Promise<{ id: string; name: string }> {
+  const row = await db
+    .prepare(
+      `SELECT t.id, t.name FROM subscriptions s JOIN subscription_tiers t ON t.id = s.tier_id
+       WHERE s.user_id = ? AND s.status = 'active'`
+    )
+    .bind(userId)
+    .first<{ id: string; name: string }>();
+  return row ?? { id: "free", name: "Free" };
+}
+
 /** Fixed-window per-minute limiter in KV. Returns false when the limit is hit. */
 export async function checkRateLimit(kv: KVNamespace, userId: number, limit: number): Promise<boolean> {
   const minute = Math.floor(Date.now() / 60000);

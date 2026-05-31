@@ -31,7 +31,7 @@ const credits = user?.credits ?? Astro.props.credits ?? 47;
 ---
 
 <Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd}>
-  <script is:inline set:html={`document.documentElement.setAttribute('data-auth','${user ? "in" : "out"}')`}></script>
+  <script is:inline set:html={`document.documentElement.setAttribute('data-auth','${user ? "in" : "out"}');${user ? "document.documentElement.setAttribute('data-plan','free');" : ""}`}></script>
   <div class="flex min-h-screen">
     <Sidebar credits={credits} user={user} />
     <div class="flex min-w-0 flex-1 flex-col">
@@ -49,16 +49,19 @@ const credits = user?.credits ?? Astro.props.credits ?? 47;
     // default; this upgrades to the signed-in user when a session exists).
     fetch("/api/auth/me", { headers: { accept: "application/json" } })
       .then((r) => (r.ok ? r.json() : { user: null }))
-      .then(({ user }) => {
+      .then(({ user, plan }) => {
         const set = (sel, fn) => document.querySelectorAll(sel).forEach(fn);
         if (user) {
           const name = user.name || (user.email ? user.email.split("@")[0] : "You");
           set(".pd-acct-name", (e) => (e.textContent = name));
-          set(".pd-acct-sub", (e) => (e.textContent = user.isAdmin ? "Admin" : "Member"));
+          set(".pd-acct-sub", (e) => (e.textContent = user.isAdmin ? "Admin" : (plan && plan.id !== "free" ? plan.name : "Member")));
           set(".pd-acct-avatar", (e) => (e.textContent = (name[0] || "U").toUpperCase()));
           set(".pd-credits-val", (e) => (e.textContent = String(user.credits)));
           set(".pd-acct-link", (e) => e.setAttribute("href", "/account"));
           document.documentElement.setAttribute("data-auth", "in");
+          // Topbar CTA: Free → "Upgrade", paid plan → plan badge.
+          document.documentElement.setAttribute("data-plan", (plan && plan.id) || "free");
+          if (plan && plan.name) set(".pd-plan-name", (e) => (e.textContent = plan.name));
         } else {
           document.documentElement.setAttribute("data-auth", "out");
         }
