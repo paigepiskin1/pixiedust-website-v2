@@ -102,6 +102,20 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       </div>
       <label class="mt-3 block"><span style={lbl}>input_json — provider params (use placeholders like prompt)</span><textarea name="input_json" rows="6" style={mono}>{v("input_json", DEF_INPUT)}</textarea></label>
       <label class="mt-3 block"><span style={lbl}>fields_json — user input definitions</span><textarea name="fields_json" rows="6" style={mono}>{v("fields_json", DEF_FIELDS)}</textarea></label>
+
+      <!-- Reference images: preloaded into the template's file field by default -->
+      <div class="mt-3">
+        <span style={lbl}>Reference image(s) — preloaded into the file input for users</span>
+        <div class="mt-1.5 flex flex-wrap items-center gap-2" id="pd-ref-thumbs"></div>
+        <div class="mt-2 flex items-center gap-2">
+          <label class="rounded-lg font-semibold" style="position:relative;padding:7px 12px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;overflow:hidden;">
+            <span id="pd-ref-upload-label">+ Upload reference</span>
+            <input id="pd-ref-upload" type="file" accept="image/*,video/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+          </label>
+          <span id="pd-ref-status" style="font-size:11px;color:var(--pd-ink3);"></span>
+        </div>
+        <span class="mt-1 block text-ink-4" style="font-size:10.5px;">Sets the <code>default</code> on the first file field in fields_json. Users see it pre-filled and can keep or replace it.</span>
+      </div>
       <label class="mt-3 block"><span style={lbl}>steps_json — multi-step builder (optional, null for single-step)</span><textarea name="steps_json" rows="3" style={mono}>{v("steps_json")}</textarea></label>
     </div>
 
@@ -252,6 +266,63 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       fieldsEl.value = JSON.stringify(fields, null, 2);
       show(`Scaffolded ${fields.length} field(s) — review types/labels.`, true);
     });
+
+    // ── Reference images: write the first file field's `default` in fields_json ──
+    const refThumbs = document.getElementById("pd-ref-thumbs")!;
+    const refUpload = document.getElementById("pd-ref-upload") as HTMLInputElement;
+    const refStatus = document.getElementById("pd-ref-status")!;
+    const refFieldsTA = () => form.elements.namedItem("fields_json") as HTMLTextAreaElement;
+    const readFields = (): any[] => { try { const a = JSON.parse(refFieldsTA().value || "[]"); return Array.isArray(a) ? a : []; } catch { return []; } };
+    const firstFileIdx = (f: any[]) => f.findIndex((x) => x && x.type === "file");
+    function refUrls(): string[] {
+      const f = readFields(); const i = firstFileIdx(f);
+      if (i < 0) return [];
+      const d = f[i].default;
+      return Array.isArray(d) ? d : d ? [d] : [];
+    }
+    function setRefs(urls: string[]) {
+      const f = readFields(); const i = firstFileIdx(f);
+      if (i < 0) return;
+      if (f[i].multiple) f[i].default = urls;
+      else f[i].default = urls[0];
+      if (f[i].default == null || (Array.isArray(f[i].default) && !f[i].default.length)) delete f[i].default;
+      refFieldsTA().value = JSON.stringify(f, null, 2);
+    }
+    function renderRefThumbs() {
+      const urls = refUrls();
+      refThumbs.innerHTML = "";
+      if (!urls.length) { refThumbs.innerHTML = '<span style="font-size:11px;color:var(--pd-ink4);">None — input starts empty.</span>'; return; }
+      urls.forEach((u) => {
+        const w = document.createElement("div");
+        w.style.cssText = "position:relative;width:64px;height:64px;border-radius:9px;overflow:hidden;border:0.5px solid var(--pd-hairline);background:var(--pd-bg);";
+        const isVid = /\.(mp4|webm|mov)(\?|$)/i.test(u);
+        const el = isVid ? document.createElement("video") : document.createElement("img");
+        el.src = u; el.setAttribute("style", "width:100%;height:100%;object-fit:cover;");
+        if (isVid) { const vv = el as HTMLVideoElement; vv.muted = true; vv.loop = true; vv.autoplay = true; vv.playsInline = true; }
+        const x = document.createElement("button"); x.type = "button"; x.textContent = "✕";
+        x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
+        x.addEventListener("click", () => { setRefs(refUrls().filter((z) => z !== u)); renderRefThumbs(); });
+        w.appendChild(el); w.appendChild(x);
+        refThumbs.appendChild(w);
+      });
+    }
+    refUpload.addEventListener("change", async () => {
+      const file = refUpload.files?.[0]; if (!file) return;
+      if (firstFileIdx(readFields()) < 0) { refStatus.textContent = "Add a file field first (use Scaffold)."; return; }
+      refStatus.textContent = "Uploading…";
+      const fd = new FormData(); fd.append("file", file);
+      try {
+        const r = await fetch("/api/upload", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok) { refStatus.textContent = d.error || "Upload failed"; return; }
+        const f = readFields(); const i = firstFileIdx(f);
+        setRefs(f[i].multiple ? [...refUrls(), d.url] : [d.url]);
+        renderRefThumbs();
+        refStatus.textContent = "Added — Save to keep it.";
+      } catch { refStatus.textContent = "Upload failed"; }
+      refUpload.value = "";
+    });
+    renderRefThumbs();
 
     // ── Import helpers ──
     const importMsg = document.getElementById("pd-import-msg")!;

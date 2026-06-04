@@ -32,7 +32,7 @@ function formatAccept(accept: string) {
     f.type === "file" ? (
       <div class="block">
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
-        <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined}>
+        <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
           <div class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
@@ -110,7 +110,7 @@ function formatAccept(accept: string) {
       const acceptLabel = accept ? accept.replace(/image\//g,"").replace(/video\//g,"").replace(/,\s*/g,", ").toUpperCase() : "";
       return `<div>
         <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
-        <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}">
+        <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
           <div class="pd-upload-zone" style="position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);border-radius:12px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
@@ -253,6 +253,30 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       el.addEventListener("dragover",  e => e.preventDefault());
       el.addEventListener("drop", async e => { e.preventDefault(); dc=0; uhl(); for(const f of Array.from((e as DragEvent).dataTransfer?.files??[]).slice(0,maxFiles-urls.length)) await addFile(f); });
       el.addEventListener("change", async () => { const files=Array.from(el.files??[]).slice(0,maxFiles-urls.length); el.value=""; for(const f of files) await addFile(f); });
+
+      // Render a thumb for an already-hosted URL (preloaded reference images).
+      function addExisting(url: string) {
+        if (!url || urls.length >= maxFiles) return;
+        const thumb = document.createElement("div");
+        thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
+        const img = document.createElement("img");
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+        img.src = url;
+        const x = document.createElement("button");
+        x.type = "button"; x.textContent = "✕";
+        x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
+        x.addEventListener("click", () => { urls = urls.filter(u => u !== url); thumb.remove(); syncZone(); });
+        thumb.appendChild(img); thumb.appendChild(x);
+        thumbsEl?.appendChild(thumb);
+        urls.push(url);
+      }
+      // Preload reference images from the field's default.
+      try {
+        const def = wrap?.dataset.default ? JSON.parse(wrap.dataset.default) : null;
+        const arr = Array.isArray(def) ? def : def ? [def] : [];
+        for (const u of arr.slice(0, maxFiles)) addExisting(String(u));
+      } catch { /* ignore bad default */ }
+
       syncZone();
       return;
     }
@@ -272,6 +296,19 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     el.addEventListener("dragover",   e=>e.preventDefault());
     el.addEventListener("drop", async e=>{e.preventDefault();dc2=0;uhl2();const f=(e as DragEvent).dataTransfer?.files?.[0];if(f)await handleUpload(f,key,zone??null,preview??null,previewImg??null,status??null);});
     clearBtn?.addEventListener("click",()=>{delete fileUrls[key];el.value="";if(previewImg)previewImg.src="";if(preview)preview.style.display="none";if(zone)zone.style.display="";});
+
+    // Preload a reference image from the field's default.
+    try {
+      const def = wrap?.dataset.default ? JSON.parse(wrap.dataset.default) : null;
+      const url = Array.isArray(def) ? def[0] : def;
+      if (url) {
+        fileUrls[key] = String(url);
+        if (previewImg) previewImg.src = String(url);
+        if (preview) preview.style.display = "";
+        if (zone) zone.style.display = "none";
+        if (status) { status.textContent = "Reference image (replace if you like)"; status.style.color = "var(--pd-ink3)"; }
+      }
+    } catch { /* ignore bad default */ }
   });
 };
 
