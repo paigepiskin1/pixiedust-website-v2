@@ -21,6 +21,13 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     // never block a request on auth resolution
   }
   const response = await next();
+  // Staging hosts (sys.*, *.pages.dev, localhost) must never be indexed — only
+  // the production apex. Canonical tags already point to the apex; this header
+  // is the reliable belt (survives Cloudflare's managed robots.txt).
+  const host = context.url.hostname;
+  if (host !== "pixiedustapp.com" && host !== "www.pixiedustapp.com") {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-XSS-Protection", "1; mode=block");
