@@ -201,10 +201,10 @@ const config = {
         {switchList.map((t) => (
           <a href={`/studio/${t.id}`} class="pd-sw-card" data-name={`${t.title} ${t.category ?? ""} ${t.kind} ${t.tags.join(" ")}`.toLowerCase()} data-current={t.id === template.id ? "true" : "false"} style="text-decoration:none;color:var(--pd-ink);border-radius:14px;border:0.5px solid var(--pd-hairline);background:var(--pd-bg);display:flex;flex-direction:column;">
             <div style="position:relative;height:150px;background:var(--pd-bg3);overflow:hidden;border-radius:14px 14px 0 0;flex:none;">
-              {t.previewImage ? (
+              {t.previewVideo ? (
+                <video class="pd-autoplay" src={t.previewVideo} poster={t.previewImage ?? undefined} muted loop autoplay playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;" />
+              ) : t.previewImage ? (
                 <img src={t.previewImage} alt={t.title} loading="lazy" style="width:100%;height:100%;object-fit:cover;" />
-              ) : t.previewVideo ? (
-                <video src={t.previewVideo} muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;" />
               ) : (
                 <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--pd-ink4);">{t.title.slice(0, 1).toUpperCase()}</div>
               )}
@@ -629,6 +629,13 @@ const config = {
         document.body.style.overflow = "hidden";
         if (search) { search.value = ""; search.focus(); }
         modal.querySelectorAll(".pd-sw-card").forEach(function (c) { c.style.display = "flex"; });
+        // Kick the preview videos to life now that the modal is visible (the
+        // global IntersectionObserver also manages them, but nudge on open).
+        modal.querySelectorAll("video").forEach(function (v) {
+          v.muted = true;
+          var p = v.play();
+          if (p && p.catch) p.catch(function () {});
+        });
         var cur = modal.querySelector('[data-current="true"]');
         if (cur) cur.scrollIntoView({ block: "center" });
       }
