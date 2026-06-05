@@ -1,0 +1,64 @@
+---
+import Base from "../layouts/Base.astro";
+
+// Brand / press assets. All files live in /public.
+const dl = "display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:8px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);color:var(--pd-ink2);font-size:11.5px;font-family:var(--font-mono);text-decoration:none;letter-spacing:0.3px;";
+const tile = "border-radius:16px;border:0.5px solid var(--pd-hairline);overflow:hidden;background:var(--pd-bg2);";
+const swatch = "height:180px;display:flex;align-items:center;justify-content:center;padding:28px;";
+
+const logoAssets = [
+  { name: "Logo · on light", bg: "#ffffff", img: "/logo.svg", svg: "/logo.svg", png: "/logo-880.png", h: 40 },
+  { name: "Logo · on dark", bg: "#0a0a0b", img: "/logo-white.svg", svg: "/logo-white.svg", png: "/logo-white-880.png", h: 40 },
+];
+const iconAssets = [
+  { name: "Icon · on light", bg: "#ffffff", img: "/logo-icon.svg", svg: "/logo-icon.svg", png: "/logo-icon-512.png", h: 84 },
+  { name: "Icon · on dark", bg: "#0a0a0b", img: "/logo-icon.svg", svg: "/logo-icon.svg", png: "/logo-icon-512.png", h: 84 },
+];
+const profileAssets = [
+  { name: "Profile · transparent", bg: "transparent", checkered: true, img: "/logo-icon-padded.svg", svg: "/logo-icon-padded.svg", png: "/logo-icon-padded-512.png", h: 120 },
+  { name: "Profile · white", bg: "#ffffff", img: "/logo-profile-white-512.png", png: "/logo-profile-white-512.png", h: 120, round: true },
+  { name: "Profile · black", bg: "#0a0a0b", img: "/logo-profile-black-512.png", png: "/logo-profile-black-512.png", h: 120, round: true },
+];
+
+const DownIcon = '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 1.5v6M3.5 5.5 6 8l2.5-2.5M2 10.5h8"/></svg>';
+const checkered = "background-image:linear-gradient(45deg,#2a2a2e 25%,transparent 25%),linear-gradient(-45deg,#2a2a2e 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#2a2a2e 75%),linear-gradient(-45deg,transparent 75%,#2a2a2e 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0;";
+---
+
+<Base title="Brand & logos — PixieDust" description="Download PixieDust logos and brand assets (SVG + PNG, light & dark, profile sizes).">
+  <main class="mx-auto w-full" style="max-width:1040px;padding:48px 24px 80px;">
+    <div class="mb-1.5 flex items-center gap-2.5">
+      <img src="/logo-icon.svg" alt="" width="28" height="28" />
+      <span class="font-mono uppercase" style="font-size:10.5px;color:var(--pd-ink3);letter-spacing:1.2px;">Brand assets</span>
+    </div>
+    <h1 class="font-display font-medium text-ink" style="font-size:38px;letter-spacing:-1px;">PixieDust logos</h1>
+    <p class="mt-2 text-ink-3" style="font-size:14px;max-width:560px;line-height:1.5;">Download the marks below in SVG (scalable) or PNG. Use the light version on dark backgrounds and vice-versa. Brand gradient: <span class="font-mono" style="color:var(--pd-ink2);">#7C3AED → #EC4899</span>.</p>
+
+    {[
+      { heading: "Logo", items: logoAssets },
+      { heading: "Icon", items: iconAssets },
+      { heading: "Profile picture (padded)", items: profileAssets },
+    ].map((sec) => (
+      <section class="mt-9">
+        <h2 class="mb-3 font-display font-medium text-ink" style="font-size:16px;letter-spacing:-0.3px;">{sec.heading}</h2>
+        <div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));">
+          {sec.items.map((a: any) => (
+            <div style={tile}>
+              <div style={`${swatch}${a.checkered ? checkered : `background:${a.bg};`}`}>
+                <img src={a.img} alt={a.name} style={`height:${a.h}px;width:auto;max-width:88%;${a.round ? "border-radius:20px;" : ""}`} />
+              </div>
+              <div class="flex items-center justify-between gap-2" style="padding:11px 13px;border-top:0.5px solid var(--pd-hairline);">
+                <span class="text-ink-2" style="font-size:12px;">{a.name}</span>
+                <span class="flex gap-1.5">
+                  {a.svg && <a href={a.svg} download style={dl}><Fragment set:html={DownIcon} />SVG</a>}
+                  {a.png && <a href={a.png} download style={dl}><Fragment set:html={DownIcon} />PNG</a>}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    ))}
+
+    <p class="mt-10 text-ink-4" style="font-size:11.5px;">Please don't recolor, stretch, or rotate the mark. Keep clear space around it equal to the height of the sparkle.</p>
+  </main>
+</Base>
