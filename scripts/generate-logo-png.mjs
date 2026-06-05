@@ -16,11 +16,24 @@ const BUNNY_ZONE = "pixiecdn";
 const BUNNY_KEY = "3a6d5162-f894-43bb-a826ff078ea6-d1fc-44d5";
 const CDN_BASE = "https://pixiecdn.b-cdn.net";
 
+// Space Grotesk Bold is required to render the "PixieDust" wordmark — resvg has
+// no system fonts loaded, so without this the text rendered blank.
+const FONT_PATH = path.join(__dirname, ".fonts", "SpaceGrotesk-700.ttf");
+const FONT_FILES = fs.existsSync(FONT_PATH) ? [FONT_PATH] : [];
+if (!FONT_FILES.length) {
+  console.warn(`⚠ Wordmark font missing at ${FONT_PATH} — text will not render. ` +
+    `Download it: curl -o "${FONT_PATH}" https://cdn.jsdelivr.net/fontsource/fonts/space-grotesk@latest/latin-700-normal.ttf`);
+}
+
 async function svgToPng(svgPath, widthPx) {
   const svg = fs.readFileSync(svgPath, "utf8");
   const resvg = new Resvg(svg, {
     fitTo: { mode: "width", value: widthPx },
-    font: { loadSystemFonts: false }, // avoids system font scanning delay
+    font: {
+      loadSystemFonts: false, // avoids system font scanning delay
+      fontFiles: FONT_FILES,
+      defaultFontFamily: "Space Grotesk",
+    },
   });
   const rendered = resvg.render();
   return rendered.asPng();

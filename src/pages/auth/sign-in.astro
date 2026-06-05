@@ -1,15 +1,43 @@
 ---
+export const prerender = false;
 import Base from "../../layouts/Base.astro";
 import Media from "../../components/ui/Media.astro";
 import type { Tone } from "../../lib/content";
+import { listTemplates } from "../../lib/templates";
 
 // The post-sign-in redirect (?redirect=) is read + sanitized client-side.
-const slides: { tone: Tone; kicker: string; title: string; cred: string }[] = [
+// Editorial fallback slides (used if no real preview videos are available).
+const fallback: { tone: Tone; kicker: string; title: string; cred: string }[] = [
   { tone: "lilac", kicker: "Motion · trending", title: "Snakes wrapped,\nin 8 seconds.", cred: "428k creators · this week" },
   { tone: "pink", kicker: "Photoshoot · 24 shots", title: "A full editorial,\nno set rental.", cred: "Used by 12 of TIME’s 100" },
   { tone: "dusk", kicker: "Cinema · Kling Pro", title: "Main character\nenergy on tap.", cred: "186k cinematic scenes / week" },
   { tone: "mint", kicker: "Fashion try-on", title: "Wear the wardrobe.\nKeep your face.", cred: "2 cr · works in seconds" },
 ];
+const tones: Tone[] = ["lilac", "pink", "dusk", "mint", "teal", "amber"];
+
+// Pull real, loaded examples: visible templates that have a preview video.
+let slides: { tone: Tone; kicker: string; title: string; cred: string; video?: string; poster?: string }[] = [];
+try {
+  const db = Astro.locals.runtime?.env?.DB;
+  if (db) {
+    const all = await listTemplates(db, {});
+    const withVideo = all.filter((t) => t.previewVideo);
+    // Featured first, then the rest — cap at 6 for the montage.
+    withVideo.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
+    slides = withVideo.slice(0, 6).map((t, i) => ({
+      tone: tones[i % tones.length],
+      kicker: t.category ? `${t.category} · live example` : "Made on PixieDust",
+      title: t.title,
+      cred: t.subtitle || "Made on PixieDust · in seconds",
+      video: t.previewVideo!,
+      poster: t.previewImage || undefined,
+    }));
+  }
+} catch {
+  /* fall back to editorial slides below */
+}
+const usingReal = slides.length >= 2;
+if (!usingReal) slides = fallback;
 const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$0", "to start"]];
 ---
 
@@ -22,8 +50,28 @@ const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$
     <aside class="relative overflow-hidden" style="min-height:280px;border-right:0.5px solid var(--pd-hairline);">
       {
         slides.map((sl, idx) => (
-          <div class="pd-auth-slide absolute inset-0 transition-opacity duration-[900ms]" data-idx={idx} style={`opacity:${idx === 0 ? 1 : 0};`}>
-            <Media tone={sl.tone} angle={130} />
+          <div
+            class="pd-auth-slide absolute inset-0 transition-opacity duration-[900ms]"
+            data-idx={idx}
+            data-kicker={sl.kicker}
+            data-title={sl.title.replace(/\n/g, "<br>")}
+            data-cred={sl.cred}
+            style={`opacity:${idx === 0 ? 1 : 0};`}
+          >
+            {sl.video ? (
+              <video
+                class="absolute inset-0 h-full w-full object-cover"
+                src={sl.video}
+                poster={sl.poster}
+                autoplay
+                muted
+                loop
+                playsinline
+                preload={idx === 0 ? "auto" : "none"}
+              />
+            ) : (
+              <Media tone={sl.tone} angle={130} />
+            )}
             <div class="absolute inset-0" style="background:linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.8) 100%);" />
           </div>
         ))
@@ -191,29 +239,33 @@ const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$
       function init() {
         var slides = Array.from(document.querySelectorAll(".pd-auth-slide"));
         var pips = Array.from(document.querySelectorAll(".pd-auth-pip"));
-        var slideData = [
-          { kicker: "Motion · trending", title: "Snakes wrapped,<br>in 8 seconds.", cred: "428k creators · this week" },
-          { kicker: "Photoshoot · 24 shots", title: "A full editorial,<br>no set rental.", cred: "Used by 12 of TIME’s 100" },
-          { kicker: "Cinema · Kling Pro", title: "Main character<br>energy on tap.", cred: "186k cinematic scenes / week" },
-          { kicker: "Fashion try-on", title: "Wear the wardrobe.<br>Keep your face.", cred: "2 cr · works in seconds" },
-        ];
         var kickerEl = document.getElementById("pd-auth-kicker");
         var titleEl = document.getElementById("pd-auth-title");
         var credEl = document.getElementById("pd-auth-cred");
         var si = 0;
         function showSlide(n) {
           si = ((n % slides.length) + slides.length) % slides.length;
-          slides.forEach(function (s, i) { s.style.opacity = i === si ? "1" : "0"; });
+          slides.forEach(function (s, i) {
+            s.style.opacity = i === si ? "1" : "0";
+            var v = s.querySelector("video");
+            if (v) {
+              if (i === si) { try { v.play().catch(function () {}); } catch (e) {} }
+              else { try { v.pause(); } catch (e) {} }
+            }
+          });
           pips.forEach(function (p, i) {
             p.style.width = i === si ? "22px" : "6px";
             p.style.background = i === si ? "#fff" : "rgba(255,255,255,0.35)";
           });
-          if (kickerEl) kickerEl.textContent = slideData[si].kicker;
-          if (titleEl) titleEl.innerHTML = slideData[si].title;
-          if (credEl) credEl.textContent = slideData[si].cred;
+          var active = slides[si];
+          if (active) {
+            if (kickerEl) kickerEl.textContent = active.dataset.kicker || "";
+            if (titleEl) titleEl.innerHTML = active.dataset.title || "";
+            if (credEl) credEl.textContent = active.dataset.cred || "";
+          }
         }
         pips.forEach(function (p, i) { p.addEventListener("click", function () { showSlide(i); }); });
-        if (slides.length) setInterval(function () { showSlide(si + 1); }, 4500);
+        if (slides.length) { showSlide(0); setInterval(function () { showSlide(si + 1); }, 5200); }
 
         var form = document.getElementById("pd-auth-form");
         function applyMode() {

@@ -2,6 +2,12 @@ export const prerender = false;
 import type { APIContext } from "astro";
 import { verifyWebhookSignature } from "../../../lib/stripe";
 import { adjustBalance } from "../../../lib/credits";
+import { notifyPurchase } from "../../../lib/telegram";
+
+async function emailFor(db: import("@cloudflare/workers-types").D1Database, userId: number): Promise<string | null> {
+  const row = await db.prepare("SELECT email FROM users WHERE id = ?").bind(userId).first<{ email: string | null }>();
+  return row?.email ?? null;
+}
 
 function ok(msg = "ok") {
   return new Response(JSON.stringify({ received: true, msg }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -29,6 +35,9 @@ export async function POST({ request, locals }: APIContext) {
 
   const db = env.DB;
   const obj = event.data?.object ?? {};
+  const ctx = (locals.runtime as any).ctx;
+  // Fire a notification without blocking the webhook response.
+  const fire = (p: Promise<void>) => { if (ctx?.waitUntil) ctx.waitUntil(p); else p.catch(() => {}); };
 
   try {
     if (event.type === "checkout.session.completed") {
@@ -40,6 +49,7 @@ export async function POST({ request, locals }: APIContext) {
 
       if (meta.kind === "pack") {
         await adjustBalance(db, userId, credits, { reason: "purchase", refType: "purchase", refId: obj.id, note: meta.pack_id });
+        fire(notifyPurchase(env, { kind: "pack", credits, label: meta.pack_id, email: await emailFor(db, userId), amountUsd: obj.amount_total ? obj.amount_total / 100 : null }));
       } else if (meta.kind === "sub") {
         await db
           .prepare(
@@ -54,6 +64,7 @@ export async function POST({ request, locals }: APIContext) {
         if (credits > 0) {
           await adjustBalance(db, userId, credits, { reason: "subscription_grant", refType: "subscription", refId: obj.id, note: meta.tier_id });
         }
+        fire(notifyPurchase(env, { kind: "sub", credits, label: meta.tier_id, email: await emailFor(db, userId), amountUsd: obj.amount_total ? obj.amount_total / 100 : null }));
       }
       return ok("processed");
     }
@@ -73,6 +84,7 @@ export async function POST({ request, locals }: APIContext) {
         .first<{ user_id: number; monthly_credits: number; tier_id: string }>();
       if (sub && sub.monthly_credits > 0) {
         await adjustBalance(db, sub.user_id, sub.monthly_credits, { reason: "subscription_grant", refType: "subscription", refId: obj.id, note: sub.tier_id });
+        fire(notifyPurchase(env, { kind: "renewal", credits: sub.monthly_credits, label: sub.tier_id, email: await emailFor(db, sub.user_id), amountUsd: obj.amount_paid ? obj.amount_paid / 100 : null }));
       }
       return ok("renewed");
     }
