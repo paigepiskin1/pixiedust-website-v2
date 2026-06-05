@@ -44,6 +44,16 @@
   --pd-side-w: var(--pd-nav-w);
 }
 
+/* Footer links */
+.pd-footer-nav a {
+  color: var(--pd-ink3);
+  text-decoration: none;
+  transition: color 0.12s;
+}
+.pd-footer-nav a:hover {
+  color: var(--pd-ink);
+}
+
 /* Auth-state toggles (set on <html data-auth="in|out">). Used by the topbar
    Upgrade/Sign-in swap and any other element that differs by auth state. */
 .pd-auth-in,
