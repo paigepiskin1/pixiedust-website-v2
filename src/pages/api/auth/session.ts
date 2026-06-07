@@ -103,8 +103,13 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
       }
     }
 
-    // Fire welcome email once per user (non-blocking — doesn't delay sign-in)
-    sendWelcomeEmail(env, env.DB, finalUser).catch(() => {});
+    // Fire welcome email once per user (non-blocking — doesn't delay sign-in).
+    // MUST run under waitUntil: otherwise the Worker is torn down when this
+    // response returns and the Mailgun fetch never completes (welcome emails
+    // were getting stuck at status='queued' and never delivered).
+    const ctx = (locals.runtime as any).ctx;
+    const welcomeP = sendWelcomeEmail(env, env.DB, finalUser).catch(() => {});
+    if (ctx?.waitUntil) ctx.waitUntil(welcomeP);
     const sid = await createSession(env.SESSIONS, claims.uid);
     cookies.set(SESSION_COOKIE, sid, {
       httpOnly: true,

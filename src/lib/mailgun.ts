@@ -155,18 +155,30 @@ export async function sendWelcomeEmail(
     credits: user.balance,
   });
 
-  // Mark sent first to prevent duplicate sends on retried requests.
+  // Mark sent first to prevent duplicate sends from concurrent sign-ins.
   await db
     .prepare("UPDATE users SET welcome_sent_at = datetime('now') WHERE uid = ?")
     .bind(user.uid)
     .run();
 
-  // Fire and forget — don't block the sign-in response on email delivery.
-  sendEmail(env, db, {
-    to: user.email,
-    subject,
-    html,
-    template: "welcome",
-    userUid: user.uid,
-  }).catch((err) => console.error("[welcome-email] send error:", err));
+  // Await the send so the caller can keep the Worker alive (ctx.waitUntil).
+  // If delivery fails, clear the flag so the next sign-in retries instead of
+  // the user silently never getting a welcome email.
+  try {
+    const res = await sendEmail(env, db, {
+      to: user.email,
+      subject,
+      html,
+      template: "welcome",
+      userUid: user.uid,
+    });
+    if (!res.ok) throw new Error(res.error || "send failed");
+  } catch (err) {
+    console.error("[welcome-email] send error:", err);
+    await db
+      .prepare("UPDATE users SET welcome_sent_at = NULL WHERE uid = ?")
+      .bind(user.uid)
+      .run()
+      .catch(() => {});
+  }
 }
