@@ -117,6 +117,18 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         <span class="mt-1 block text-ink-4" style="font-size:10.5px;">Sets the <code>default</code> on the first file field in fields_json. Users see it pre-filled and can keep or replace it.</span>
       </div>
       <label class="mt-3 block"><span style={lbl}>steps_json — multi-step builder (optional, null for single-step)</span><textarea name="steps_json" rows="3" style={mono}>{v("steps_json")}</textarea></label>
+
+      <!-- AI multi-step chain builder -->
+      <div class="mt-3 rounded-xl" style="padding:14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline);">
+        <div class="mb-2 font-mono uppercase" style="font-size:9px;color:var(--pd-lilac);letter-spacing:0.7px;">✨ AI — build a multi-step chain</div>
+        <div class="flex flex-wrap items-start gap-2">
+          <textarea id="pd-chain-prompt" rows="2" placeholder="Describe the steps, e.g. 'stylize a selfie into an oil painting, then animate it into a 5s clip'" style={mono + "flex:1;min-width:240px;"}></textarea>
+          <button type="button" id="pd-chain-btn" class="rounded-lg font-semibold" style="padding:9px 14px;font-size:12px;background:var(--pd-lilac);color:#0A0A0B;border:none;cursor:pointer;white-space:nowrap;">Build chain</button>
+        </div>
+        <button type="button" id="pd-chain-example" style="margin-top:8px;font-size:10.5px;color:var(--pd-ink3);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">try an example</button>
+        <div id="pd-chain-msg" class="mt-2 hidden" style="font-size:11.5px;"></div>
+        <span class="mt-1.5 block text-ink-4" style="font-size:10.5px;">Fills id, title, type, fields_json, steps_json + step 1 into the payload. Review, then "Open in studio" to test the chain.</span>
+      </div>
     </div>
 
     {!isNew && (
@@ -387,6 +399,45 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         importStatus("AI converted — review the generated input + fields.", true);
       } catch {
         importStatus("Network error.", false);
+      }
+    });
+
+    // ── AI multi-step chain builder ──
+    const chainMsg = document.getElementById("pd-chain-msg")!;
+    function chainStatus(text: string, ok: boolean) {
+      chainMsg.classList.remove("hidden");
+      chainMsg.style.color = ok ? "var(--pd-mint)" : "var(--pd-pink)";
+      chainMsg.textContent = text;
+    }
+    const chainPrompt = document.getElementById("pd-chain-prompt") as HTMLTextAreaElement;
+    document.getElementById("pd-chain-example")!.addEventListener("click", () => {
+      chainPrompt.value = "Turn a user's selfie into a stylized oil-painting portrait, then animate that portrait into a 5-second clip with subtle motion.";
+      chainPrompt.focus();
+    });
+    document.getElementById("pd-chain-btn")!.addEventListener("click", async () => {
+      const prompt = chainPrompt.value.trim();
+      if (!prompt) return chainStatus("Describe the multi-step template first (or tap “try an example”).", false);
+      chainStatus("Asking Opus to design the chain…", true);
+      try {
+        const res = await fetch("/api/admin/ai-chain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+        const d = await res.json();
+        if (!res.ok) return chainStatus(d.error || "Chain build failed.", false);
+        const isNewTemplate = !(form.elements.namedItem("id") as HTMLInputElement)?.readOnly;
+        if (isNewTemplate && d.id) setField("id", d.id);
+        setField("title", d.title);
+        setField("kind", d.kind);
+        setField("type", d.type);
+        setField("subtitle", d.subtitle);
+        setField("credit_cost", String(d.credit_cost));
+        setField("tags_json", d.tags_json);
+        setField("provider", "replicate");
+        setField("model", d.model);
+        setField("input_json", d.input_json);
+        setField("fields_json", d.fields_json);
+        setField("steps_json", d.steps_json);
+        chainStatus(`Built a ${d.stepCount}-step chain — review the fields + steps, then “Open in studio” to test it.`, true);
+      } catch {
+        chainStatus("Network error.", false);
       }
     });
 

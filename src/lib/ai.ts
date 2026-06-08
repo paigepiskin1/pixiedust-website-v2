@@ -54,6 +54,62 @@ export async function aiTemplate(
   return JSON.parse(text) as AiFullTemplate;
 }
 
+// ── Multi-step (chained) template generation ───────────────────────────────
+const CHAIN_SYSTEM = `You design a MULTI-STEP (chained) PixieDust generation template from a plain-language request. Return STRICT JSON only (no prose/markdown):
+{ "id","title","kind","type","subtitle","credit_cost","tone","tags","fields_json","steps_json" }
+
+How chains work:
+- steps_json is an ORDERED array of steps. Each step = { "id": "<shortId>", "model": "owner/name", "input": <providerPayload> }.
+- A step's "input" may reference USER inputs as "{{key}}" ("{{key*}}" if required) and ANY EARLIER step's output as "{{<stepId>.output}}" (a media URL).
+- Steps run in order; each step's output URL is available to all later steps via {{stepId.output}}. The LAST step's output is the final result shown to the user.
+- fields_json = array of { "key","type","label","required","help"?,"options"?,"default"? }, ONE per unique {{key}} used across ALL steps (do NOT make a field for {{stepId.output}} refs). type ∈ text,textarea,number,select,file,toggle,url. Use "file" for image/photo inputs, "textarea" for prompts.
+
+Other rules:
+- id: lowercase slug. type: "image" or "video" (the type of the FINAL output). kind ∈ preset|shoot|cinema|i2v|fashion-video|game-video|motion|beauty|fashion|avatar|ad.
+- Models we support:
+  • TEXT→IMAGE only (NO image input): black-forest-labs/flux-schnell.
+  • IMAGE EDIT / image+text→image (accepts an "image_input" array of URLs): google/nano-banana, google/nano-banana-pro, bytedance/seedream-4, openai/gpt-image-2.
+  • IMAGE→VIDEO (accepts an "image" URL + "prompt"): bytedance/seedance-1-lite, google/veo-3.
+- CRITICAL: any step that consumes a USER photo ({{photoKey}}) or a prior step's image ({{stepId.output}}) MUST use an image-capable model (nano-banana / nano-banana-pro / seedream-4 for image output, or seedance-1-lite / veo-3 for video output). NEVER feed an image into flux-schnell — it ignores images.
+- credit_cost: integer, ~5 per step. tone ∈ teal,lilac,mint,pink,noir,dusk,ice,amber. tags: short string array.
+
+WORKED EXAMPLE — request "turn a selfie into a stylized portrait, then animate it into a short clip":
+{
+  "id":"portrait-to-clip","title":"Portrait → Living Clip","kind":"i2v","type":"video",
+  "subtitle":"Stylize your selfie, then bring it to life","credit_cost":10,"tone":"lilac","tags":["portrait","animate","trend"],
+  "fields_json":[
+    {"key":"photo","type":"file","label":"Your photo","required":true,"help":"A clear selfie works best"},
+    {"key":"style","type":"textarea","label":"Portrait style","required":true,"default":"cinematic studio portrait, soft rim light"},
+    {"key":"motion","type":"textarea","label":"How should it move?","required":false,"default":"subtle head turn and a gentle smile"}
+  ],
+  "steps_json":[
+    {"id":"portrait","model":"google/nano-banana","input":{"prompt":"{{style*}}","image_input":["{{photo*}}"]}},
+    {"id":"clip","model":"bytedance/seedance-1-lite","input":{"prompt":"{{motion}}","image":"{{portrait.output}}","duration":5,"resolution":"720p"}}
+  ]
+}`;
+
+export interface AiChainTemplate {
+  id: string; title: string; kind: string; type: string;
+  subtitle?: string; credit_cost?: number; tone?: string; tags?: unknown;
+  fields_json: unknown; steps_json: unknown;
+}
+
+export async function aiChain(apiKey: string, prompt: string): Promise<AiChainTemplate> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: MODEL, temperature: 0.3, max_tokens: 2500, messages: [{ role: "system", content: CHAIN_SYSTEM }, { role: "user", content: `Request: ${prompt}` }] }),
+  });
+  const data = (await res.json()) as any;
+  if (!res.ok) throw new Error(data.error?.message || `OpenRouter ${res.status}`);
+  let text: string = data.choices?.[0]?.message?.content ?? "";
+  text = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) text = text.slice(start, end + 1);
+  return JSON.parse(text) as AiChainTemplate;
+}
+
 export async function aiConvert(apiKey: string, raw: string): Promise<AiTemplate> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
