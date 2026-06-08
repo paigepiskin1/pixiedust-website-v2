@@ -117,12 +117,17 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         <span class="mt-1 block text-ink-4" style="font-size:10.5px;">Sets the <code>default</code> on the first file field in fields_json. Users see it pre-filled and can keep or replace it.</span>
       </div>
       <div class="mt-3">
-        <div class="flex items-center justify-between" style="margin-bottom:4px;">
-          <span style={lbl}>Chain steps (steps_json) — each step is a model; its output feeds the next. Leave empty for single-step.</span>
+        <div class="flex items-center justify-between" style="margin-bottom:6px;">
+          <span style={lbl}>Chain steps — each step is its own model; its output feeds the next. Empty = single-step.</span>
           <button type="button" id="pd-add-step" class="rounded-lg font-semibold" style="padding:6px 11px;font-size:11px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;white-space:nowrap;">+ Add step</button>
         </div>
-        <textarea name="steps_json" rows="5" style={mono}>{v("steps_json")}</textarea>
-        <span class="mt-1 block text-ink-4" style="font-size:10.5px;">e.g. step 1 (image model) → outputs an image → step 2 references it as <code>{`{{step1.output}}`}</code> for its image input → outputs the final video. Use “+ Add step” to chain another model onto the last one, then “Scaffold fields”.</span>
+        <!-- Structured per-step editor (built from steps_json by JS) -->
+        <div id="pd-steps-editor" class="grid gap-2"></div>
+        <details class="mt-2">
+          <summary style="font-size:10.5px;color:var(--pd-ink3);cursor:pointer;">raw steps_json (advanced — auto-synced)</summary>
+          <textarea name="steps_json" rows="5" style={mono + "margin-top:6px;"}>{v("steps_json")}</textarea>
+        </details>
+        <span class="mt-1 block text-ink-4" style="font-size:10.5px;">Step 2+ auto-references the prior step's image via <code>{`{{step1.output}}`}</code>. Set each step's model (e.g. <code>bytedance/seedance-2.0-fast</code>), then “Scaffold fields”.</span>
       </div>
 
       <!-- AI multi-step chain builder -->
@@ -309,7 +314,8 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         : { id: `step${n}`, model: "", input: { prompt: "{{prompt*}}", image_input: ["{{photo*}}"] } };
       steps.push(step);
       stepsEl.value = JSON.stringify(steps, null, 2);
-      show(prevId ? `Added step ${n}, wired to {{${prevId}.output}}. Set its model, then “Scaffold fields”.` : `Added step 1. Set its model + inputs, then “Scaffold fields”.`, true);
+      renderStepsEditor();
+      show(prevId ? `Added step ${n}, wired to {{${prevId}.output}}. Set its model below, then “Scaffold fields”.` : `Added step 1. Set its model + inputs below, then “Scaffold fields”.`, true);
     });
 
     // ── Reference images: write the first file field's `default` in fields_json ──
@@ -470,7 +476,8 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         setField("fields_json", d.fields_json);
         setField("steps_json", d.steps_json);
         renderTestFields(); // refresh the right-side test form with the new fields
-        chainStatus(`Built a ${d.stepCount}-step chain — the test panel (right) updated. Run it there to preview the final result.`, true);
+        renderStepsEditor(); // refresh the per-step editor rows
+        chainStatus(`Built a ${d.stepCount}-step chain — adjust each step's model below; the test panel (right) updated too.`, true);
       } catch {
         chainStatus("Network error.", false);
       }
@@ -564,6 +571,70 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
     } else {
       window.addEventListener("load", renderTestFields, { once: true });
     }
+
+    // ── Structured per-step chain editor (model + id + input per step) ─────────
+    const stepsEditor = document.getElementById("pd-steps-editor")!;
+    const stepsTA2 = form.elements.namedItem("steps_json") as HTMLTextAreaElement;
+    const escH = (s: any) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+    function syncStepsToTextarea() {
+      const rows = Array.from(stepsEditor.querySelectorAll(".pd-step-row"));
+      if (!rows.length) { stepsTA2.value = ""; return; }
+      let bad = false;
+      const steps = rows.map((row) => {
+        const id = (row.querySelector(".pd-step-id") as HTMLInputElement).value.trim();
+        const model = (row.querySelector(".pd-step-model") as HTMLInputElement).value.trim();
+        const inEl = row.querySelector(".pd-step-input") as HTMLTextAreaElement;
+        let input: any = {};
+        try { input = inEl.value.trim() ? JSON.parse(inEl.value) : {}; inEl.style.borderColor = "var(--pd-hairline2)"; }
+        catch { bad = true; inEl.style.borderColor = "var(--pd-pink)"; }
+        return { id, model, input };
+      });
+      if (bad) return; // don't overwrite steps_json with broken JSON
+      stepsTA2.value = JSON.stringify(steps, null, 2);
+    }
+
+    function renderStepsEditor() {
+      let steps: any[] | null = [];
+      const raw = stepsTA2.value.trim();
+      if (raw) { try { const p = JSON.parse(raw); steps = Array.isArray(p) ? p : []; } catch { steps = null; } }
+      if (steps === null) { stepsEditor.innerHTML = `<div style="font-size:11px;color:var(--pd-pink);padding:6px;">Raw steps_json isn't valid JSON — open “raw steps_json (advanced)” to fix it.</div>`; return; }
+      if (!steps.length) { stepsEditor.innerHTML = `<div style="font-size:11px;color:var(--pd-ink4);padding:6px;">Single-step template (no chain). Tap “+ Add step” to chain another model.</div>`; return; }
+      const inpS = "width:100%;padding:7px 9px;border-radius:8px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:12px;";
+      const monoS = inpS + "font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5;resize:vertical;";
+      stepsEditor.innerHTML = steps.map((s, i) => {
+        const prevId = i > 0 ? (steps![i - 1].id || `step${i}`) : null;
+        return `
+        <div class="pd-step-row" style="border:0.5px solid var(--pd-hairline2);border-radius:12px;padding:10px;background:var(--pd-bg);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+            <span style="font-size:10px;font-family:monospace;color:var(--pd-lilac);letter-spacing:0.5px;">STEP ${i + 1}${prevId ? ` · input image = {{${escH(prevId)}.output}}` : ""}</span>
+            <button type="button" class="pd-step-del" data-i="${i}" style="background:none;border:none;color:var(--pd-pink);cursor:pointer;font-size:11px;">remove ✕</button>
+          </div>
+          <div style="display:grid;grid-template-columns:96px 1fr;gap:6px;margin-bottom:6px;">
+            <input class="pd-step-id" value="${escH(s.id ?? `step${i + 1}`)}" placeholder="id" style="${inpS}" />
+            <input class="pd-step-model" value="${escH(s.model ?? "")}" placeholder="owner/name — e.g. bytedance/seedance-2.0-fast" style="${inpS}" />
+          </div>
+          <textarea class="pd-step-input" rows="4" placeholder='{ "prompt": "{{prompt*}}" }' style="${monoS}">${escH(JSON.stringify(s.input ?? {}, null, 2))}</textarea>
+        </div>`;
+      }).join("");
+      stepsEditor.querySelectorAll(".pd-step-del").forEach((b) =>
+        b.addEventListener("click", () => {
+          const i = Number((b as HTMLElement).dataset.i);
+          let arr: any[] = [];
+          try { arr = JSON.parse(stepsTA2.value || "[]"); } catch { arr = []; }
+          arr.splice(i, 1);
+          stepsTA2.value = arr.length ? JSON.stringify(arr, null, 2) : "";
+          renderStepsEditor();
+        })
+      );
+      stepsEditor.querySelectorAll(".pd-step-id,.pd-step-model,.pd-step-input").forEach((el) =>
+        el.addEventListener("input", syncStepsToTextarea)
+      );
+    }
+
+    // Re-parse the editor when the raw textarea is edited by hand.
+    stepsTA2.addEventListener("change", renderStepsEditor);
+    renderStepsEditor();
 
     // Collapse toggle
     let testExpanded = true;
