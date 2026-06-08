@@ -1,0 +1,65 @@
+---
+export const prerender = false;
+import Base from "../../layouts/Base.astro";
+
+// Consume the verification token: look it up in KV, mark the uid verified, and
+// render a branded result. The session gate (api/auth/session.ts) reads the
+// `verified:<uid>` marker for brand-new password accounts.
+const env = Astro.locals.runtime.env;
+const t = Astro.url.searchParams.get("token") || "";
+let state: "ok" | "expired" | "missing" = "missing";
+
+if (t) {
+  try {
+    const raw = await env.SESSIONS.get(`verify:${t}`);
+    if (raw) {
+      const { uid } = JSON.parse(raw) as { uid: string; email?: string };
+      if (uid) {
+        // Mark verified for 30 days — long enough to complete a first sign-in,
+        // after which the D1 user row exists and the marker is no longer needed.
+        await env.SESSIONS.put(`verified:${uid}`, "1", { expirationTtl: 2592000 });
+        await env.SESSIONS.delete(`verify:${t}`);
+        state = "ok";
+      } else {
+        state = "expired";
+      }
+    } else {
+      state = "expired";
+    }
+  } catch {
+    state = "expired";
+  }
+}
+
+const heading = state === "ok" ? "Email verified ✓" : state === "expired" ? "This link has expired" : "Invalid link";
+const sub =
+  state === "ok"
+    ? "You're all set. Sign in to start creating — your 5 free credits are waiting."
+    : state === "expired"
+      ? "Verification links last 24 hours. Sign in again and we'll send you a fresh one."
+      : "We couldn't read a verification token. Try the link from your email again.";
+---
+
+<Base title="Verify email — PixieDust" noindex={true}>
+  <div class="flex min-h-screen items-center justify-center px-5" style="background:var(--pd-bg);">
+    <div class="w-full max-w-md text-center" style="padding:40px 28px;border:0.5px solid var(--pd-hairline2);border-radius:20px;background:var(--pd-bg2);">
+      <div class="mx-auto mb-6 flex items-center justify-center gap-2.5">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="11" stroke="var(--pd-lilac)" stroke-width="1.4"></circle>
+          <circle cx="12" cy="12" r="5.5" fill="var(--pd-lilac)"></circle>
+        </svg>
+        <span class="font-display font-semibold" style="font-size:19px;letter-spacing:-0.5px;color:var(--pd-ink);">PixieDust</span>
+      </div>
+      <div style="font-size:46px;line-height:1;margin-bottom:16px;">{state === "ok" ? "✨" : "⏳"}</div>
+      <h1 class="font-display font-medium" style="font-size:26px;letter-spacing:-0.6px;color:var(--pd-ink);">{heading}</h1>
+      <p class="mt-3" style="font-size:14px;line-height:1.6;color:var(--pd-ink-3,var(--pd-ink3));">{sub}</p>
+      <a
+        href="/auth/sign-in"
+        class="mt-7 inline-flex items-center justify-center rounded-[11px] font-bold"
+        style="padding:13px 26px;background:var(--pd-lilac);color:#0A0A0B;font-size:14px;text-decoration:none;"
+      >
+        {state === "ok" ? "Sign in →" : "Back to sign in"}
+      </a>
+    </div>
+  </div>
+</Base>

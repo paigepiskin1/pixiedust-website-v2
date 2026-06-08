@@ -8,7 +8,6 @@ import {
   signInWithPopup,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  sendEmailVerification,
   sendPasswordResetEmail,
   updateProfile,
   signOut,
@@ -42,16 +41,27 @@ export async function establishSession(user: User): Promise<void> {
   }
 }
 
-/** Resend the Firebase verification email to a signed-in (unverified) user. */
+/** Send our OWN branded verification email (Mailgun) via the server, using the
+ * user's Firebase ID token. Replaces Firebase's default verification email so
+ * the message comes from our domain. */
 export async function sendVerification(user: User): Promise<void> {
-  await sendEmailVerification(user).catch(() => {});
+  try {
+    const idToken = await user.getIdToken();
+    await fetch("/api/auth/send-verification", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+  } catch {
+    /* best-effort */
+  }
 }
 
 export async function signUpWithEmail(email: string, password: string, name?: string): Promise<User> {
   const auth = getFirebaseAuth();
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   if (name) await updateProfile(cred.user, { displayName: name });
-  await sendEmailVerification(cred.user).catch(() => {});
+  await sendVerification(cred.user);
   return cred.user;
 }
 

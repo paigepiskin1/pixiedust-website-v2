@@ -49,7 +49,13 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
     if (claims.signInProvider === "password" && !claims.emailVerified) {
       const existing = await getUserByUid(env.DB, claims.uid);
       if (!existing) {
-        return json({ error: "Please verify your email — we just sent you a link. Click it, then sign in.", needVerify: true }, 403);
+        // New password account: require OUR email verification (a click on the
+        // branded Mailgun link sets verified:<uid> in KV). Existing accounts
+        // (a D1 row already exists) are grandfathered and never blocked.
+        const verified = await env.SESSIONS.get(`verified:${claims.uid}`);
+        if (!verified) {
+          return json({ error: "Please verify your email — we just sent you a link. Click it, then sign in.", needVerify: true }, 403);
+        }
       }
     }
 
