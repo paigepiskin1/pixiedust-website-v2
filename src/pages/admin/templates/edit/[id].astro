@@ -116,7 +116,14 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         </div>
         <span class="mt-1 block text-ink-4" style="font-size:10.5px;">Sets the <code>default</code> on the first file field in fields_json. Users see it pre-filled and can keep or replace it.</span>
       </div>
-      <label class="mt-3 block"><span style={lbl}>steps_json — multi-step builder (optional, null for single-step)</span><textarea name="steps_json" rows="3" style={mono}>{v("steps_json")}</textarea></label>
+      <div class="mt-3">
+        <div class="flex items-center justify-between" style="margin-bottom:4px;">
+          <span style={lbl}>Chain steps (steps_json) — each step is a model; its output feeds the next. Leave empty for single-step.</span>
+          <button type="button" id="pd-add-step" class="rounded-lg font-semibold" style="padding:6px 11px;font-size:11px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;white-space:nowrap;">+ Add step</button>
+        </div>
+        <textarea name="steps_json" rows="5" style={mono}>{v("steps_json")}</textarea>
+        <span class="mt-1 block text-ink-4" style="font-size:10.5px;">e.g. step 1 (image model) → outputs an image → step 2 references it as <code>{`{{step1.output}}`}</code> for its image input → outputs the final video. Use “+ Add step” to chain another model onto the last one, then “Scaffold fields”.</span>
+      </div>
 
       <!-- AI multi-step chain builder -->
       <div class="mt-3 rounded-xl" style="padding:14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline);">
@@ -265,18 +272,44 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       msg.textContent = text;
     }
 
-    // Scaffold fields[] from {{placeholders}} in input_json
+    // Scaffold fields[] from {{placeholders}} across input_json AND steps_json.
+    // The [a-zA-Z0-9_]+ class excludes dotted refs like {{step1.output}} (those
+    // are auto-filled from prior step outputs, not user inputs).
     document.getElementById("pd-scaffold")!.addEventListener("click", () => {
       const inputEl = form.elements.namedItem("input_json") as HTMLTextAreaElement;
+      const stepsEl = form.elements.namedItem("steps_json") as HTMLTextAreaElement;
       const fieldsEl = form.elements.namedItem("fields_json") as HTMLTextAreaElement;
-      const matches = Array.from(inputEl.value.matchAll(/\{\{(\w+)(\*?)\}\}/g));
+      const haystack = `${inputEl.value}\n${stepsEl?.value ?? ""}`;
+      const matches = Array.from(haystack.matchAll(/\{\{([a-zA-Z0-9_]+)(\*?)\}\}/g));
       const seen = new Set<string>();
       const guess = (k: string) => (/(prompt|description|caption)/i.test(k) ? "textarea" : /(image|photo|file|img)/i.test(k) ? "file" : /(num|count|qty|strength|steps|scale)/i.test(k) ? "number" : "text");
       const fields = matches
         .filter((m) => !seen.has(m[1]) && seen.add(m[1]))
         .map((m) => ({ key: m[1], type: guess(m[1]), label: m[1].replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), required: m[2] === "*" }));
       fieldsEl.value = JSON.stringify(fields, null, 2);
-      show(`Scaffolded ${fields.length} field(s) — review types/labels.`, true);
+      renderTestFields();
+      show(`Scaffolded ${fields.length} field(s) from input + steps — review types/labels.`, true);
+    });
+
+    // Append a chained step: a new model whose image input is auto-wired to the
+    // previous step's output (the canonical image→video handoff). Step 1 instead
+    // pulls from a user field so there's something to feed the chain.
+    document.getElementById("pd-add-step")!.addEventListener("click", () => {
+      const stepsEl = form.elements.namedItem("steps_json") as HTMLTextAreaElement;
+      let steps: any[] = [];
+      const rawVal = stepsEl.value.trim();
+      if (rawVal) {
+        try { const p = JSON.parse(rawVal); if (Array.isArray(p)) steps = p; else throw 0; }
+        catch { show("steps_json isn't valid JSON yet — fix it before adding a step.", false); return; }
+      }
+      const n = steps.length + 1;
+      const prevId = steps.length ? (steps[steps.length - 1].id || `step${steps.length}`) : null;
+      const step = prevId
+        ? { id: `step${n}`, model: "", input: { prompt: "", image: `{{${prevId}.output}}` } }
+        : { id: `step${n}`, model: "", input: { prompt: "{{prompt*}}", image_input: ["{{photo*}}"] } };
+      steps.push(step);
+      stepsEl.value = JSON.stringify(steps, null, 2);
+      show(prevId ? `Added step ${n}, wired to {{${prevId}.output}}. Set its model, then “Scaffold fields”.` : `Added step 1. Set its model + inputs, then “Scaffold fields”.`, true);
     });
 
     // ── Reference images: write the first file field's `default` in fields_json ──
@@ -396,6 +429,7 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         if (!res.ok) return importStatus(d.error || "AI convert failed.", false);
         setField("input_json", d.input_json);
         setField("fields_json", d.fields_json);
+        renderTestFields(); // refresh the right-side test form
         importStatus("AI converted — review the generated input + fields.", true);
       } catch {
         importStatus("Network error.", false);
@@ -435,7 +469,8 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
         setField("input_json", d.input_json);
         setField("fields_json", d.fields_json);
         setField("steps_json", d.steps_json);
-        chainStatus(`Built a ${d.stepCount}-step chain — review the fields + steps, then “Open in studio” to test it.`, true);
+        renderTestFields(); // refresh the right-side test form with the new fields
+        chainStatus(`Built a ${d.stepCount}-step chain — the test panel (right) updated. Run it there to preview the final result.`, true);
       } catch {
         chainStatus("Network error.", false);
       }
