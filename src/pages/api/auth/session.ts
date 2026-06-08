@@ -42,6 +42,13 @@ export async function POST({ request, locals, cookies, url }: APIContext) {
   try {
     const claims = await verifyIdToken(idToken);
 
+    // Deleted accounts can never come back, even if the Firebase auth record
+    // still exists (e.g. service-account delete was skipped). Admin delete
+    // writes this tombstone.
+    if (await env.SESSIONS.get(`deleted_uid:${claims.uid}`)) {
+      return json({ error: "This account has been deleted." }, 403);
+    }
+
     // Require a verified email for NEW password sign-ups. OAuth providers
     // (Google/Apple) are already verified, so they're exempt. Existing accounts
     // are grandfathered (we only block before a D1 row exists) so nobody

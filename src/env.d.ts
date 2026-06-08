@@ -27,6 +27,7 @@ interface Env {
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
   KLIPY_API_KEY: string;
+  FIREBASE_SERVICE_ACCOUNT: string; // service-account JSON (admin user deletion)
 }
 
 declare namespace App {
