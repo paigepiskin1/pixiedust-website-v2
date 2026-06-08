@@ -610,11 +610,13 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
             <span style="font-size:10px;font-family:monospace;color:var(--pd-lilac);letter-spacing:0.5px;">STEP ${i + 1}${prevId ? ` · input image = {{${escH(prevId)}.output}}` : ""}</span>
             <button type="button" class="pd-step-del" data-i="${i}" style="background:none;border:none;color:var(--pd-pink);cursor:pointer;font-size:11px;">remove ✕</button>
           </div>
-          <div style="display:grid;grid-template-columns:96px 1fr;gap:6px;margin-bottom:6px;">
+          <div style="display:grid;grid-template-columns:96px 1fr auto;gap:6px;margin-bottom:7px;">
             <input class="pd-step-id" value="${escH(s.id ?? `step${i + 1}`)}" placeholder="id" style="${inpS}" />
             <input class="pd-step-model" value="${escH(s.model ?? "")}" placeholder="owner/name — e.g. bytedance/seedance-2.0-fast" style="${inpS}" />
+            <button type="button" class="pd-step-schema" data-i="${i}" title="Fetch this model's inputs from Replicate" style="padding:7px 11px;border-radius:8px;background:var(--pd-lilac);color:#0A0A0B;border:none;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;">⤓ inputs</button>
           </div>
-          <textarea class="pd-step-input" rows="4" placeholder='{ "prompt": "{{prompt*}}" }' style="${monoS}">${escH(JSON.stringify(s.input ?? {}, null, 2))}</textarea>
+          <span style="font-size:9.5px;font-family:monospace;color:var(--pd-ink4);text-transform:uppercase;letter-spacing:0.4px;">input — provider params (use {{field}} for user inputs)</span>
+          <textarea class="pd-step-input" rows="5" placeholder='{ "prompt": "{{prompt*}}" }' style="${monoS}margin-top:3px;">${escH(JSON.stringify(s.input ?? {}, null, 2))}</textarea>
         </div>`;
       }).join("");
       stepsEditor.querySelectorAll(".pd-step-del").forEach((b) =>
@@ -629,6 +631,39 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       );
       stepsEditor.querySelectorAll(".pd-step-id,.pd-step-model,.pd-step-input").forEach((el) =>
         el.addEventListener("input", syncStepsToTextarea)
+      );
+      // Per-step "⤓ inputs": fetch the model's schema (like step 1) and fill this
+      // step's input JSON. For step 2+, auto-wire its image input to the prior
+      // step's output so the chain handoff is automatic.
+      const IMG_KEYS = /^(image|image_input|image_url|image_uri|images|img|init_image|first_frame_image|start_image|subject_reference|reference_image)$/i;
+      stepsEditor.querySelectorAll<HTMLButtonElement>(".pd-step-schema").forEach((b) =>
+        b.addEventListener("click", async () => {
+          const idx = Number(b.dataset.i);
+          const rows = Array.from(stepsEditor.querySelectorAll(".pd-step-row"));
+          const row = rows[idx];
+          const model = (row.querySelector(".pd-step-model") as HTMLInputElement).value.trim();
+          const inEl = row.querySelector(".pd-step-input") as HTMLTextAreaElement;
+          if (!model) return show("Enter this step's model first.", false);
+          const prevId = idx > 0 ? ((rows[idx - 1].querySelector(".pd-step-id") as HTMLInputElement).value.trim() || `step${idx}`) : null;
+          const orig = b.textContent; b.textContent = "…"; b.disabled = true;
+          try {
+            const res = await fetch("/api/admin/replicate-schema", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
+            const d = await res.json();
+            if (!res.ok) return show(d.error || "Schema fetch failed.", false);
+            let input: any = {};
+            try { input = JSON.parse(d.input_json); } catch { input = {}; }
+            if (prevId) {
+              for (const k of Object.keys(input)) {
+                if (IMG_KEYS.test(k)) input[k] = Array.isArray(input[k]) ? [`{{${prevId}.output}}`] : `{{${prevId}.output}}`;
+              }
+            }
+            inEl.value = JSON.stringify(input, null, 2);
+            inEl.style.borderColor = "var(--pd-hairline2)";
+            syncStepsToTextarea();
+            show(`Loaded ${model} inputs into step ${idx + 1}${prevId ? ` (image wired to {{${prevId}.output}})` : ""}. Tap “Scaffold fields” to expose the user inputs.`, true);
+          } catch { show("Network error fetching schema.", false); }
+          finally { b.textContent = orig; b.disabled = false; }
+        })
       );
     }
 
