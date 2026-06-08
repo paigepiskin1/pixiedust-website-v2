@@ -57,7 +57,7 @@ const stats = [
       <button id="pd-role" type="button" data-on={u.is_admin} class="font-semibold" style="padding:8px 13px;border-radius:10px;font-size:12px;cursor:pointer;border:0.5px solid var(--pd-hairline2);background:transparent;color:var(--pd-ink2);">{u.is_admin ? "Revoke admin" : "Make admin"}</button>
       <button id="pd-disable" type="button" data-on={disabled ? 1 : 0} class="font-semibold" style={`padding:8px 13px;border-radius:10px;font-size:12px;cursor:pointer;border:none;color:#fff;background:${disabled ? "var(--pd-mint)" : "var(--pd-pink)"};`}>{disabled ? "Enable account" : "Disable account"}</button>
       {u.uid !== Astro.locals.user!.uid && !u.is_admin && (
-        <button id="pd-delete" type="button" data-email={u.email ?? ""} class="font-semibold" style="padding:8px 13px;border-radius:10px;font-size:12px;cursor:pointer;border:0.5px solid color-mix(in srgb,var(--pd-pink) 55%,transparent);background:transparent;color:var(--pd-pink);">Delete user</button>
+        <button id="pd-delete" type="button" data-email={u.email ?? ""} class="font-semibold" style="padding:8px 13px;border-radius:10px;font-size:12px;cursor:pointer;border:none;background:#e0245e;color:#fff;">🗑 Delete user</button>
       )}
     </div>
   </div>
@@ -212,12 +212,8 @@ const stats = [
     const deleteBtn = document.getElementById("pd-delete") as HTMLButtonElement | null;
     deleteBtn?.addEventListener("click", async () => {
       if (isSelf) { toast("You can't delete your own account.", "var(--pd-pink)"); return; }
-      const email = deleteBtn.dataset.email || "";
-      const typed = window.prompt(
-        `This permanently deletes this user from Firebase AND the database — their account, credits, subscription, and creations. This cannot be undone.\n\nType the user's email to confirm:\n${email}`
-      );
-      if (typed === null) return;
-      if (email && typed.trim().toLowerCase() !== email.toLowerCase()) { toast("Email didn't match — not deleted.", "var(--pd-pink)"); return; }
+      const email = deleteBtn.dataset.email || "this user";
+      if (!await (window as any).pdConfirm(`Permanently delete ${email}? This removes them from Firebase + the database — account, credits, subscription, and creations. This cannot be undone.`)) return;
       deleteBtn.disabled = true;
       deleteBtn.textContent = "Deleting…";
       const res = await fetch("/api/admin/users/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid }) });
