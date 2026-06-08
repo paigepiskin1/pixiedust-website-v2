@@ -11,42 +11,58 @@ interface TgEnv {
   SESSIONS: KVNamespace;
 }
 
-const GIFS_KEY = "klipy:money_gifs";        // short-lived rotation set
+const GIFS_KEY = "klipy:money_gifs";        // cached diverse pool (6h)
 const FALLBACK_KEY = "klipy:money_gif_last"; // long-lived single fallback
-const QUERIES = ["money rain", "make it rain", "cash money", "rich", "money bag"];
+const PREV_KEY = "klipy:money_gif_prev";     // last-sent url, to avoid repeats
+const QUERIES = ["money rain", "make it rain", "cash money", "rich", "celebrate money", "money bag", "stonks", "cha ching"];
 
 function pickRandom<T>(arr: T[]): T {
   if (arr.length <= 1) return arr[0];
   return arr[crypto.getRandomValues(new Uint32Array(1))[0] % arr.length];
 }
 
-/** A money GIF URL — cached in KV (6h); refetched from Klipy on miss; falls
- * back to the last good URL if Klipy is unavailable. */
+/** Build a large, diverse pool of money-gif URLs from several Klipy queries. */
+async function fetchPool(apiKey: string): Promise<string[]> {
+  const all: string[] = [];
+  for (const q of QUERIES) {
+    try {
+      const res = await fetch(`https://api.klipy.com/api/v1/${apiKey}/gifs/search?q=${encodeURIComponent(q)}&per_page=24&page=1`);
+      if (!res.ok) continue;
+      const j = (await res.json()) as any;
+      for (const it of (j?.data?.data ?? [])) {
+        const u = it?.file?.md?.gif?.url || it?.file?.hd?.gif?.url || it?.file?.sm?.gif?.url;
+        if (u) all.push(u);
+      }
+    } catch { /* skip this query */ }
+  }
+  return [...new Set(all)]; // dedupe
+}
+
+/** A money GIF URL. Pulls from a diverse multi-query pool cached in KV (6h, to
+ * stay within Klipy limits), picks at random, and avoids repeating the last one
+ * sent. Falls back to the last good URL if Klipy is unavailable. */
 async function getMoneyGif(env: TgEnv): Promise<string | null> {
+  let pool: string[] | null = null;
   try {
-    const cached = (await env.SESSIONS.get(GIFS_KEY, "json")) as string[] | null;
-    if (cached && cached.length) return pickRandom(cached);
+    pool = (await env.SESSIONS.get(GIFS_KEY, "json")) as string[] | null;
   } catch { /* ignore */ }
 
-  if (env.KLIPY_API_KEY) {
-    try {
-      const q = pickRandom(QUERIES);
-      const res = await fetch(
-        `https://api.klipy.com/api/v1/${env.KLIPY_API_KEY}/gifs/search?q=${encodeURIComponent(q)}&per_page=24&page=1`
-      );
-      if (res.ok) {
-        const j = (await res.json()) as any;
-        const items: any[] = j?.data?.data ?? [];
-        const urls = items
-          .map((it) => it?.file?.md?.gif?.url || it?.file?.hd?.gif?.url || it?.file?.sm?.gif?.url)
-          .filter(Boolean) as string[];
-        if (urls.length) {
-          await env.SESSIONS.put(GIFS_KEY, JSON.stringify(urls), { expirationTtl: 21600 }); // 6h
-          await env.SESSIONS.put(FALLBACK_KEY, urls[0]); // no TTL → durable fallback
-          return pickRandom(urls);
-        }
-      }
-    } catch { /* fall through to fallback */ }
+  if ((!pool || pool.length < 2) && env.KLIPY_API_KEY) {
+    const fresh = await fetchPool(env.KLIPY_API_KEY);
+    if (fresh.length) {
+      pool = fresh;
+      await env.SESSIONS.put(GIFS_KEY, JSON.stringify(fresh), { expirationTtl: 21600 }); // 6h
+      await env.SESSIONS.put(FALLBACK_KEY, fresh[0]); // durable fallback
+    }
+  }
+
+  if (pool && pool.length) {
+    let prev: string | null = null;
+    try { prev = await env.SESSIONS.get(PREV_KEY); } catch { /* ignore */ }
+    let pick = pickRandom(pool);
+    for (let i = 0; i < 6 && pool.length > 1 && pick === prev; i++) pick = pickRandom(pool);
+    try { await env.SESSIONS.put(PREV_KEY, pick, { expirationTtl: 21600 }); } catch { /* ignore */ }
+    return pick;
   }
 
   try { return await env.SESSIONS.get(FALLBACK_KEY); } catch { return null; }
