@@ -60,7 +60,8 @@ const CHAIN_SYSTEM = `You design a MULTI-STEP (chained) PixieDust generation tem
 
 How chains work:
 - steps_json is an ORDERED array of steps. Each step = { "id": "<shortId>", "model": "owner/name", "input": <providerPayload> }.
-- A step's "input" may reference USER inputs as "{{key}}" ("{{key*}}" if required) and ANY EARLIER step's output as "{{<stepId>.output}}" (a media URL).
+- Use as MANY steps as the request needs — typically 2, but 3 or 4 are fine (e.g. generate image → upscale/edit → animate → extend). Use only as many as truly add value; never pad.
+- A step's "input" may reference USER inputs as "{{key}}" ("{{key*}}" if required) and ANY EARLIER step's output as "{{<stepId>.output}}" (a media URL) — not just the immediately-preceding one.
 - Steps run in order; each step's output URL is available to all later steps via {{stepId.output}}. The LAST step's output is the final result shown to the user.
 - fields_json = array of { "key","type","label","required","help"?,"options"?,"default"? }, ONE per unique {{key}} used across ALL steps (do NOT make a field for {{stepId.output}} refs). type ∈ text,textarea,number,select,file,toggle,url. Use "file" for image/photo inputs, "textarea" for prompts.
 
