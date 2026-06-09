@@ -4,10 +4,11 @@ import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
 import { listTemplates, templateToCard } from "../lib/templates";
-import { VIDEO_CATS } from "../lib/catalog";
+import { VIDEO_CATS, deriveCats } from "../lib/catalog";
 
 const db = Astro.locals.runtime.env.DB;
 const items = (await listTemplates(db, { kinds: ["cinema", "i2v", "fashion-video", "game-video"] })).map(templateToCard);
+const cats = deriveCats(VIDEO_CATS, items);
 ---
 
 <AppShell title="AI Video Generator — PixieDust" description="Generate cinematic AI videos from text prompts or photos. Create animations, music videos, and motion content effortlessly." credits={Astro.locals.user?.credits ?? 47}>
@@ -17,6 +18,6 @@ const items = (await listTemplates(db, { kinds: ["cinema", "i2v", "fashion-video
       title="Video"
       sub="Cinematic scenes, photo-to-life, fashion runway, video-game openings — drop yourself into the frame."
     />
-    <FilterableCatalog items={items} categories={VIDEO_CATS} aspect="9 / 14" />
+    <FilterableCatalog items={items} categories={cats} aspect="9 / 14" />
   </div>
 </AppShell>

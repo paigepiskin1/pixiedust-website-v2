@@ -24,6 +24,19 @@ const PINK = "var(--pd-pink)";
 const LILAC = "var(--pd-lilac)";
 const MINT = "var(--pd-mint)";
 
+/** Build the category pills for a catalog page from the items that actually
+ * exist: curated categories in their canonical order when populated, then any
+ * NEW category assigned in the template editor, with empty ones dropped (so a
+ * filter never lands on a blank grid). "All" is always first. */
+export function deriveCats(curated: string[], items: { c?: string }[]): string[] {
+  const present = Array.from(new Set(items.map((i) => i.c).filter(Boolean))) as string[];
+  return [
+    "All",
+    ...curated.filter((c) => c !== "All" && present.includes(c)),
+    ...present.filter((c) => !curated.includes(c)).sort(),
+  ];
+}
+
 // ─── Presets ───────────────────────────────────────────────
 export const PRESET_CATS = ["All", "Film", "Era", "Y2K", "Creative", "Professional", "Cameras", "Color grades", "Mood"];
 const presetRaw: Omit<CatalogItem, "accent" | "cr" | "href">[] = [

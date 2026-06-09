@@ -4,10 +4,11 @@ import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
 import { listTemplates, templateToCard } from "../lib/templates";
-import { BEAUTY_CATS } from "../lib/catalog";
+import { BEAUTY_CATS, deriveCats } from "../lib/catalog";
 
 const db = Astro.locals.runtime.env.DB;
 const items = (await listTemplates(db, { kind: "beauty" })).map(templateToCard);
+const cats = deriveCats(BEAUTY_CATS, items);
 ---
 
 <AppShell title="AI Beauty Studio — PixieDust" description="Enhance portraits with AI — change hairstyles, apply makeup, and transform your look with realistic beauty templates." credits={Astro.locals.user?.credits ?? 47}>
@@ -17,6 +18,6 @@ const items = (await listTemplates(db, { kind: "beauty" })).map(templateToCard);
       title="Beauty Studio"
       sub="Try a look in seconds. Mix and match — every output stays in your gallery."
     />
-    <FilterableCatalog items={items} categories={BEAUTY_CATS} aspect="9 / 12" />
+    <FilterableCatalog items={items} categories={cats} aspect="9 / 12" />
   </div>
 </AppShell>
