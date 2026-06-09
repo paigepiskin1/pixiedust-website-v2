@@ -557,8 +557,14 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       }
       const res = await fetch("/api/admin/templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       const out = await res.json();
-      if (res.ok) { show("Saved. Redirecting…", true); setTimeout(() => (window.location.href = "/admin/templates"), 500); }
-      else show(out.error || "Save failed.", false);
+      if (res.ok) {
+        show("Saved ✓", true);
+        // Stay on the page (no redirect). For a brand-new template, swap the URL
+        // to its real edit page so further saves update it instead of recreating.
+        if (out.id && location.pathname.endsWith("/edit/new")) {
+          history.replaceState(null, "", `/admin/templates/edit/${out.id}`);
+        }
+      } else show(out.error || "Save failed.", false);
     });
 
     // ── Inline test panel ────────────────────────────────────────────────────
