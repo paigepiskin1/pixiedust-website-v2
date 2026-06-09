@@ -8,6 +8,17 @@ import { PRESET_CATS } from "../lib/catalog";
 
 const db = Astro.locals.runtime.env.DB;
 const items = (await listTemplates(db, { kind: "preset" })).map(templateToCard);
+
+// Category pills are derived from the presets that actually exist: curated
+// categories appear in their canonical order, and any NEW category assigned in
+// the template editor (e.g. "Models") shows up automatically. Empty categories
+// are dropped so a filter never lands on a blank grid.
+const present = Array.from(new Set(items.map((i) => i.c).filter(Boolean))) as string[];
+const cats = [
+  "All",
+  ...PRESET_CATS.filter((c) => c !== "All" && present.includes(c)),
+  ...present.filter((c) => !PRESET_CATS.includes(c)).sort(),
+];
 ---
 
 <AppShell title="AI Photo Presets — PixieDust" description="Apply stunning AI-powered photo presets to your images. Cinematic, editorial, and artistic styles in one click." credits={Astro.locals.user?.credits ?? 47}>
@@ -17,6 +28,6 @@ const items = (await listTemplates(db, { kind: "preset" })).map(templateToCard);
       title="Presets"
       sub="120+ aesthetic looks. Drop a photo, pick a vibe — film stocks, decades, painters, cameras, color grades."
     />
-    <FilterableCatalog items={items} categories={PRESET_CATS} aspect="1 / 1.25" />
+    <FilterableCatalog items={items} categories={cats} aspect="1 / 1.25" />
   </div>
 </AppShell>
