@@ -48,6 +48,25 @@ async function stripeFetch(secretKey: string, method: "GET" | "POST", path: stri
   return data;
 }
 
+/** Retrieve a subscription's status + current period end (renewal date). */
+export async function retrieveSubscription(
+  secretKey: string,
+  subscriptionId: string
+): Promise<{ status: string; currentPeriodEnd: number | null } | null> {
+  try {
+    const sub = await stripeFetch(secretKey, "GET", `/subscriptions/${subscriptionId}`);
+    // Newer Stripe API versions moved current_period_end onto the subscription
+    // item; fall back through both locations.
+    const periodEnd =
+      sub.current_period_end ??
+      sub.items?.data?.[0]?.current_period_end ??
+      null;
+    return { status: sub.status, currentPeriodEnd: periodEnd };
+  } catch {
+    return null;
+  }
+}
+
 /** Get the user's Stripe customer id, creating + persisting one if missing. */
 export async function getOrCreateCustomer(
   secretKey: string,

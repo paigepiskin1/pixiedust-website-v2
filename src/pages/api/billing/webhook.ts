@@ -1,12 +1,27 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { verifyWebhookSignature } from "../../../lib/stripe";
+import { verifyWebhookSignature, retrieveSubscription } from "../../../lib/stripe";
 import { adjustBalance } from "../../../lib/credits";
 import { notifyPurchase } from "../../../lib/telegram";
 
 async function emailFor(db: import("@cloudflare/workers-types").D1Database, userId: number): Promise<string | null> {
   const row = await db.prepare("SELECT email FROM users WHERE id = ?").bind(userId).first<{ email: string | null }>();
   return row?.email ?? null;
+}
+
+/** Pull the subscription's status + renewal date from Stripe and store it. */
+async function syncPeriodEnd(
+  env: any,
+  db: import("@cloudflare/workers-types").D1Database,
+  subId: string | null | undefined
+): Promise<void> {
+  if (!subId) return;
+  const info = await retrieveSubscription(env.STRIPE_SECRET_KEY, subId);
+  if (!info?.currentPeriodEnd) return;
+  await db
+    .prepare("UPDATE subscriptions SET current_period_end = ?, status = ?, updated_at = datetime('now') WHERE stripe_subscription_id = ?")
+    .bind(new Date(info.currentPeriodEnd * 1000).toISOString(), info.status, subId)
+    .run();
 }
 
 function ok(msg = "ok") {
@@ -65,6 +80,7 @@ export async function POST({ request, locals }: APIContext) {
           await adjustBalance(db, userId, credits, { reason: "subscription_grant", refType: "subscription", refId: obj.id, note: meta.tier_id });
         }
         fire(notifyPurchase(env, { kind: "sub", credits, label: meta.tier_id, email: await emailFor(db, userId), amountUsd: obj.amount_total ? obj.amount_total / 100 : null }));
+        fire(syncPeriodEnd(env, db, obj.subscription));
       }
       return ok("processed");
     }
@@ -86,6 +102,7 @@ export async function POST({ request, locals }: APIContext) {
         await adjustBalance(db, sub.user_id, sub.monthly_credits, { reason: "subscription_grant", refType: "subscription", refId: obj.id, note: sub.tier_id });
         fire(notifyPurchase(env, { kind: "renewal", credits: sub.monthly_credits, label: sub.tier_id, email: await emailFor(db, sub.user_id), amountUsd: obj.amount_paid ? obj.amount_paid / 100 : null }));
       }
+      fire(syncPeriodEnd(env, db, subId));
       return ok("renewed");
     }
 
