@@ -61,7 +61,7 @@ function formatAccept(accept: string) {
         ) : f.type === "select" && (f.options ?? []).some((o) => (o as any).image) ? (
           <>
             <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
-            <div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px;">
+            <div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fill,140px);gap:8px;justify-content:start;">
               {(f.options ?? []).map((o) => {
                 const active = String(f.default ?? f.options?.[0]?.value ?? "") === o.value;
                 return (
