@@ -321,7 +321,9 @@ export function templateToCard(t: Template): CardShape {
     name: t.title,
     sub: t.subtitle ?? undefined,
     tag: t.tags[0] ?? undefined,
-    meta: t.meta ?? undefined,
+    // `meta` is a short card label — skip it when it holds structured JSON
+    // (e.g. studio howItWorks) so raw JSON never leaks onto a card.
+    meta: t.meta && !/^\s*[[{]/.test(t.meta) ? t.meta : undefined,
     tone: t.tone,
     accent: t.accent ?? "var(--pd-lilac)",
     cr: t.creditCost,

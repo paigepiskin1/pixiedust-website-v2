@@ -4,18 +4,27 @@ import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import FilterableCatalog from "../components/catalog/FilterableCatalog.astro";
 import { listTemplates, templateToCard } from "../lib/templates";
+import { deriveCats } from "../lib/catalog";
 
 const db = Astro.locals.runtime.env.DB;
-const items = (await listTemplates(db, { kind: "fashion" })).map(templateToCard);
+const all = await listTemplates(db, { kind: "fashion" });
+
+// Fashion is a single flagship tool — open the Outfit Try-On studio directly
+// instead of a one-card catalog. Falls back to a catalog if there are several.
+const flagship = all.find((t) => t.id === "outfit-tryon") ?? (all.length === 1 ? all[0] : null);
+if (flagship) return Astro.redirect(`/studio/${flagship.id}`);
+
+const items = all.map(templateToCard);
+const cats = deriveCats([], items);
 ---
 
 <AppShell title="Virtual AI Fashion Try-on — PixieDust" description="See how any outfit looks on you with AI. Virtual try-on for clothes, accessories, and full looks — no fitting room needed." credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <PageHeader
-      kicker="Wear anything · 2 cr"
+      kicker="Wear anything"
       title="Fashion Try-on"
       sub="Upload a photo, upload a garment — or pick a look. We'll dress you in seconds."
     />
-    <FilterableCatalog items={items} aspect="9 / 13" />
+    <FilterableCatalog items={items} categories={cats} aspect="9 / 13" />
   </div>
 </AppShell>
