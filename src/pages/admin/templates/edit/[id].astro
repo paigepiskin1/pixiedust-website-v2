@@ -736,7 +736,7 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
             return u != null ? String(u) : "";
           });
         }
-        if (Array.isArray(v)) return v.map(sub);
+        if (Array.isArray(v)) return v.flatMap((item) => { const r = sub(item); return Array.isArray(r) ? r : [r]; });
         if (v && typeof v === "object") {
           const o: Record<string, unknown> = {};
           for (const [k, val] of Object.entries(v as Record<string, unknown>)) o[k] = sub(val);

@@ -192,7 +192,13 @@ export async function getTemplate(db: D1Database, id: string): Promise<Template 
 
 /** All fields across single-step or multi-step templates, by key. */
 export function allFields(t: Template): TemplateField[] {
-  return t.steps ? t.steps.flatMap((s) => s.fields) : t.fields;
+  // User-facing fields live at the top level (fields_json). Older chain
+  // templates also carried per-step `fields`; merge those in (deduped) and
+  // ignore steps that have none (the current chain builder omits step fields).
+  const out: TemplateField[] = [...(t.fields ?? [])];
+  if (t.steps) for (const s of t.steps) if (Array.isArray(s.fields)) out.push(...s.fields);
+  const seen = new Set<string>();
+  return out.filter((f) => f && f.key && !seen.has(f.key) && (seen.add(f.key), true));
 }
 
 export interface ResolveResult {
@@ -275,7 +281,10 @@ export function resolveChainStep(
         return u != null ? String(u) : "";
       });
     }
-    if (Array.isArray(v)) return v.map(sub);
+    // Flatten one level: a multi-file placeholder ({{photos*}}) resolves to an
+    // array, so an array like ["{{photos*}}", "{{step1.output}}"] becomes a flat
+    // list of URLs (what image models expect) instead of a nested array.
+    if (Array.isArray(v)) return v.flatMap((item) => { const r = sub(item); return Array.isArray(r) ? r : [r]; });
     if (v && typeof v === "object") {
       const o: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(v as Record<string, unknown>)) o[k] = sub(val);
