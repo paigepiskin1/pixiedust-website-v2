@@ -18,6 +18,15 @@ const switchList = await listTemplates(db, { isAdmin: false });
 
 const fields = allFields(template);
 const accent = template.accent ?? "var(--pd-lilac)";
+
+// Optional rich studio content stored in the template's `meta` JSON:
+//   { "howItWorks": ["Upload your photos", "Add the outfit pieces", ...] }
+// Renders a "How it works" panel in the left column when present.
+let howItWorks: string[] = [];
+try {
+  const m = template.meta ? JSON.parse(template.meta) : null;
+  if (m && Array.isArray(m.howItWorks)) howItWorks = m.howItWorks.filter((s: unknown) => typeof s === "string").slice(0, 6);
+} catch { /* meta isn't JSON — ignore */ }
 const credits = Astro.locals.user?.credits ?? 0;
 const signedIn = !!Astro.locals.user;
 const baseCost = computeCost(template, { quantity: template.quantities?.[0] ?? 1, duration: template.durations?.[0] });
@@ -98,6 +107,20 @@ const config = {
             </span>
           ))}
         </div>
+
+        {howItWorks.length > 0 && (
+          <div class="mt-3.5 rounded-2xl" style="padding:15px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+            <div class="mb-2.5 font-mono uppercase" style="font-size:9px;color:var(--pd-ink3);letter-spacing:0.7px;">How it works</div>
+            <ol class="flex flex-col gap-2.5" style="list-style:none;padding:0;margin:0;">
+              {howItWorks.map((step, i) => (
+                <li class="flex items-start gap-2.5">
+                  <span class="flex shrink-0 items-center justify-center rounded-full font-mono font-semibold" style={`width:18px;height:18px;font-size:10px;background:color-mix(in srgb,${accent} 18%,transparent);color:${accent};margin-top:1px;`}>{i + 1}</span>
+                  <span class="text-ink-2" style="font-size:12px;line-height:1.4;">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
       </aside>
 
       <!-- CENTER: inputs -->
