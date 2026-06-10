@@ -196,9 +196,11 @@ const config = {
         </div>
       </section>
 
-      <!-- RIGHT: output canvas — async jobs feed (each Generate adds a tile) -->
-      <section>
-        <div id="pd-output" class="relative overflow-hidden rounded-[20px]" style="min-height:420px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+      <!-- RIGHT: output canvas — async jobs feed (each Generate adds a tile).
+           Stretches to the column height (default grid stretch) so it never
+           leaves an empty gap next to the taller left/center columns. -->
+      <section class="flex">
+        <div id="pd-output" class="relative w-full overflow-y-auto rounded-[20px]" style="height:100%;min-height:480px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
           <div id="pd-out-empty" class="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
             <div class="mx-auto mb-3 flex size-12 items-center justify-center rounded-full" style="background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 3v3M10 14v3M3 10h3M14 10h3M5 5l2 2M13 13l2 2M15 5l-2 2M5 15l2-2" /></svg>
