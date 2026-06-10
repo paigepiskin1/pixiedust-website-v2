@@ -58,6 +58,21 @@ function formatAccept(accept: string) {
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         {f.type === "textarea" ? (
           <textarea data-field={f.key} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
+        ) : f.type === "select" && (f.options ?? []).some((o) => (o as any).image) ? (
+          <>
+            <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
+            <div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px;">
+              {(f.options ?? []).map((o) => {
+                const active = String(f.default ?? f.options?.[0]?.value ?? "") === o.value;
+                return (
+                  <button type="button" class="pd-opt-card" data-val={o.value} data-active={active ? "true" : "false"} style={`display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${active ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)"};border:1px solid ${active ? "var(--pd-lilac)" : "var(--pd-hairline2)"};`}>
+                    {(o as any).image && <img src={(o as any).image} alt={o.label} loading="lazy" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);" />}
+                    <span style="font-size:12px;font-weight:500;color:var(--pd-ink);padding:0 2px 2px;line-height:1.25;">{o.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
         ) : f.type === "select" ? (
           <select data-field={f.key} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;">
             {(f.options ?? []).map((o) => <option value={o.value} selected={o.value === String(f.default ?? "")}>{o.label}</option>)}
@@ -319,6 +334,24 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         if (status) { status.textContent = "Reference image (replace if you like)"; status.style.color = "var(--pd-ink3)"; }
       }
     } catch { /* ignore bad default */ }
+  });
+
+  // Thumbnail-card option groups (a <select> whose options carry images). Clicks
+  // update the sibling hidden input so pdCollectFieldValues picks up the value.
+  root.querySelectorAll<HTMLElement>(".pd-opt-cards").forEach((group) => {
+    const hidden = group.parentElement?.querySelector<HTMLInputElement>('input[type="hidden"][data-field]');
+    const cards = Array.from(group.querySelectorAll<HTMLElement>(".pd-opt-card"));
+    cards.forEach((card) => {
+      card.addEventListener("click", () => {
+        if (hidden) hidden.value = card.dataset.val ?? "";
+        cards.forEach((c) => {
+          const on = c === card;
+          c.dataset.active = on ? "true" : "false";
+          c.style.borderColor = on ? "var(--pd-lilac)" : "var(--pd-hairline2)";
+          c.style.background = on ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)";
+        });
+      });
+    });
   });
 };
 
