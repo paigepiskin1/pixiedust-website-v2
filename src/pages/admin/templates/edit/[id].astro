@@ -45,6 +45,7 @@ const mono = inp + "font-family:var(--font-mono);font-size:12px;line-height:1.5;
 const lbl = "display:block;margin-bottom:5px;font-family:var(--font-mono);font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;";
 const card = "padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;margin-bottom:16px;";
 const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--pd-ink);letter-spacing:-0.3px;margin-bottom:14px;";
+const codeS = "font-family:var(--font-mono);font-size:11.5px;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline);border-radius:4px;padding:1px 5px;color:var(--pd-ink);";
 ---
 
 <AdminShell title={isNew ? "Admin · New template" : `Admin · ${v("title")}`} tab="templates">
@@ -59,6 +60,50 @@ const h3 = "font-family:var(--font-display);font-size:16px;font-weight:600;color
       <a href="/admin/templates" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">← All templates</a>
     </div>
   </div>
+
+  {isNew && (
+    <details open style="margin-bottom:18px;border:0.5px solid color-mix(in srgb,var(--pd-lilac) 35%,var(--pd-hairline));border-radius:16px;background:color-mix(in srgb,var(--pd-lilac) 6%,var(--pd-bg2));overflow:hidden;">
+      <summary style="cursor:pointer;padding:15px 18px;font-family:var(--font-display);font-size:15px;font-weight:600;color:var(--pd-ink);list-style:none;">🤖 Building this with Claude (browser extension)? — read this first</summary>
+      <div style="padding:2px 20px 20px;font-size:13px;line-height:1.65;color:var(--pd-ink2);">
+        <p style="margin:0 0 12px;color:var(--pd-ink3);">Instructions for an AI agent (Claude in Chrome) filling this form. Goal: create one template, then click <b>Save template</b>. The page does not redirect — a “Saved ✓” message confirms success.</p>
+
+        <p style="margin:14px 0 4px;font-weight:600;color:var(--pd-ink);">⚡ Fastest paths</p>
+        <ul style="margin:0 0 4px;padding-left:18px;">
+          <li><b>Single model</b> (one image/video model): type the model id (<code style={codeS}>owner/name</code>) into <b>Model</b> in the “Provider payload” card, then click <b>Fetch Replicate schema</b>. It auto-fills Model, input_json, fields_json and Type. Then set Title, Slug/id, Kind, Category, Credit cost → <b>Save</b>.</li>
+          <li><b>Multi-step chain</b> (e.g. make an image, then animate it): in the <b>✨ AI — build a multi-step chain</b> box, describe every step in one sentence (“generate X, then animate it into a video”) and click <b>Build chain</b>. It fills steps, fields, models and Type. Review each step, click <b>Scaffold fields</b>, then <b>Save</b>.</li>
+          <li><b>Manual chain</b>: click <b>+ Add step</b> per model (each new step’s image auto-wires to the previous step’s output), set each step’s <b>Model</b> and click <b>⤓ inputs</b> to pull its parameters, then <b>Scaffold fields</b>.</li>
+        </ul>
+
+        <p style="margin:14px 0 4px;font-weight:600;color:var(--pd-ink);">📋 Field reference</p>
+        <ul style="margin:0;padding-left:18px;">
+          <li><b>Slug / id</b>: lowercase, dashes, unique — e.g. <code style={codeS}>kodak-portra</code>.</li>
+          <li><b>Type</b>: <code style={codeS}>image</code> or <code style={codeS}>video</code> = the FINAL output (for a chain, the last step’s output).</li>
+          <li><b>Kind</b>: which tool/catalog it lives under — preset · shoot · cinema · i2v · fashion-video · game-video · motion · beauty · fashion · avatar · ad.</li>
+          <li><b>Category</b>: choose from the dropdown; click <b>manage</b> to add a new one.</li>
+          <li><b>Credit cost</b>: integer. Rule: <b>~5 credits per model/step</b> (≈5× our ~$0.02/gen cost). 1 step = 5, 2 steps = 10.</li>
+          <li><b>input_json</b>: the model’s parameters. Put <code style={codeS}>{`{{key}}`}</code> where the USER supplies a value (<code style={codeS}>{`{{key*}}`}</code> = required); leave other params as fixed values.</li>
+          <li><b>fields_json</b>: one entry per <code style={codeS}>{`{{key}}`}</code> → <code style={codeS}>{`{ key, type, label, required, help?, options?, default? }`}</code>. Types: text, textarea (prompts), number, select, file, toggle, url. For uploads use <code style={codeS}>file</code> with <code style={codeS}>accept:"image/*"</code> (or <code style={codeS}>video/*</code>); add <code style={codeS}>"multiple":true,"max":4</code> for several files. For a <code style={codeS}>select</code>, options are <code style={codeS}>{`[{value,label}]`}</code> — add <code style={codeS}>"image":"&lt;url&gt;"</code> per option to show preview cards. Use <b>Scaffold fields from placeholders</b> to auto-generate this from the {`{{...}}`} you used.</li>
+        </ul>
+
+        <p style="margin:14px 0 4px;font-weight:600;color:var(--pd-ink);">🔗 How chains work (steps_json)</p>
+        <ul style="margin:0;padding-left:18px;">
+          <li>Ordered list; each step = <code style={codeS}>{`{ "id":"shortId", "model":"owner/name", "input": {…} }`}</code>.</li>
+          <li>A step’s input may reference user fields as <code style={codeS}>{`{{key}}`}</code> and any earlier step’s output as <code style={codeS}>{`{{stepId.output}}`}</code> (a media URL). The LAST step’s output is the result.</li>
+        </ul>
+
+        <p style="margin:14px 0 4px;font-weight:600;color:var(--pd-ink);">🧩 Models to use (+ their image-input key)</p>
+        <ul style="margin:0;padding-left:18px;">
+          <li>Text→image, <i>no</i> image input: <code style={codeS}>black-forest-labs/flux-schnell</code>.</li>
+          <li>Image edit (image input = <code style={codeS}>image_input</code> array): <code style={codeS}>google/nano-banana</code>, <code style={codeS}>google/nano-banana-pro</code>, <code style={codeS}>bytedance/seedream-4</code>.</li>
+          <li><code style={codeS}>openai/gpt-image-2</code> (image input = <code style={codeS}>input_images</code> array).</li>
+          <li>Image→video (image input = <code style={codeS}>image</code>): <code style={codeS}>bytedance/seedance-1-lite</code>, <code style={codeS}>bytedance/seedance-2.0-fast</code>, <code style={codeS}>google/veo-3</code>.</li>
+          <li><b>Never feed an image into flux-schnell</b> (it’s text-only). When unsure of a model’s exact params, use its step’s <b>⤓ inputs</b> button.</li>
+        </ul>
+
+        <p style="margin:14px 0 0;color:var(--pd-ink3);"><b>Finish:</b> click <b>Save template</b> (bottom). Optionally open the studio to test. To add a preview image, run it once in the studio and use “Use as example”.</p>
+      </div>
+    </details>
+  )}
 
   <style>
     @media (max-width: 1100px) { #pd-editor-grid { grid-template-columns: 1fr !important; } }
