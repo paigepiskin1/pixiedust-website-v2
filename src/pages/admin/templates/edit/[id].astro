@@ -61,11 +61,28 @@ const codeS = "font-family:var(--font-mono);font-size:11.5px;background:var(--pd
     </div>
   </div>
 
-  {isNew && (
-    <details open style="margin-bottom:18px;border:0.5px solid color-mix(in srgb,var(--pd-lilac) 35%,var(--pd-hairline));border-radius:16px;background:color-mix(in srgb,var(--pd-lilac) 6%,var(--pd-bg2));overflow:hidden;">
-      <summary style="cursor:pointer;padding:15px 18px;font-family:var(--font-display);font-size:15px;font-weight:600;color:var(--pd-ink);list-style:none;">🤖 Building this with Claude (browser extension)? — read this first</summary>
+    <details open={isNew} style="margin-bottom:18px;border:0.5px solid color-mix(in srgb,var(--pd-lilac) 35%,var(--pd-hairline));border-radius:16px;background:color-mix(in srgb,var(--pd-lilac) 6%,var(--pd-bg2));overflow:hidden;">
+      <summary style="cursor:pointer;padding:15px 18px;font-family:var(--font-display);font-size:15px;font-weight:600;color:var(--pd-ink);list-style:none;">🤖 Building with Claude (browser extension) — guide &amp; starter prompt</summary>
       <div style="padding:2px 20px 20px;font-size:13px;line-height:1.65;color:var(--pd-ink2);">
         <p style="margin:0 0 12px;color:var(--pd-ink3);">Instructions for an AI agent (Claude in Chrome) filling this form. Goal: create one template, then click <b>Save template</b>. The page does not redirect — a “Saved ✓” message confirms success.</p>
+
+        <div style="margin:0 0 14px;border:0.5px solid var(--pd-hairline2);border-radius:12px;background:var(--pd-bg);overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:0.5px solid var(--pd-hairline);">
+            <span style="font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:0.7px;color:var(--pd-ink3);">Starter prompt — paste into the Claude extension</span>
+            <button type="button" id="pd-copy-prompt" style="padding:4px 10px;border-radius:7px;background:var(--pd-lilac);color:#0A0A0B;border:none;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;">Copy</button>
+          </div>
+          <pre id="pd-ai-prompt" style="margin:0;padding:12px;white-space:pre-wrap;font-family:var(--font-mono);font-size:11.5px;line-height:1.55;color:var(--pd-ink2);">{`You are filling out PixieDust's "Add template" admin form to create ONE new AI template.
+
+First, read the guide panel on this page ("Building with Claude") — it lists each field's format, the model palette (and each model's image-input key), how multi-step chains work, and what the helper buttons do.
+
+The template I want: (describe it — what it produces, which Replicate/Fal model(s) it uses, and what the user uploads or types).
+
+How to build it:
+1. Single model → put the model id in "Model" and click "Fetch Replicate schema". Multi-step → use the "AI — build a multi-step chain" box and describe all the steps in one sentence.
+2. Set Title, Slug/id, Kind, Type (the final output type), Category, and Credit cost (~5 per step).
+3. Click "Scaffold fields from placeholders" if the fields look empty, and review each step's Model + inputs.
+4. Click "Save template" and confirm you see "Saved ✓".`}</pre>
+        </div>
 
         <p style="margin:14px 0 4px;font-weight:600;color:var(--pd-ink);">⚡ Fastest paths</p>
         <ul style="margin:0 0 4px;padding-left:18px;">
@@ -103,7 +120,19 @@ const codeS = "font-family:var(--font-mono);font-size:11.5px;background:var(--pd
         <p style="margin:14px 0 0;color:var(--pd-ink3);"><b>Finish:</b> click <b>Save template</b> (bottom). Optionally open the studio to test. To add a preview image, run it once in the studio and use “Use as example”.</p>
       </div>
     </details>
-  )}
+  <script is:inline>
+    (function () {
+      var b = document.getElementById("pd-copy-prompt");
+      if (!b) return;
+      b.addEventListener("click", function () {
+        var t = (document.getElementById("pd-ai-prompt") || {}).textContent || "";
+        navigator.clipboard.writeText(t).then(function () {
+          var o = b.textContent; b.textContent = "Copied ✓";
+          setTimeout(function () { b.textContent = o; }, 1500);
+        }).catch(function () {});
+      });
+    })();
+  </script>
 
   <style>
     @media (max-width: 1100px) { #pd-editor-grid { grid-template-columns: 1fr !important; } }
