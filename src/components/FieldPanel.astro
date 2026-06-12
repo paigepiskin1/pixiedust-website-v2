@@ -183,7 +183,25 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     previewImg: HTMLImageElement|null, status: HTMLElement|null
   ) {
     const localUrl = URL.createObjectURL(file);
-    if (previewImg) previewImg.src = localUrl;
+    // Videos can't preview in an <img> — swap in a <video> for video uploads.
+    const isVideo = /^video\//.test(file.type);
+    let mediaEl: HTMLImageElement | HTMLVideoElement | null = previewImg;
+    if (isVideo && preview) {
+      let v = preview.querySelector<HTMLVideoElement>("video.pd-preview-vid");
+      if (!v) {
+        v = document.createElement("video");
+        v.className = "pd-preview-vid";
+        v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
+        v.setAttribute("style", "display:block;width:100%;max-height:220px;object-fit:cover;");
+        if (previewImg) { previewImg.style.display = "none"; previewImg.parentElement?.insertBefore(v, previewImg); }
+        else preview.insertBefore(v, preview.firstChild);
+      }
+      v.style.display = "block";
+      mediaEl = v;
+    } else if (previewImg) {
+      previewImg.style.display = "block";
+    }
+    if (mediaEl) mediaEl.src = localUrl;
     if (zone) zone.style.display = "none";
     if (preview) { preview.classList.remove("hidden"); preview.style.display = "block"; }
     if (status) { status.textContent = "Uploading…"; status.style.color = "var(--pd-ink3)"; }
@@ -206,7 +224,7 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.url) {
         fileUrls[key] = d.url;
-        if (previewImg) previewImg.src = d.url;
+        if (mediaEl) mediaEl.src = d.url;
         URL.revokeObjectURL(localUrl);
         if (status) { status.textContent = "✓ Uploaded"; status.style.color = "var(--pd-mint)"; }
       } else {
