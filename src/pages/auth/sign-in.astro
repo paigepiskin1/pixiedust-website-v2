@@ -39,6 +39,8 @@ try {
 const usingReal = slides.length >= 2;
 if (!usingReal) slides = fallback;
 const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$0", "to start"]];
+// Topbar links pass ?mode=login | signup; default to signup (5 free credits).
+const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "signup";
 ---
 
 <Base title="Sign in — PixieDust">
@@ -129,7 +131,7 @@ const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$
     <section class="relative flex flex-col justify-center" style="padding:64px 72px;">
       <a href="/" class="absolute right-9 top-7 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.6px;">← back</a>
 
-      <div id="pd-auth-form" data-mode="signup" class="mx-auto w-full" style="max-width:380px;">
+      <div id="pd-auth-form" data-mode={initialMode} class="mx-auto w-full" style="max-width:380px;">
         <div class="mb-2.5 font-mono font-semibold uppercase" style="font-size:10.5px;color:var(--pd-lilac);letter-spacing:1.2px;">
           <span data-when="signup">Sign up · 5 free credits</span>
           <span data-when="login" class="hidden">Welcome back</span>
