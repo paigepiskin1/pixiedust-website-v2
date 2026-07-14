@@ -9,7 +9,7 @@ import FeatureBanner from "../components/home/FeatureBanner.astro";
 import Reveal from "../components/motion/Reveal.tsx";
 import { listTemplates, templateToRail } from "../lib/templates";
 import { getToolCards } from "../lib/tool-cards";
-import { getTrendingPicks, resolveTrendingCards } from "../lib/trending";
+import { getHeroPicks, resolveHeroSlides } from "../lib/hero";
 
 const db = Astro.locals.runtime.env.DB;
 const [trending, presets, beauty, videoPool, toolMedia] = await Promise.all([
@@ -29,27 +29,29 @@ const videoTemplates = videoPool.filter((t) => t.previewVideo);
 const trendingMerged = [...videoTemplates, ...trending].filter(
   (t, i, arr) => arr.findIndex((x) => x.id === t.id) === i
 ).slice(0, 8);
-// Admin-curated picks take over the rail when present; otherwise auto-fill.
-const curatedTrending = await resolveTrendingCards(db, await getTrendingPicks(db));
-const trendingCards = curatedTrending.length ? curatedTrending : trendingMerged.map(templateToRail);
+const trendingCards = trendingMerged.map(templateToRail);
 const presetCards = presets.map(templateToRail);
 const beautyCards = beauty.map(templateToRail);
 
-// Real hero slides from the video-preview templates so the hero plays actual
+// Hero slides: admin-curated picks (from /admin/tools) take over when present;
+// otherwise auto-fill from the video-preview templates so the hero plays actual
 // generated motion. Falls back to curated gradient slides inside HomeHero.
 import type { HeroSlide } from "../lib/content";
-const heroSlides: HeroSlide[] = videoTemplates.slice(0, 5).map((t) => ({
-  tone: "lilac",
-  kicker: t.category || t.kind || "Featured",
-  title: t.title,
-  hot: "Trending",
-  dur: t.eta || "video",
-  cta: "Try template",
-  cr: t.creditCost ?? 0,
-  href: `/studio/${t.id}`,
-  previewImage: t.previewImage ?? undefined,
-  previewVideo: t.previewVideo ?? undefined,
-}));
+const curatedHero = await resolveHeroSlides(db, await getHeroPicks(db));
+const heroSlides: HeroSlide[] = curatedHero.length
+  ? curatedHero
+  : videoTemplates.slice(0, 5).map((t) => ({
+      tone: "lilac",
+      kicker: t.category || t.kind || "Featured",
+      title: t.title,
+      hot: "Trending",
+      dur: t.eta || "video",
+      cta: "Try template",
+      cr: t.creditCost ?? 0,
+      href: `/studio/${t.id}`,
+      previewImage: t.previewImage ?? undefined,
+      previewVideo: t.previewVideo ?? undefined,
+    }));
 ---
 
 <AppShell
