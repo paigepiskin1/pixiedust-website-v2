@@ -273,6 +273,9 @@ const config = {
     const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
 
     let credits: number = Number(cfg.credits) || 0;
+    // How many jobs are currently in flight (submitted + still polling). Drives
+    // the "you already have N running — queue more?" confirm before re-charging.
+    let activeJobs = 0;
 
     // Bunny Optimizer serves an optimized image by default; `?format=source`
     // fetches the original, full-quality file for downloads.
@@ -560,6 +563,7 @@ const config = {
     // template can produce several in parallel.
     async function launchJob(inputs: Record<string, unknown>, per: number) {
       const tile = createTile();
+      activeJobs++;
       credits -= per; // optimistic debit
       refreshButton();
       try {
@@ -593,6 +597,8 @@ const config = {
         credits += per;
         refreshButton();
         tileFail(tile, "Network error — try again.");
+      } finally {
+        activeJobs = Math.max(0, activeJobs - 1);
       }
     }
 
@@ -628,7 +634,43 @@ const config = {
       document.body.style.overflow = "";
     }
 
-    function generate() {
+    // Confirm dialog shown before queueing another batch on top of running jobs,
+    // so a click (or accidental double-click) never silently re-charges. Resolves
+    // true = queue, false = cancel.
+    let confirmEl: HTMLElement | null = null;
+    let confirmResolve: ((v: boolean) => void) | null = null;
+    function confirmQueue(running: number, adding: number, costCr: number): Promise<boolean> {
+      return new Promise((resolve) => {
+        confirmResolve = resolve;
+        const settle = (val: boolean) => {
+          if (confirmEl) confirmEl.style.display = "none";
+          document.body.style.overflow = "";
+          const r = confirmResolve; confirmResolve = null; if (r) r(val);
+        };
+        if (!confirmEl) {
+          confirmEl = document.createElement("div");
+          confirmEl.style.cssText = "position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);";
+          confirmEl.innerHTML =
+            '<div role="dialog" aria-modal="true" style="width:100%;max-width:360px;border-radius:18px;padding:24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.4);">' +
+              '<div style="font-size:17px;font-weight:600;letter-spacing:-0.3px;color:var(--pd-ink);">Queue more generations?</div>' +
+              '<div id="pd-confirm-sub" style="margin-top:6px;font-size:13px;line-height:1.5;color:var(--pd-ink3);"></div>' +
+              '<button id="pd-confirm-go" type="button" style="margin-top:18px;width:100%;padding:12px 16px;border-radius:12px;background:var(--pd-lilac);color:#0A0A0B;font-size:14px;font-weight:700;border:none;cursor:pointer;">Queue</button>' +
+              '<button id="pd-confirm-cancel" type="button" style="margin-top:10px;width:100%;padding:10px;border-radius:12px;background:transparent;border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);font-size:13px;cursor:pointer;">Cancel</button>' +
+            '</div>';
+          document.body.appendChild(confirmEl);
+          confirmEl.addEventListener("click", (e) => { if (e.target === confirmEl) settle(false); });
+          confirmEl.querySelector<HTMLElement>("#pd-confirm-cancel")!.addEventListener("click", () => settle(false));
+          confirmEl.querySelector<HTMLElement>("#pd-confirm-go")!.addEventListener("click", () => settle(true));
+          document.addEventListener("keydown", (e) => { if (e.key === "Escape" && confirmEl && confirmEl.style.display === "flex") settle(false); });
+        }
+        confirmEl.querySelector<HTMLElement>("#pd-confirm-sub")!.textContent =
+          `You already have ${running} generation${running > 1 ? "s" : ""} running. Queue ${adding} more for ${costCr} cr?`;
+        confirmEl.style.display = "flex";
+        document.body.style.overflow = "hidden";
+      });
+    }
+
+    async function generate() {
       if (!cfg.signedIn) {
         showSignInModal();
         return;
@@ -638,9 +680,16 @@ const config = {
         showError("Hang on — a file is still uploading.");
         return;
       }
-      if (credits < cost()) {
+      const total = cost();
+      if (credits < total) {
         window.location.href = "/credits";
         return;
+      }
+      // Already have jobs in flight → confirm (and show the extra cost) before
+      // queueing another batch, rather than silently charging again.
+      if (activeJobs > 0) {
+        const ok = await confirmQueue(activeJobs, quantity(), total);
+        if (!ok) return;
       }
       errEl.classList.add("hidden");
       const n = quantity();
