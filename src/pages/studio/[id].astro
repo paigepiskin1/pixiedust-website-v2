@@ -29,6 +29,12 @@ try {
 } catch { /* meta isn't JSON — ignore */ }
 const credits = Astro.locals.user?.credits ?? 0;
 const signedIn = !!Astro.locals.user;
+
+// GPT-Image models (openai/gpt-image-2, gpt-image-1.5, …) on Replicate are
+// noticeably slower than the other providers, so warn the user up front.
+const usesSlowModel =
+  /gpt-image/i.test(template.model) ||
+  (template.steps ?? []).some((s) => /gpt-image/i.test(s.model ?? ""));
 const baseCost = computeCost(template, { quantity: template.quantities?.[0] ?? 1, duration: template.durations?.[0] });
 const qualityKeys = template.quality ? Object.keys(template.quality) : [];
 const qualityLabels: Record<string, string> = { std: "Standard", pro: "Pro", cinema: "Cinema" };
@@ -127,6 +133,13 @@ const config = {
       <section class="lg:sticky lg:top-[88px] lg:self-start">
         <div class="rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
           <div class="mb-3 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Your inputs</div>
+
+          {usesSlowModel && (
+            <div class="mb-3.5 flex items-start gap-2 rounded-lg" style="padding:9px 11px;background:color-mix(in srgb, var(--pd-amber) 11%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-amber) 34%, transparent);">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--pd-amber)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px;"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4"/><circle cx="8" cy="11" r="0.4" fill="var(--pd-amber)"/></svg>
+              <span class="text-ink-2" style="font-size:11.5px;line-height:1.45;">Heads up — this template runs on a higher-quality model that takes a little longer than usual. Hang tight after you hit Generate.</span>
+            </div>
+          )}
 
           <FieldPanel fields={fields} id="pd-field-panel" />
 
