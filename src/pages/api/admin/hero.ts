@@ -15,7 +15,7 @@ async function load(db: import("@cloudflare/workers-types").D1Database): Promise
 
 /** Manage the curated homepage hero (#pd-hero).
  * Body actions: add_template {id} | add_custom {title,kicker?,href,url,mediaType,cr?} |
- * remove {index} | move {index,dir:-1|1} | clear */
+ * remove {index} | move {index,dir:-1|1} | set_templates {ids:string[]} | clear */
 export async function POST({ request, locals }: APIContext) {
   const env = locals.runtime.env;
   const actor = adminActor(request, locals, env.ADMIN_API_TOKEN);
@@ -58,6 +58,14 @@ export async function POST({ request, locals }: APIContext) {
       const i = Number(b.index), j = i + (Number(b.dir) < 0 ? -1 : 1);
       if (!Number.isInteger(i) || i < 0 || i >= picks.length || j < 0 || j >= picks.length) return json({ error: "bad move" }, 400);
       [picks[i], picks[j]] = [picks[j], picks[i]];
+      break;
+    }
+    case "set_templates": {
+      // Replace the whole list with these template ids (used to "remove" an
+      // auto-filled slide: the client sends every auto slide except the one
+      // being removed, which materializes the auto hero into a custom list).
+      const ids = Array.isArray(b.ids) ? b.ids.map((x: unknown) => String(x)) : [];
+      picks = ids.map((id) => ({ kind: "template" as const, id }));
       break;
     }
     case "clear":
