@@ -28,44 +28,12 @@ const pickViews = await Promise.all(
 const allTemplates = (await listTemplates(db, { includeHidden: true, isAdmin: true })).map((t) => ({ id: t.id, title: t.title }));
 ---
 
-<AdminShell title="Admin · Home cards" tab="tools">
-  <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Home cards</h1>
-  <p class="mt-1 text-ink-3" style="font-size:13.5px;">Set a background image or video for each "Start a project" tool card. Leave empty to use the default gradient.</p>
-
-  <div class="mt-6 grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">
-    {QUICK_TOOLS.map((t) => {
-      const m = media[t.href];
-      return (
-        <div class="pd-tool" data-href={t.href} style={card}>
-          <div class="pd-tool-preview" style="position:relative;height:150px;background:var(--pd-bg3);overflow:hidden;">
-            {m?.type === "video" ? (
-              <video class="pd-tool-media" src={m.url} muted loop playsinline autoplay preload="metadata" style="width:100%;height:100%;object-fit:cover;" />
-            ) : m?.url ? (
-              <img class="pd-tool-media" src={m.url} alt={t.name} style="width:100%;height:100%;object-fit:cover;" />
-            ) : (
-              <div class="pd-tool-media" style={`width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;color:${t.accent};background:color-mix(in srgb,${t.accent} 14%, var(--pd-bg3));`}>{t.glyph}</div>
-            )}
-            <span class="pd-tool-badge" style="position:absolute;top:8px;left:8px;padding:2px 7px;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font-size:8.5px;letter-spacing:0.5px;text-transform:uppercase;">{m ? m.type : "default"}</span>
-          </div>
-          <div style="padding:12px 14px;">
-            <div class="font-semibold text-ink" style="font-size:13.5px;">{t.name}</div>
-            <div class="font-mono" style="font-size:10px;color:var(--pd-ink4);">{t.href}</div>
-            <div class="mt-2.5 flex items-center gap-2">
-              <label class="pd-tool-upload rounded-lg font-semibold" style="position:relative;padding:7px 12px;font-size:11.5px;background:var(--pd-lilac);color:#0A0A0B;cursor:pointer;overflow:hidden;">
-                <span class="pd-tool-label">Upload</span>
-                <input type="file" accept="image/*,video/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
-              </label>
-              <button type="button" class="pd-tool-clear font-mono uppercase" style={`font-size:10px;letter-spacing:0.5px;color:var(--pd-pink);background:none;border:none;cursor:pointer;${m ? "" : "visibility:hidden;"}`}>Remove</button>
-              <span class="pd-tool-status" style="font-size:10.5px;color:var(--pd-ink3);"></span>
-            </div>
-          </div>
-        </div>
-      );
-    })}
-  </div>
+<AdminShell title="Admin · Homepage" tab="tools">
+  <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Homepage</h1>
+  <p class="mt-1 text-ink-3" style="font-size:13.5px;">Everything that shows on the home page — the big rotating hero and the “Start a project” tool cards.</p>
 
   <!-- ── Homepage hero (#pd-hero) ─────────────────────────────────────────── -->
-  <div style="margin-top:40px;padding-top:28px;border-top:0.5px solid var(--pd-hairline);">
+  <div style="margin-top:26px;">
     <h2 class="font-display font-medium text-ink" style="font-size:22px;letter-spacing:-0.5px;">Homepage hero</h2>
     <p class="mt-1 text-ink-3" style="font-size:13px;">The big rotating hero at the top of the home page (<span class="font-mono">#pd-hero</span>). Pick existing templates or add custom slides. Empty = automatic (top video templates).</p>
 
@@ -127,6 +95,44 @@ const allTemplates = (await listTemplates(db, { includeHidden: true, isAdmin: tr
         <div class="mt-1 text-ink-4" style="font-size:10px;">Title required. Upload triggers the add once the file finishes.</div>
       </div>
     </div>
+  </div>
+
+  <!-- ── Home cards ───────────────────────────────────────────────────────── -->
+  <div style="margin-top:40px;padding-top:28px;border-top:0.5px solid var(--pd-hairline);">
+    <h2 class="font-display font-medium text-ink" style="font-size:22px;letter-spacing:-0.5px;">Home cards</h2>
+    <p class="mt-1 text-ink-3" style="font-size:13px;">Set a background image or video for each “Start a project” tool card. Leave empty to use the default gradient.</p>
+  </div>
+
+  <div class="mt-6 grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">
+    {QUICK_TOOLS.map((t) => {
+      const m = media[t.href];
+      return (
+        <div class="pd-tool" data-href={t.href} style={card}>
+          <div class="pd-tool-preview" style="position:relative;height:150px;background:var(--pd-bg3);overflow:hidden;">
+            {m?.type === "video" ? (
+              <video class="pd-tool-media" src={m.url} muted loop playsinline autoplay preload="metadata" style="width:100%;height:100%;object-fit:cover;" />
+            ) : m?.url ? (
+              <img class="pd-tool-media" src={m.url} alt={t.name} style="width:100%;height:100%;object-fit:cover;" />
+            ) : (
+              <div class="pd-tool-media" style={`width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;color:${t.accent};background:color-mix(in srgb,${t.accent} 14%, var(--pd-bg3));`}>{t.glyph}</div>
+            )}
+            <span class="pd-tool-badge" style="position:absolute;top:8px;left:8px;padding:2px 7px;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font-size:8.5px;letter-spacing:0.5px;text-transform:uppercase;">{m ? m.type : "default"}</span>
+          </div>
+          <div style="padding:12px 14px;">
+            <div class="font-semibold text-ink" style="font-size:13.5px;">{t.name}</div>
+            <div class="font-mono" style="font-size:10px;color:var(--pd-ink4);">{t.href}</div>
+            <div class="mt-2.5 flex items-center gap-2">
+              <label class="pd-tool-upload rounded-lg font-semibold" style="position:relative;padding:7px 12px;font-size:11.5px;background:var(--pd-lilac);color:#0A0A0B;cursor:pointer;overflow:hidden;">
+                <span class="pd-tool-label">Upload</span>
+                <input type="file" accept="image/*,video/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+              </label>
+              <button type="button" class="pd-tool-clear font-mono uppercase" style={`font-size:10px;letter-spacing:0.5px;color:var(--pd-pink);background:none;border:none;cursor:pointer;${m ? "" : "visibility:hidden;"}`}>Remove</button>
+              <span class="pd-tool-status" style="font-size:10.5px;color:var(--pd-ink3);"></span>
+            </div>
+          </div>
+        </div>
+      );
+    })}
   </div>
 
   <script>
