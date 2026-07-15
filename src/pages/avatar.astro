@@ -53,7 +53,7 @@ const config = {
         <div class="mt-3.5 rounded-2xl" style="padding:15px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
           <div class="mb-2.5 font-mono uppercase" style="font-size:9px;color:var(--pd-ink3);letter-spacing:0.7px;">How it works</div>
           <ol class="flex flex-col gap-2.5" style="list-style:none;padding:0;margin:0;">
-            {["Upload a clear, close-up photo of the area", "Pick a body area, then choose tattoo packs", "Combine as many packs as you like", "Generate — see yourself inked in seconds"].map((step, i) => (
+            {["Upload a clear, close-up photo of the area", "Pick a body area, then choose tattoo packs", "Combine as many packs as you like", "Generate — see yourself inked (about a minute)"].map((step, i) => (
               <li class="flex items-start gap-2.5">
                 <span class="flex shrink-0 items-center justify-center rounded-full font-mono font-semibold" style="width:18px;height:18px;font-size:10px;background:color-mix(in srgb,var(--pd-lilac) 18%,transparent);color:var(--pd-lilac);margin-top:1px;">{i + 1}</span>
                 <span class="text-ink-2" style="font-size:12px;line-height:1.4;">{step}</span>
@@ -122,7 +122,7 @@ const config = {
           <button id="pd-generate" type="button" class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl font-bold" style="padding:13px 16px;background:var(--pd-lilac);color:#0A0A0B;font-size:14px;letter-spacing:-0.1px;cursor:pointer;">
             <span id="pd-gen-label">Generate · {creditCost} cr</span>
           </button>
-          <div class="mt-2 text-center font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.5px;">PixieDust · ~1 min</div>
+          <div class="mt-2 text-center font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.5px;">PixieDust · ~1–2 min</div>
         </div>
       </section>
 
