@@ -120,9 +120,11 @@ const config = {
             <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Hair color</span>
             <div id="pd-color-row" class="flex flex-wrap gap-1.5">
               {HAIR_COLORS.map((col, i) => (
-                <button type="button" class="pd-color-btn flex items-center gap-1.5 rounded-full" data-color-id={col.id} data-active={i === 0 ? "true" : "false"} style="padding:4px 10px 4px 4px;background:var(--pd-bg);border:1px solid var(--pd-hairline2);cursor:pointer;">
-                  <span style={`display:inline-block;width:16px;height:16px;border-radius:50%;border:0.5px solid var(--pd-hairline3);${col.hex ? `background:${col.hex};` : "background:conic-gradient(from 0deg,#c99b5b,#3b2417,#b5502a,#ece6d6,#c99b5b);"}`}></span>
-                  <span class="text-ink" style="font-size:11px;">{col.label}</span>
+                <button type="button" class="pd-color-btn flex items-center gap-1.5 rounded-full" data-color-id={col.id} data-active={i === 0 ? "true" : "false"} style="padding:4px 11px 4px 4px;background:var(--pd-bg);border:1.5px solid var(--pd-hairline2);cursor:pointer;">
+                  <span class="pd-color-swatch" style={`position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:0.5px solid var(--pd-hairline3);${col.hex ? `background:${col.hex};` : "background:conic-gradient(from 0deg,#c99b5b,#3b2417,#b5502a,#ece6d6,#c99b5b);"}`}>
+                    <svg class="pd-color-check" width="11" height="11" viewBox="0 0 12 12" fill="none" style="display:none;"><path d="M2.5 6.2 4.8 8.5 9.5 3.5" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  <span class="pd-color-name text-ink" style="font-size:11px;">{col.label}</span>
                 </button>
               ))}
             </div>
@@ -184,7 +186,12 @@ const config = {
     .pd-cut-card:hover { transform: translateY(-2px); border-color: var(--pd-hairline3); }
     .pd-cut-card[data-active="true"] { border-color: var(--pd-teal); }
     .pd-cut-card[data-active="true"] .pd-cut-check { display: flex !important; }
-    .pd-color-btn[data-active="true"] { border-color: var(--pd-teal); background: color-mix(in srgb,var(--pd-teal) 10%,var(--pd-bg)); }
+    .pd-color-btn { transition: border-color 120ms, background 120ms, box-shadow 120ms; }
+    .pd-color-btn:hover { border-color: var(--pd-hairline3); }
+    .pd-color-btn[data-active="true"] { border-color: var(--pd-teal); background: color-mix(in srgb,var(--pd-teal) 18%,var(--pd-bg)); box-shadow: 0 0 0 2px color-mix(in srgb,var(--pd-teal) 55%,transparent); }
+    .pd-color-btn[data-active="true"] .pd-color-name { color: var(--pd-teal); font-weight: 700; }
+    .pd-color-btn[data-active="true"] .pd-color-swatch { box-shadow: 0 0 0 2px var(--pd-bg), 0 0 0 3.5px var(--pd-teal); }
+    .pd-color-btn[data-active="true"] .pd-color-check { display: block !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.95)) drop-shadow(0 0 2px rgba(255,255,255,0.8)); }
     .pd-tier-btn { background: var(--pd-bg); border: 1px solid var(--pd-hairline2); transition: border-color 120ms, background 120ms; }
     .pd-tier-btn[data-active="true"] { border-color: var(--pd-teal); background: color-mix(in srgb,var(--pd-teal) 8%,var(--pd-bg)); }
     @keyframes pd-spin { to { transform: rotate(360deg); } }
