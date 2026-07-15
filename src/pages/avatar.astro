@@ -10,11 +10,21 @@ import { getTemplate } from "../lib/templates";
 import { AREAS, TATTOO_PACKS, TATTOO_BASE_RULE } from "../lib/tattoo-packs";
 
 const db = Astro.locals.runtime.env.DB;
-let template = null;
-try {
-  template = await getTemplate(db, "tattoo-studio");
-} catch { /* D1 unavailable — fall back to defaults below */ }
-const creditCost = template?.creditCost ?? 10;
+
+// Quality/speed tiers — each maps to a model-specific template. Costs are read
+// live from the templates (with sensible fallbacks) so pricing stays in sync.
+const TIER_DEFS = [
+  { id: "fast", templateId: "tattoo-studio-fast", label: "Fast", sub: "Low res · ~30s", defCost: 6 },
+  { id: "balanced", templateId: "tattoo-studio", label: "Balanced", sub: "Medium res · ~1 min", defCost: 10 },
+  { id: "hi", templateId: "tattoo-studio-hi", label: "High res", sub: "Best detail · ~2 min", defCost: 15 },
+];
+const tierTemplates = await Promise.all(
+  TIER_DEFS.map((t) => getTemplate(db, t.templateId).catch(() => null))
+);
+const tiers = TIER_DEFS.map((t, i) => ({ id: t.id, templateId: t.templateId, label: t.label, sub: t.sub, creditCost: tierTemplates[i]?.creditCost ?? t.defCost }));
+const defaultTierIdx = 1; // Balanced
+const template = tierTemplates[defaultTierIdx]; // hero preview + default cost
+const defaultCost = tiers[defaultTierIdx].creditCost;
 const credits = Astro.locals.user?.credits ?? 0;
 const signedIn = !!Astro.locals.user;
 
@@ -23,8 +33,8 @@ const personField: TemplateField[] = [
 ];
 
 const config = {
-  templateId: "tattoo-studio",
-  creditCost,
+  tiers,
+  defaultTier: tiers[defaultTierIdx].id,
   credits,
   signedIn,
   baseRule: TATTOO_BASE_RULE,
@@ -107,6 +117,20 @@ const config = {
             <div id="pd-selected-chips" class="flex flex-wrap gap-1.5"></div>
           </div>
 
+          <!-- Quality / speed tier -->
+          <div class="mt-4">
+            <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Quality</span>
+            <div id="pd-tier" class="grid gap-1.5" style="grid-template-columns:repeat(3,1fr);">
+              {tiers.map((tr) => (
+                <button type="button" class="pd-tier-btn rounded-xl text-left" data-tier={tr.id} data-cost={tr.creditCost} data-template={tr.templateId} data-active={tr.id === config.defaultTier ? "true" : "false"} style="padding:9px 10px;cursor:pointer;">
+                  <span class="block font-semibold text-ink" style="font-size:12px;">{tr.label}</span>
+                  <span class="block text-ink-3" style="font-size:10px;line-height:1.3;margin-top:2px;">{tr.sub}</span>
+                  <span class="block font-mono" style="font-size:10px;margin-top:3px;color:var(--pd-lilac);">{tr.creditCost} cr</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <!-- Outputs -->
           <div class="mt-4">
             <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Outputs <span class="text-ink-3" style="font-weight:400;">· generated in parallel</span></span>
@@ -120,7 +144,7 @@ const config = {
           <div id="pd-gen-error" class="mt-3 hidden rounded-lg" style="padding:9px 12px;background:color-mix(in srgb, var(--pd-pink) 12%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-pink) 40%, transparent);color:var(--pd-pink);font-size:12.5px;"></div>
 
           <button id="pd-generate" type="button" class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl font-bold" style="padding:13px 16px;background:var(--pd-lilac);color:#0A0A0B;font-size:14px;letter-spacing:-0.1px;cursor:pointer;">
-            <span id="pd-gen-label">Generate · {creditCost} cr</span>
+            <span id="pd-gen-label">Generate · {defaultCost} cr</span>
           </button>
           <div class="mt-2 text-center font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.5px;">PixieDust · ~1–2 min</div>
         </div>
@@ -149,6 +173,8 @@ const config = {
     .pd-pack-card:hover { transform: translateY(-2px); border-color: var(--pd-hairline3); }
     .pd-pack-card[data-active="true"] { border-color: var(--pd-lilac); }
     .pd-pack-card[data-active="true"] .pd-pack-check { display: flex !important; }
+    .pd-tier-btn { background: var(--pd-bg); border: 1px solid var(--pd-hairline2); transition: border-color 120ms, background 120ms; }
+    .pd-tier-btn[data-active="true"] { border-color: var(--pd-lilac); background: color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg)); }
     @keyframes pd-spin { to { transform: rotate(360deg); } }
   </style>
 
@@ -158,6 +184,7 @@ const config = {
     let credits: number = Number(cfg.credits) || 0;
     let activeJobs = 0;
     const selected: string[] = [];
+    let tier: any = (cfg.tiers || []).find((t: any) => t.id === cfg.defaultTier) || (cfg.tiers || [])[0] || { templateId: "tattoo-studio", creditCost: 10 };
 
     const panel = document.getElementById("pd-tattoo-upload") as HTMLElement;
     const genBtn = $("#pd-generate") as HTMLButtonElement;
@@ -170,7 +197,17 @@ const config = {
       const a = document.querySelector<HTMLElement>('#pd-qty .pd-seg[data-active="true"]');
       return Number(a?.dataset.val) || 1;
     }
-    function cost(): number { return (Number(cfg.creditCost) || 10) * quantity(); }
+    function unitCost(): number { return Number(tier?.creditCost) || 10; }
+    function cost(): number { return unitCost() * quantity(); }
+
+    // Quality tier selection
+    document.querySelectorAll<HTMLElement>("#pd-tier .pd-tier-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll<HTMLElement>("#pd-tier .pd-tier-btn").forEach((b) => b.setAttribute("data-active", String(b === btn)));
+        tier = (cfg.tiers || []).find((t: any) => t.id === btn.dataset.tier) || tier;
+        refreshButton();
+      });
+    });
 
     function refreshButton() {
       const c = cost();
@@ -316,7 +353,7 @@ const config = {
       document.body.style.overflow = "hidden";
     }
 
-    async function poll(id: string, tile: HTMLElement): Promise<void> {
+    async function poll(id: string, tile: HTMLElement, per: number): Promise<void> {
       const stages = ["Reading your photo", "Inking the design", "Refining", "Almost there"];
       let tick = 0;
       while (true) {
@@ -326,31 +363,31 @@ const config = {
         try { data = await (await fetch(`/api/generate/status?id=${id}`)).json(); } catch { continue; }
         tileStage(tile, (stages[Math.min(tick, stages.length - 1)]) + "…");
         if (data.status === "completed") { tileResult(tile, data.outputs || [], id); return; }
-        if (data.status === "failed") { credits += Number(cfg.creditCost) || 0; refreshButton(); tileFail(tile, friendlyError(data.error)); return; }
+        if (data.status === "failed") { credits += per; refreshButton(); tileFail(tile, friendlyError(data.error)); return; }
       }
     }
 
-    async function launchJob(inputs: Record<string, unknown>) {
+    async function launchJob(inputs: Record<string, unknown>, per: number, templateId: string) {
       const tile = createTile();
       activeJobs++;
-      credits -= Number(cfg.creditCost) || 0;
+      credits -= per; // optimistic debit
       refreshButton();
       try {
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ templateId: cfg.templateId, inputs, quantity: 1 }),
+          body: JSON.stringify({ templateId, inputs, quantity: 1 }),
         });
         const data = await res.json();
         if (!res.ok) {
-          credits += Number(cfg.creditCost) || 0; refreshButton();
+          credits += per; refreshButton();
           if (data.needCredits) { tile.remove(); window.location.href = "/credits"; }
           else tileFail(tile, friendlyError(data.error || "Could not start generation."));
           return;
         }
-        await poll(data.id, tile);
+        await poll(data.id, tile, per);
       } catch {
-        credits += Number(cfg.creditCost) || 0; refreshButton();
+        credits += per; refreshButton();
         tileFail(tile, "Network error — try again.");
       } finally {
         activeJobs = Math.max(0, activeJobs - 1);
@@ -370,7 +407,9 @@ const config = {
       errEl.classList.add("hidden");
       const inputs = { person, prompt };
       const n = quantity();
-      for (let i = 0; i < n; i++) launchJob(inputs);
+      const per = unitCost();
+      const templateId = tier.templateId;
+      for (let i = 0; i < n; i++) launchJob(inputs, per, templateId);
     }
 
     genBtn.addEventListener("click", generate);
