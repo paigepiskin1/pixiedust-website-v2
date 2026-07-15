@@ -12,8 +12,8 @@ import { MAKEUP_LOOKS, MAKEUP_TARGETS, BEAUTY_BASE_RULE } from "../lib/beauty-pa
 const db = Astro.locals.runtime.env.DB;
 
 const TIER_DEFS = [
-  { id: "fast", templateId: "beauty-studio-fast", label: "Fast", sub: "Lower res · ~30s", defCost: 6 },
-  { id: "hi", templateId: "beauty-studio-hi", label: "High res", sub: "Best detail · ~2 min", defCost: 15 },
+  { id: "fast", templateId: "beauty-studio-fast", label: "Fast", sub: "Lower res · ~30s", defCost: 3 },
+  { id: "hi", templateId: "beauty-studio-hi", label: "High res", sub: "Best detail · ~2 min", defCost: 5 },
 ];
 const tierTemplates = await Promise.all(TIER_DEFS.map((t) => getTemplate(db, t.templateId).catch(() => null)));
 const tiers = TIER_DEFS.map((t, i) => ({ id: t.id, templateId: t.templateId, label: t.label, sub: t.sub, creditCost: tierTemplates[i]?.creditCost ?? t.defCost }));
@@ -195,7 +195,7 @@ const config = {
     let mode = "looks";
     let target = "main";
     let selectedLook: string | null = null;
-    let tier: any = (cfg.tiers || []).find((t: any) => t.id === cfg.defaultTier) || (cfg.tiers || [])[0] || { templateId: "beauty-studio-fast", creditCost: 6 };
+    let tier: any = (cfg.tiers || []).find((t: any) => t.id === cfg.defaultTier) || (cfg.tiers || [])[0] || { templateId: "beauty-studio-fast", creditCost: 3 };
 
     const personPanel = document.getElementById("pd-beauty-person") as HTMLElement;
     const refPanel = document.getElementById("pd-beauty-ref") as HTMLElement;
@@ -210,7 +210,7 @@ const config = {
       const a = document.querySelector<HTMLElement>('#pd-qty .pd-seg[data-active="true"]');
       return Number(a?.dataset.val) || 1;
     }
-    function unitCost(): number { return Number(tier?.creditCost) || 6; }
+    function unitCost(): number { return Number(tier?.creditCost) || 3; }
     function cost(): number { return unitCost() * quantity(); }
     function personUrl(): string | undefined { return ((personPanel as any)?._pdFileUrls || {}).person; }
     function refUrl(): string | undefined { return ((refPanel as any)?._pdFileUrls || {}).reference; }

@@ -14,8 +14,8 @@ const db = Astro.locals.runtime.env.DB;
 // Quality/speed tiers — each maps to a model-specific template. Costs are read
 // live from the templates (with sensible fallbacks) so pricing stays in sync.
 const TIER_DEFS = [
-  { id: "fast", templateId: "tattoo-studio-fast", label: "Fast", sub: "Lower res · ~30s", defCost: 6 },
-  { id: "hi", templateId: "tattoo-studio-hi", label: "High res", sub: "Best detail · ~2 min", defCost: 15 },
+  { id: "fast", templateId: "tattoo-studio-fast", label: "Fast", sub: "Lower res · ~30s", defCost: 3 },
+  { id: "hi", templateId: "tattoo-studio-hi", label: "High res", sub: "Best detail · ~2 min", defCost: 5 },
 ];
 const tierTemplates = await Promise.all(
   TIER_DEFS.map((t) => getTemplate(db, t.templateId).catch(() => null))
@@ -183,7 +183,7 @@ const config = {
     let credits: number = Number(cfg.credits) || 0;
     let activeJobs = 0;
     const selected: string[] = [];
-    let tier: any = (cfg.tiers || []).find((t: any) => t.id === cfg.defaultTier) || (cfg.tiers || [])[0] || { templateId: "tattoo-studio-fast", creditCost: 6 };
+    let tier: any = (cfg.tiers || []).find((t: any) => t.id === cfg.defaultTier) || (cfg.tiers || [])[0] || { templateId: "tattoo-studio-fast", creditCost: 3 };
 
     const panel = document.getElementById("pd-tattoo-upload") as HTMLElement;
     const genBtn = $("#pd-generate") as HTMLButtonElement;
@@ -196,7 +196,7 @@ const config = {
       const a = document.querySelector<HTMLElement>('#pd-qty .pd-seg[data-active="true"]');
       return Number(a?.dataset.val) || 1;
     }
-    function unitCost(): number { return Number(tier?.creditCost) || 10; }
+    function unitCost(): number { return Number(tier?.creditCost) || 3; }
     function cost(): number { return unitCost() * quantity(); }
 
     // Quality tier selection
