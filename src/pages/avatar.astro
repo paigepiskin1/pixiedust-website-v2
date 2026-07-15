@@ -14,15 +14,14 @@ const db = Astro.locals.runtime.env.DB;
 // Quality/speed tiers — each maps to a model-specific template. Costs are read
 // live from the templates (with sensible fallbacks) so pricing stays in sync.
 const TIER_DEFS = [
-  { id: "fast", templateId: "tattoo-studio-fast", label: "Fast", sub: "Low res · ~30s", defCost: 6 },
-  { id: "balanced", templateId: "tattoo-studio", label: "Balanced", sub: "Medium res · ~1 min", defCost: 10 },
+  { id: "fast", templateId: "tattoo-studio-fast", label: "Fast", sub: "Lower res · ~30s", defCost: 6 },
   { id: "hi", templateId: "tattoo-studio-hi", label: "High res", sub: "Best detail · ~2 min", defCost: 15 },
 ];
 const tierTemplates = await Promise.all(
   TIER_DEFS.map((t) => getTemplate(db, t.templateId).catch(() => null))
 );
 const tiers = TIER_DEFS.map((t, i) => ({ id: t.id, templateId: t.templateId, label: t.label, sub: t.sub, creditCost: tierTemplates[i]?.creditCost ?? t.defCost }));
-const defaultTierIdx = 1; // Balanced
+const defaultTierIdx = 0; // Fast
 const template = tierTemplates[defaultTierIdx]; // hero preview + default cost
 const defaultCost = tiers[defaultTierIdx].creditCost;
 const credits = Astro.locals.user?.credits ?? 0;
@@ -120,7 +119,7 @@ const config = {
           <!-- Quality / speed tier -->
           <div class="mt-4">
             <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Quality</span>
-            <div id="pd-tier" class="grid gap-1.5" style="grid-template-columns:repeat(3,1fr);">
+            <div id="pd-tier" class="grid gap-1.5" style="grid-template-columns:repeat(2,1fr);">
               {tiers.map((tr) => (
                 <button type="button" class="pd-tier-btn rounded-xl text-left" data-tier={tr.id} data-cost={tr.creditCost} data-template={tr.templateId} data-active={tr.id === config.defaultTier ? "true" : "false"} style="padding:9px 10px;cursor:pointer;">
                   <span class="block font-semibold text-ink" style="font-size:12px;">{tr.label}</span>
@@ -184,7 +183,7 @@ const config = {
     let credits: number = Number(cfg.credits) || 0;
     let activeJobs = 0;
     const selected: string[] = [];
-    let tier: any = (cfg.tiers || []).find((t: any) => t.id === cfg.defaultTier) || (cfg.tiers || [])[0] || { templateId: "tattoo-studio", creditCost: 10 };
+    let tier: any = (cfg.tiers || []).find((t: any) => t.id === cfg.defaultTier) || (cfg.tiers || [])[0] || { templateId: "tattoo-studio-fast", creditCost: 6 };
 
     const panel = document.getElementById("pd-tattoo-upload") as HTMLElement;
     const genBtn = $("#pd-generate") as HTMLButtonElement;
