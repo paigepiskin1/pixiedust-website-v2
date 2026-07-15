@@ -41,6 +41,7 @@ export const QUICK_TOOLS: QuickTool[] = [
   { href: "/fashion", name: "Fashion Try-on", sub: "Wear anything", tone: "pink", accent: "var(--pd-pink)", glyph: "❖" },
   { href: "/beauty", name: "Beauty Studio", sub: "Hair · makeup", tone: "mint", accent: "var(--pd-mint)", glyph: "◐" },
   { href: "/avatar", name: "Tattoo Studio", sub: "Preview ink", tone: "lilac", accent: "var(--pd-lilac)", glyph: "✦" },
+  { href: "/hair", name: "Hair Studio", sub: "Cuts & color", tone: "teal", accent: "var(--pd-teal)", glyph: "✂" },
   { href: "/ad", name: "Ad Studio", sub: "Campaign-ready", tone: "amber", accent: "var(--pd-amber)", glyph: "⌘" },
 ];
 

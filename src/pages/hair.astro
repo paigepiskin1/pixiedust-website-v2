@@ -1,0 +1,434 @@
+---
+// Hair Studio — try on haircuts + colors, or a reference hairstyle. Same tiered
+// model approach as the Tattoo Studio (Fast=nano-banana-pro, High=gpt-image-2).
+export const prerender = false;
+import AppShell from "../layouts/AppShell.astro";
+import FieldPanel from "../components/FieldPanel.astro";
+import type { TemplateField } from "../lib/templates";
+import { getTemplate } from "../lib/templates";
+import { HAIR_GENDERS, HAIR_CUTS, HAIR_COLORS, HAIR_BASE_RULE } from "../lib/hair-packs";
+
+const db = Astro.locals.runtime.env.DB;
+
+const TIER_DEFS = [
+  { id: "fast", templateId: "hair-studio-fast", label: "Fast", sub: "Lower res · ~30s", defCost: 6 },
+  { id: "hi", templateId: "hair-studio-hi", label: "High res", sub: "Best detail · ~2 min", defCost: 15 },
+];
+const tierTemplates = await Promise.all(TIER_DEFS.map((t) => getTemplate(db, t.templateId).catch(() => null)));
+const tiers = TIER_DEFS.map((t, i) => ({ id: t.id, templateId: t.templateId, label: t.label, sub: t.sub, creditCost: tierTemplates[i]?.creditCost ?? t.defCost }));
+const defaultTierIdx = 0;
+const template = tierTemplates[defaultTierIdx];
+const defaultCost = tiers[defaultTierIdx].creditCost;
+const credits = Astro.locals.user?.credits ?? 0;
+const signedIn = !!Astro.locals.user;
+
+const personField: TemplateField[] = [
+  { key: "person", type: "file", label: "Your photo", required: true, accept: "image/*", help: "Upload a clear, front-facing photo of your head & shoulders" },
+];
+const refField: TemplateField[] = [
+  { key: "reference", type: "file", label: "Reference hairstyle", accept: "image/*", help: "Upload a photo of the hairstyle you want to copy" },
+];
+
+const config = {
+  tiers,
+  defaultTier: tiers[defaultTierIdx].id,
+  credits,
+  signedIn,
+  baseRule: HAIR_BASE_RULE,
+  cuts: Object.fromEntries(HAIR_CUTS.map((c) => [c.id, { prompt: c.prompt, label: c.label }])),
+  colors: HAIR_COLORS.map((c) => ({ id: c.id, label: c.label, prompt: c.prompt })),
+};
+---
+
+<AppShell title="Hair Studio — PixieDust" description="Try on new haircuts and hair colors with AI. Upload a photo, pick a women's or men's cut and a color — or upload a reference hairstyle to copy." credits={credits}>
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
+    <div class="grid gap-6 lg:grid-cols-[300px_minmax(0,1.15fr)_minmax(0,1fr)] lg:[grid-auto-rows:1fr] lg:min-h-[calc(100vh-128px)]">
+
+      <!-- LEFT -->
+      <aside class="lg:sticky lg:top-[88px] lg:self-start">
+        <div class="mb-[7px] flex items-center gap-[7px]">
+          <span class="inline-block shrink-0 rounded-full" style="width:5px;height:5px;background:var(--pd-teal);box-shadow:0 0 10px color-mix(in srgb,var(--pd-teal) 50%,transparent);"></span>
+          <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:1.1px;">Hair try-on · cuts & color</span>
+        </div>
+        <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.8px;line-height:1.05;">Hair Studio</h1>
+        <p class="mt-2 text-ink-3" style="font-size:13px;line-height:1.5;">
+          Try a new cut or color before the salon. Pick a style, choose a shade, or copy a reference hairstyle.
+        </p>
+        <div class="mt-3 overflow-hidden rounded-[18px]" style="border:0.5px solid var(--pd-hairline);aspect-ratio:3/4;background:var(--pd-bg2);">
+          {template?.previewImage && <img src={template.previewImage} alt="Hair Studio example" class="h-full w-full object-cover" />}
+        </div>
+        <div class="mt-3.5 rounded-2xl" style="padding:15px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div class="mb-2.5 font-mono uppercase" style="font-size:9px;color:var(--pd-ink3);letter-spacing:0.7px;">How it works</div>
+          <ol class="flex flex-col gap-2.5" style="list-style:none;padding:0;margin:0;">
+            {["Upload a clear, front-facing photo", "Pick a cut and/or a color — or a reference photo", "We restyle only your hair, keeping your face", "Generate — preview your new look"].map((step, i) => (
+              <li class="flex items-start gap-2.5">
+                <span class="flex shrink-0 items-center justify-center rounded-full font-mono font-semibold" style="width:18px;height:18px;font-size:10px;background:color-mix(in srgb,var(--pd-teal) 18%,transparent);color:var(--pd-teal);margin-top:1px;">{i + 1}</span>
+                <span class="text-ink-2" style="font-size:12px;line-height:1.4;">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </aside>
+
+      <!-- CENTER -->
+      <section class="lg:sticky lg:top-[88px] lg:self-start">
+        <div class="rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div class="mb-3 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Your photo</div>
+          <FieldPanel fields={personField} id="pd-hair-person" />
+
+          <!-- Mode -->
+          <div class="mt-5">
+            <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Style source</span>
+            <div id="pd-mode-tabs" class="flex flex-wrap gap-1.5">
+              {HAIR_GENDERS.map((g, i) => (
+                <button type="button" class="pd-seg rounded-lg font-semibold" data-mode={g.id} data-active={i === 0 ? "true" : "false"} style="padding:7px 14px;font-size:12px;cursor:pointer;">{g.label}</button>
+              ))}
+              <button type="button" class="pd-seg rounded-lg font-semibold" data-mode="reference" data-active="false" style="padding:7px 14px;font-size:12px;cursor:pointer;">Reference photo</button>
+            </div>
+          </div>
+
+          <!-- Cut gallery -->
+          <div id="pd-cut-wrap" class="mt-4">
+            <div class="mb-1.5 flex items-center justify-between">
+              <span class="font-medium text-ink" style="font-size:12.5px;">Haircut</span>
+              <button type="button" id="pd-clear-cut" class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.5px;background:none;border:none;cursor:pointer;">Clear</button>
+            </div>
+            <div id="pd-cut-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">
+              {HAIR_CUTS.map((c) => (
+                <button type="button" class="pd-cut-card" data-cut-id={c.id} data-gender={c.gender} data-active="false" style="display:flex;flex-direction:column;gap:0;padding:0;border-radius:12px;cursor:pointer;text-align:left;overflow:hidden;background:var(--pd-bg);border:1px solid var(--pd-hairline2);transition:border-color 120ms,transform 120ms;">
+                  <div style="position:relative;width:100%;aspect-ratio:3/4;background:var(--pd-bg3);">
+                    <img src={c.preview} alt={c.label} loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;" />
+                    <span class="pd-cut-check" style="display:none;position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--pd-teal);color:#0A0A0B;font-size:11px;font-weight:700;align-items:center;justify-content:center;">✓</span>
+                  </div>
+                  <div style="padding:7px 9px 9px;">
+                    <div class="text-ink" style="font-size:12px;font-weight:600;line-height:1.2;">{c.label}</div>
+                    <div class="text-ink-3" style="font-size:10.5px;line-height:1.3;margin-top:2px;">{c.blurb}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <!-- Reference upload (hidden unless reference mode) -->
+          <div id="pd-ref-wrap" class="mt-4" style="display:none;">
+            <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Reference hairstyle</span>
+            <FieldPanel fields={refField} id="pd-hair-ref" />
+          </div>
+
+          <!-- Color -->
+          <div class="mt-4">
+            <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Hair color</span>
+            <div id="pd-color-row" class="flex flex-wrap gap-1.5">
+              {HAIR_COLORS.map((col, i) => (
+                <button type="button" class="pd-color-btn flex items-center gap-1.5 rounded-full" data-color-id={col.id} data-active={i === 0 ? "true" : "false"} style="padding:4px 10px 4px 4px;background:var(--pd-bg);border:1px solid var(--pd-hairline2);cursor:pointer;">
+                  <span style={`display:inline-block;width:16px;height:16px;border-radius:50%;border:0.5px solid var(--pd-hairline3);${col.hex ? `background:${col.hex};` : "background:conic-gradient(from 0deg,#c99b5b,#3b2417,#b5502a,#ece6d6,#c99b5b);"}`}></span>
+                  <span class="text-ink" style="font-size:11px;">{col.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <!-- Quality tier -->
+          <div class="mt-4">
+            <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Quality</span>
+            <div id="pd-tier" class="grid gap-1.5" style="grid-template-columns:repeat(2,1fr);">
+              {tiers.map((tr) => (
+                <button type="button" class="pd-tier-btn rounded-xl text-left" data-tier={tr.id} data-cost={tr.creditCost} data-template={tr.templateId} data-active={tr.id === config.defaultTier ? "true" : "false"} style="padding:9px 10px;cursor:pointer;">
+                  <span class="block font-semibold text-ink" style="font-size:12px;">{tr.label}</span>
+                  <span class="block text-ink-3" style="font-size:10px;line-height:1.3;margin-top:2px;">{tr.sub}</span>
+                  <span class="block font-mono" style="font-size:10px;margin-top:3px;color:var(--pd-teal);">{tr.creditCost} cr</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <!-- Outputs -->
+          <div class="mt-4">
+            <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Outputs <span class="text-ink-3" style="font-weight:400;">· generated in parallel</span></span>
+            <div class="flex flex-wrap gap-1.5" id="pd-qty">
+              {[1, 2, 3, 4].map((n, i) => (
+                <button type="button" class="pd-seg rounded-lg font-semibold" data-val={n} data-active={i === 0 ? "true" : "false"} style="padding:7px 14px;font-size:12px;cursor:pointer;">{n}</button>
+              ))}
+            </div>
+          </div>
+
+          <div id="pd-gen-error" class="mt-3 hidden rounded-lg" style="padding:9px 12px;background:color-mix(in srgb, var(--pd-pink) 12%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-pink) 40%, transparent);color:var(--pd-pink);font-size:12.5px;"></div>
+
+          <button id="pd-generate" type="button" class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl font-bold" style="padding:13px 16px;background:var(--pd-teal);color:#0A0A0B;font-size:14px;letter-spacing:-0.1px;cursor:pointer;">
+            <span id="pd-gen-label">Generate · {defaultCost} cr</span>
+          </button>
+          <div class="mt-2 text-center font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.5px;">PixieDust · ~1–2 min</div>
+        </div>
+      </section>
+
+      <!-- RIGHT -->
+      <section class="flex">
+        <div class="relative w-full overflow-y-auto rounded-[20px]" style="height:100%;min-height:480px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div id="pd-out-empty" class="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
+            <div class="mx-auto mb-3 flex size-12 items-center justify-center rounded-full" style="background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 3v3M10 14v3M3 10h3M14 10h3M5 5l2 2M13 13l2 2M15 5l-2 2M5 15l2-2" /></svg>
+            </div>
+            <div class="text-ink-3" style="font-size:13px;">Your new hairstyles appear here. Run as many looks as you like.</div>
+          </div>
+          <div id="pd-jobs" class="grid gap-3" style="padding:14px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="application/json" id="pd-hair-config" is:inline set:html={JSON.stringify(config)}></script>
+
+  <style>
+    .pd-seg { background: var(--pd-bg); color: var(--pd-ink2); border: 0.5px solid var(--pd-hairline2); }
+    .pd-seg[data-active="true"] { background: var(--pd-ink); color: var(--pd-bg); border-color: transparent; }
+    .pd-cut-card:hover { transform: translateY(-2px); border-color: var(--pd-hairline3); }
+    .pd-cut-card[data-active="true"] { border-color: var(--pd-teal); }
+    .pd-cut-card[data-active="true"] .pd-cut-check { display: flex !important; }
+    .pd-color-btn[data-active="true"] { border-color: var(--pd-teal); background: color-mix(in srgb,var(--pd-teal) 10%,var(--pd-bg)); }
+    .pd-tier-btn { background: var(--pd-bg); border: 1px solid var(--pd-hairline2); transition: border-color 120ms, background 120ms; }
+    .pd-tier-btn[data-active="true"] { border-color: var(--pd-teal); background: color-mix(in srgb,var(--pd-teal) 8%,var(--pd-bg)); }
+    @keyframes pd-spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <script>
+    const cfg = JSON.parse(document.getElementById("pd-hair-config")!.textContent || "{}");
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+    let credits: number = Number(cfg.credits) || 0;
+    let activeJobs = 0;
+    let mode = "female";
+    let selectedCut: string | null = null;
+    let selectedColor = "keep";
+    let tier: any = (cfg.tiers || []).find((t: any) => t.id === cfg.defaultTier) || (cfg.tiers || [])[0] || { templateId: "hair-studio-fast", creditCost: 6 };
+
+    const personPanel = document.getElementById("pd-hair-person") as HTMLElement;
+    const refPanel = document.getElementById("pd-hair-ref") as HTMLElement;
+    const genBtn = $("#pd-generate") as HTMLButtonElement;
+    const genLabel = $("#pd-gen-label");
+    const errEl = $("#pd-gen-error");
+    const emptyEl = $("#pd-out-empty");
+    const jobsEl = $("#pd-jobs");
+
+    function quantity(): number {
+      const a = document.querySelector<HTMLElement>('#pd-qty .pd-seg[data-active="true"]');
+      return Number(a?.dataset.val) || 1;
+    }
+    function unitCost(): number { return Number(tier?.creditCost) || 6; }
+    function cost(): number { return unitCost() * quantity(); }
+    function personUrl(): string | undefined { return ((personPanel as any)?._pdFileUrls || {}).person; }
+    function refUrl(): string | undefined { return ((refPanel as any)?._pdFileUrls || {}).reference; }
+    function hasSelection(): boolean {
+      if (mode === "reference") return !!refUrl();
+      return !!selectedCut || selectedColor !== "keep";
+    }
+
+    function refreshButton() {
+      const c = cost();
+      if (!cfg.signedIn) { genLabel.textContent = "Sign in to generate"; return; }
+      if (!hasSelection()) { genLabel.textContent = mode === "reference" ? "Upload a reference" : "Pick a cut or color"; genBtn.style.opacity = "0.6"; return; }
+      genBtn.style.opacity = "1";
+      if (credits < c) {
+        genLabel.textContent = `Get more credits · need ${c} cr`;
+        genBtn.style.background = "transparent"; genBtn.style.color = "var(--pd-ink)"; genBtn.style.border = "0.5px solid var(--pd-hairline2)";
+      } else {
+        genLabel.textContent = `Generate · ${c} cr`;
+        genBtn.style.background = "var(--pd-teal)"; genBtn.style.color = "#0A0A0B"; genBtn.style.border = "none";
+      }
+    }
+
+    // Mode tabs
+    document.querySelectorAll<HTMLElement>("#pd-mode-tabs .pd-seg").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll<HTMLElement>("#pd-mode-tabs .pd-seg").forEach((b) => b.setAttribute("data-active", String(b === btn)));
+        mode = btn.dataset.mode!;
+        const isRef = mode === "reference";
+        $("#pd-cut-wrap").style.display = isRef ? "none" : "block";
+        $("#pd-ref-wrap").style.display = isRef ? "block" : "none";
+        if (!isRef) filterCuts(mode);
+        refreshButton();
+      });
+    });
+    function filterCuts(gender: string) {
+      document.querySelectorAll<HTMLElement>(".pd-cut-card").forEach((c) => {
+        c.style.display = c.dataset.gender === gender ? "flex" : "none";
+      });
+    }
+    filterCuts("female");
+
+    // Cut selection (single)
+    document.querySelectorAll<HTMLElement>(".pd-cut-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const id = card.dataset.cutId!;
+        if (selectedCut === id) { selectedCut = null; card.dataset.active = "false"; }
+        else {
+          selectedCut = id;
+          document.querySelectorAll<HTMLElement>(".pd-cut-card").forEach((c) => (c.dataset.active = String(c === card)));
+        }
+        refreshButton();
+      });
+    });
+    $("#pd-clear-cut").addEventListener("click", () => {
+      selectedCut = null;
+      document.querySelectorAll<HTMLElement>(".pd-cut-card").forEach((c) => (c.dataset.active = "false"));
+      refreshButton();
+    });
+
+    // Color selection (single)
+    document.querySelectorAll<HTMLElement>(".pd-color-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedColor = btn.dataset.colorId!;
+        document.querySelectorAll<HTMLElement>(".pd-color-btn").forEach((b) => b.setAttribute("data-active", String(b === btn)));
+        refreshButton();
+      });
+    });
+
+    // Tier
+    document.querySelectorAll<HTMLElement>("#pd-tier .pd-tier-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll<HTMLElement>("#pd-tier .pd-tier-btn").forEach((b) => b.setAttribute("data-active", String(b === btn)));
+        tier = (cfg.tiers || []).find((t: any) => t.id === btn.dataset.tier) || tier;
+        refreshButton();
+      });
+    });
+    // Outputs
+    document.querySelectorAll<HTMLElement>("#pd-qty .pd-seg").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll<HTMLElement>("#pd-qty .pd-seg").forEach((b) => b.setAttribute("data-active", String(b === btn)));
+        refreshButton();
+      });
+    });
+
+    function buildPrompt(): string {
+      const parts: string[] = [];
+      if (mode === "reference" && refUrl()) {
+        parts.push("Restyle their hair to closely match the hairstyle shown in the second reference image — copy its cut, length, shape and texture, but keep the person's own identity and face.");
+      } else if (selectedCut && cfg.cuts[selectedCut]) {
+        parts.push(`Give them ${cfg.cuts[selectedCut].prompt}.`);
+      }
+      const col = (cfg.colors || []).find((c: any) => c.id === selectedColor);
+      if (col && col.prompt) parts.push(`Colour their hair ${col.prompt}.`);
+      if (!parts.length) return "";
+      return `${cfg.baseRule} ${parts.join(" ")}`;
+    }
+
+    // Results / polling
+    function friendlyError(raw: unknown): string {
+      const e = String(raw ?? "").replace(/\s*\(refunded\)\s*$/i, "");
+      if (/e005|flagged as sensitive|safety|moderation|content policy|nsfw|sensitive/i.test(e))
+        return "The model's safety filter blocked this — try a different photo. You weren't charged.";
+      if (/rate limit|slow down/i.test(e)) return "Too many requests. You weren't charged — try again in a minute.";
+      if (/timeout|timed out/i.test(e)) return "This timed out. You weren't charged — try again.";
+      return (e || "Generation failed") + " — you weren't charged.";
+    }
+    function showError(msg: string) { errEl.textContent = msg; errEl.classList.remove("hidden"); }
+
+    function createTile(): HTMLElement {
+      emptyEl.classList.add("hidden");
+      const tile = document.createElement("div");
+      tile.style.cssText = "position:relative;aspect-ratio:1/1.1;border-radius:14px;overflow:hidden;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);";
+      tile.innerHTML =
+        '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px;text-align:center;">' +
+        '<div style="width:30px;height:30px;border-radius:50%;border:3px solid var(--pd-hairline2);border-top-color:var(--pd-teal);animation:pd-spin .8s linear infinite;"></div>' +
+        '<div class="pd-job-stage font-mono uppercase" style="font-size:9.5px;letter-spacing:.7px;color:var(--pd-ink2);">Submitting…</div>' +
+        '</div>';
+      jobsEl.prepend(tile);
+      return tile;
+    }
+    function tileStage(tile: HTMLElement, text: string) { const s = tile.querySelector<HTMLElement>(".pd-job-stage"); if (s) s.textContent = text; }
+    function tileFail(tile: HTMLElement, msg: string) {
+      tile.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;text-align:center;color:var(--pd-pink);font-size:11.5px;line-height:1.4;"></div>';
+      (tile.firstElementChild as HTMLElement).textContent = msg;
+    }
+    function tileResult(tile: HTMLElement, outputs: string[], genId?: string) {
+      tile.innerHTML = "";
+      const url = outputs[0];
+      if (!url) { tileFail(tile, "No output."); return; }
+      const img = document.createElement("img");
+      img.src = url;
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;";
+      img.addEventListener("click", () => openLb(url));
+      tile.appendChild(img);
+      const dl = document.createElement("a");
+      dl.href = genId ? `/api/download?id=${encodeURIComponent(genId)}` : url;
+      if (!genId) dl.setAttribute("download", "");
+      dl.textContent = "↓"; dl.title = "Download";
+      dl.style.cssText = "position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center;";
+      tile.appendChild(dl);
+    }
+    let lbEl: HTMLElement | null = null;
+    function openLb(url: string) {
+      if (!lbEl) {
+        lbEl = document.createElement("div");
+        lbEl.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:center;cursor:zoom-out;";
+        lbEl.addEventListener("click", () => { lbEl!.style.display = "none"; document.body.style.overflow = ""; });
+        document.body.appendChild(lbEl);
+      }
+      lbEl.innerHTML = `<img src="${url}" style="max-width:94vw;max-height:90vh;border-radius:14px;object-fit:contain;" />`;
+      lbEl.style.display = "flex";
+      document.body.style.overflow = "hidden";
+    }
+
+    async function poll(id: string, tile: HTMLElement, per: number): Promise<void> {
+      const stages = ["Reading your photo", "Restyling your hair", "Refining", "Almost there"];
+      let tick = 0;
+      while (true) {
+        await new Promise((r) => setTimeout(r, 2000));
+        tick++;
+        let data: any;
+        try { data = await (await fetch(`/api/generate/status?id=${id}`)).json(); } catch { continue; }
+        tileStage(tile, (stages[Math.min(tick, stages.length - 1)]) + "…");
+        if (data.status === "completed") { tileResult(tile, data.outputs || [], id); return; }
+        if (data.status === "failed") { credits += per; refreshButton(); tileFail(tile, friendlyError(data.error)); return; }
+      }
+    }
+
+    async function launchJob(inputs: Record<string, unknown>, per: number, templateId: string) {
+      const tile = createTile();
+      activeJobs++;
+      credits -= per;
+      refreshButton();
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ templateId, inputs, quantity: 1 }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          credits += per; refreshButton();
+          if (data.needCredits) { tile.remove(); window.location.href = "/credits"; }
+          else tileFail(tile, friendlyError(data.error || "Could not start generation."));
+          return;
+        }
+        await poll(data.id, tile, per);
+      } catch {
+        credits += per; refreshButton();
+        tileFail(tile, "Network error — try again.");
+      } finally {
+        activeJobs = Math.max(0, activeJobs - 1);
+      }
+    }
+
+    async function generate() {
+      if (!cfg.signedIn) { window.location.href = "/auth/sign-in?redirect=" + encodeURIComponent(location.pathname); return; }
+      const person = personUrl();
+      if (!person) { showError("Upload a photo first."); return; }
+      if (Number((personPanel as any)?._pdUploading || 0) > 0 || Number((refPanel as any)?._pdUploading || 0) > 0) { showError("Hang on — a photo is still uploading."); return; }
+      if (!hasSelection()) { showError(mode === "reference" ? "Upload a reference hairstyle." : "Pick a cut or a color."); return; }
+      const prompt = buildPrompt();
+      if (!prompt) { showError("Pick a style or color."); return; }
+      const images: string[] = [person];
+      if (mode === "reference" && refUrl()) images.push(refUrl()!);
+      const total = cost();
+      if (credits < total) { window.location.href = "/credits"; return; }
+      errEl.classList.add("hidden");
+      const inputs = { images, prompt };
+      const n = quantity();
+      const per = unitCost();
+      const templateId = tier.templateId;
+      for (let i = 0; i < n; i++) launchJob(inputs, per, templateId);
+    }
+
+    genBtn.addEventListener("click", generate);
+    refreshButton();
+  </script>
+</AppShell>
