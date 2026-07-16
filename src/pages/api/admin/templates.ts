@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIContext } from "astro";
 import { adminActor, auditAdmin } from "../../../lib/admin";
-import { saveTemplate } from "../../../lib/template-write";
+import { saveTemplate, renameTemplate } from "../../../lib/template-write";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -30,6 +30,18 @@ export async function POST({ request, locals }: APIContext) {
   }
 
   const wasNew = !!d._wasNew;
+
+  // Slug rename: the editor sends the original id in `_originalId`. If it differs
+  // from the submitted id, rename the PK first (so the subsequent save updates
+  // the renamed row instead of creating a duplicate).
+  const originalId = typeof d._originalId === "string" ? d._originalId.trim() : "";
+  const newId = String(d.id || "").trim();
+  if (originalId && newId && originalId !== newId) {
+    const rn = await renameTemplate(env.DB, originalId, newId);
+    if (!rn.ok) return json({ error: rn.error }, rn.status ?? 400);
+    await auditAdmin(env.DB, actor, "template.rename", "template", newId, { from: originalId });
+  }
+
   const res = await saveTemplate(env.DB, d);
   if (!res.ok) return json({ error: res.error }, res.status ?? 400);
 

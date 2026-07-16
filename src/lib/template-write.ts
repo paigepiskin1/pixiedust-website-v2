@@ -22,6 +22,31 @@ export interface SaveResult {
   status?: number;
 }
 
+/**
+ * Rename a template's slug (primary key). `INSERT OR REPLACE` can't rename — it
+ * would leave the old row behind — so this updates the PK in place and repoints
+ * everything that references the old id (generation history, hero picks).
+ */
+export async function renameTemplate(db: D1Database, from: string, to: string): Promise<SaveResult> {
+  if (!/^[a-z0-9-]{2,80}$/.test(to)) return { ok: false, error: "Slug must be 2–80 chars: a–z, 0–9, dash.", status: 400 };
+  if (from === to) return { ok: true, id: to };
+  const exists = await db.prepare("SELECT 1 FROM templates WHERE id = ?").bind(from).first();
+  if (!exists) return { ok: false, error: "Original template not found.", status: 404 };
+  const clash = await db.prepare("SELECT 1 FROM templates WHERE id = ?").bind(to).first();
+  if (clash) return { ok: false, error: `Slug "${to}" is already taken by another template.`, status: 409 };
+  try {
+    await db.batch([
+      db.prepare("UPDATE templates SET id = ? WHERE id = ?").bind(to, from),
+      db.prepare("UPDATE generations SET template_id = ? WHERE template_id = ?").bind(to, from),
+      // Repoint any curated homepage-hero pick that references this template.
+      db.prepare("UPDATE app_settings SET value = replace(value, ?, ?) WHERE key = 'hero_slides'").bind(`"id":"${from}"`, `"id":"${to}"`),
+    ]);
+  } catch (err) {
+    return { ok: false, error: "Rename failed: " + String((err as Error).message || err), status: 500 };
+  }
+  return { ok: true, id: to };
+}
+
 export async function saveTemplate(db: D1Database, d: Record<string, any>): Promise<SaveResult> {
   const id = String(d.id || "").trim();
   if (!/^[a-z0-9-]{2,80}$/.test(id)) return { ok: false, error: "Slug must be 2–80 chars: a–z, 0–9, dash.", status: 400 };
