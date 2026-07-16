@@ -37,8 +37,9 @@ if (!isNew) {
 }
 const KINDS = ["preset", "shoot", "cinema", "i2v", "fashion-video", "game-video", "motion", "beauty", "fashion", "avatar", "ad", "motion-upload"];
 const TONES = ["teal", "lilac", "mint", "pink", "noir", "dusk", "ice", "amber"];
-// Replicate only for now (other providers hidden until enabled).
-const PROVIDERS = ["replicate"];
+// Providers that route through SyncNode. Replicate uses "Fetch schema"; for
+// byteplus (Ark / Dreamina·Seedance) enter the model id + input_json manually.
+const PROVIDERS = ["replicate", "byteplus"];
 
 const inp = "width:100%;padding:10px 12px;border-radius:10px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:13px;outline:none;";
 const mono = inp + "font-family:var(--font-mono);font-size:12px;line-height:1.5;";
