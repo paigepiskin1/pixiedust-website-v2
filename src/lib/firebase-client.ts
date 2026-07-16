@@ -87,8 +87,19 @@ async function oauthSignIn(provider: GoogleAuthProvider | OAuthProvider): Promis
     await signInWithRedirect(auth, provider);
     return null; // page is navigating away; result handled on return
   }
-  const cred = await signInWithPopup(auth, provider);
-  return cred.user;
+  try {
+    const cred = await signInWithPopup(auth, provider);
+    return cred.user;
+  } catch (err) {
+    // Popup blocked or unsupported (strict browsers, embedded webviews) —
+    // fall back to the full-page redirect automatically instead of erroring.
+    const code = (err as { code?: string })?.code || "";
+    if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    throw err;
+  }
 }
 
 /** Returns the signed-in user, or null when the redirect flow kicked in (the
