@@ -13,6 +13,7 @@ export interface MakeupLook {
 }
 
 export const MAKEUP_LOOKS: MakeupLook[] = [
+  { id: "subtle-retouch", label: "Subtle Retouch", blurb: "Fuller lips · refined nose · lashes", prompt: "a subtle, natural retouch — slightly fuller lips, a slightly smaller nose, and slightly enhanced eyelashes", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784204022442.jpg" },
   { id: "clean-girl", label: "Clean Girl", blurb: "Dewy, natural, nude", prompt: "a natural 'clean girl' makeup look — glowy dewy skin, lightly brushed-up brows, subtle bronzer, cream blush, minimal neutral eyeshadow, and glossy nude lips", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784140480907.jpg" },
   { id: "soft-glam", label: "Soft Glam", blurb: "Neutral eye + lashes", prompt: "a soft glam makeup look — neutral shimmer eyeshadow, subtle winged eyeliner, natural lashes, defined brows, soft contour, and mauve satin lips", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784140484080.jpg" },
   { id: "full-glam", label: "Full Glam", blurb: "Sculpted, dramatic", prompt: "a full glam makeup look — blended neutral smokey eyeshadow, sharp winged liner, dramatic voluminous lashes, sculpted contour and highlight, and nude glossy lips", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784140484365.jpg" },
@@ -36,6 +37,12 @@ export const BEAUTY_BASE_RULE =
   "Keep the person's identity, facial features, face shape, bone structure, skin texture, hair, expression, pose, and background exactly the same — change nothing except the makeup. " +
   "Apply the makeup realistically and cleanly, blended naturally to their own skin tone. Do not beautify, slim, smooth, or reshape the face beyond applying makeup.";
 
+/** Retouch rule — allows gentle, believable feature enhancement (not makeup-only). */
+export const BEAUTY_RETOUCH_RULE =
+  "Generate an edited version of the input photo with a subtle, natural retouch. " +
+  "Keep the person clearly recognizable and keep their skin texture, hair, expression, pose, and background the same. " +
+  "Make only gentle, believable enhancements as described — keep it subtle and never over-edited.";
+
 export interface MakeupSelection {
   lookId?: string | null;
   hasReference?: boolean;
@@ -54,6 +61,10 @@ function targetPhrase(sel: MakeupSelection): string {
 export function buildBeautyPrompt(sel: MakeupSelection): string {
   const who = targetPhrase(sel);
   const look = sel.lookId ? MAKEUP_LOOKS.find((l) => l.id === sel.lookId) : null;
+  // The retouch look gently reshapes features, so it uses a rule that permits it.
+  if (!sel.hasReference && sel.lookId === "subtle-retouch") {
+    return `${BEAUTY_RETOUCH_RULE} Apply ${look?.prompt} to ${who}. Keep it subtle and believable.`;
+  }
   let action = "";
   if (sel.hasReference) {
     action =

@@ -7,7 +7,7 @@ import AppShell from "../layouts/AppShell.astro";
 import FieldPanel from "../components/FieldPanel.astro";
 import type { TemplateField } from "../lib/templates";
 import { getTemplate } from "../lib/templates";
-import { MAKEUP_LOOKS, MAKEUP_TARGETS, BEAUTY_BASE_RULE } from "../lib/beauty-packs";
+import { MAKEUP_LOOKS, MAKEUP_TARGETS, BEAUTY_BASE_RULE, BEAUTY_RETOUCH_RULE } from "../lib/beauty-packs";
 
 const db = Astro.locals.runtime.env.DB;
 
@@ -36,6 +36,7 @@ const config = {
   credits,
   signedIn,
   baseRule: BEAUTY_BASE_RULE,
+  retouchRule: BEAUTY_RETOUCH_RULE,
   looks: Object.fromEntries(MAKEUP_LOOKS.map((l) => [l.id, { prompt: l.prompt, label: l.label }])),
   targets: MAKEUP_TARGETS,
 };
@@ -294,6 +295,10 @@ const config = {
     function buildPrompt(): string {
       const who = targetPhrase();
       let action = "";
+      // Retouch look gently reshapes features → uses a rule that allows it.
+      if (mode !== "reference" && selectedLook === "subtle-retouch" && cfg.looks[selectedLook]) {
+        return `${cfg.retouchRule} Apply ${cfg.looks[selectedLook].prompt} to ${who}. Keep it subtle and believable.`;
+      }
       if (mode === "reference" && refUrl()) {
         action = `Look at the makeup worn by the person in the second reference image. Analyze and isolate ONLY their makeup — eyeshadow, eyeliner, lashes, brows, blush, contour, highlight, and lip color/finish — and recreate that same makeup look on ${who} in the first image. Do NOT copy the reference person's face, identity, skin tone, or features — transfer only the makeup, adapted naturally to the subject's own face and skin tone.`;
       } else if (selectedLook && cfg.looks[selectedLook]) {
