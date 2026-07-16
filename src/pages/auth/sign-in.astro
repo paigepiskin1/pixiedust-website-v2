@@ -285,6 +285,7 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
     import {
       signInWithGoogle,
       signInWithApple,
+      completeRedirectSignIn,
       signUpWithEmail,
       signInWithEmailPassword,
       resetPassword,
@@ -296,6 +297,7 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
     const params = new URLSearchParams(location.search);
     const rawRedirect = params.get("redirect") || "/";
     const redirect = rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") ? rawRedirect : "/";
+    const OAUTH_DEST_KEY = "pd_oauth_redirect";
 
     // ── helpers ──
     const form = document.getElementById("pd-auth-form")!;
@@ -331,17 +333,44 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
       window.location.href = redirect;
     }
 
+    // Finish a redirect-based OAuth sign-in (mobile) when we land back here.
+    (async () => {
+      let user;
+      try {
+        user = await completeRedirectSignIn();
+      } catch (err) {
+        showError(authErrorMessage(err));
+        return;
+      }
+      if (!user) return;
+      busy = true; // block manual actions while we finish
+      const stored = sessionStorage.getItem(OAUTH_DEST_KEY);
+      const dest = stored && stored.startsWith("/") && !stored.startsWith("//") ? stored : redirect;
+      sessionStorage.removeItem(OAUTH_DEST_KEY);
+      try {
+        await establishSession(user);
+        window.location.href = dest;
+      } catch (err) {
+        busy = false;
+        showError(authErrorMessage(err));
+      }
+    })();
+
     // ── handlers ──
     document.getElementById("pd-google")!.addEventListener("click", () =>
       withBusy(async () => {
+        sessionStorage.setItem(OAUTH_DEST_KEY, redirect);
         const user = await signInWithGoogle();
+        if (!user) return; // mobile: redirecting away — finished on return
         await establishSession(user);
         go();
       })
     );
     document.getElementById("pd-apple")!.addEventListener("click", () =>
       withBusy(async () => {
+        sessionStorage.setItem(OAUTH_DEST_KEY, redirect);
         const user = await signInWithApple();
+        if (!user) return; // mobile: redirecting away — finished on return
         await establishSession(user);
         go();
       })

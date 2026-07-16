@@ -6,6 +6,8 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -71,20 +73,42 @@ export async function signInWithEmailPassword(email: string, password: string): 
   return cred.user;
 }
 
-export async function signInWithGoogle(): Promise<User> {
+/** Mobile browsers block or badly handle auth popups, so we use the redirect
+ * flow there and popups on desktop. Redirect navigates away and the result is
+ * picked up by completeRedirectSignIn() when the page reloads. */
+function prefersRedirect(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|Opera Mini|Windows Phone/i.test(navigator.userAgent);
+}
+
+async function oauthSignIn(provider: GoogleAuthProvider | OAuthProvider): Promise<User | null> {
   const auth = getFirebaseAuth();
-  const provider = new GoogleAuthProvider();
+  if (prefersRedirect()) {
+    await signInWithRedirect(auth, provider);
+    return null; // page is navigating away; result handled on return
+  }
   const cred = await signInWithPopup(auth, provider);
   return cred.user;
 }
 
-export async function signInWithApple(): Promise<User> {
-  const auth = getFirebaseAuth();
+/** Returns the signed-in user, or null when the redirect flow kicked in (the
+ * page will navigate away and completeRedirectSignIn() finishes it on return). */
+export async function signInWithGoogle(): Promise<User | null> {
+  return oauthSignIn(new GoogleAuthProvider());
+}
+
+export async function signInWithApple(): Promise<User | null> {
   const provider = new OAuthProvider("apple.com");
   provider.addScope("email");
   provider.addScope("name");
-  const cred = await signInWithPopup(auth, provider);
-  return cred.user;
+  return oauthSignIn(provider);
+}
+
+/** On page load, resolve a pending redirect-based OAuth sign-in. Returns the
+ * user if we just came back from one, or null otherwise. */
+export async function completeRedirectSignIn(): Promise<User | null> {
+  const res = await getRedirectResult(getFirebaseAuth());
+  return res?.user ?? null;
 }
 
 export async function resetPassword(email: string): Promise<void> {
@@ -105,7 +129,10 @@ export function authErrorMessage(err: unknown): string {
     case "auth/invalid-credential":
     case "auth/wrong-password":
     case "auth/user-not-found": return "Email or password is incorrect.";
-    case "auth/popup-closed-by-user": return "Sign-in was cancelled.";
+    case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request": return "Sign-in was cancelled.";
+    case "auth/popup-blocked": return "Your browser blocked the sign-in popup — try again and we'll redirect you instead.";
+    case "auth/unauthorized-domain": return "This site isn't authorized for social sign-in yet. Contact support.";
     case "auth/operation-not-allowed": return "That sign-in method isn't enabled yet.";
     case "auth/too-many-requests": return "Too many attempts — try again in a bit.";
     default: return (err as Error)?.message || "Something went wrong. Try again.";
