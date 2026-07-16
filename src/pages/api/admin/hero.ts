@@ -65,7 +65,7 @@ export async function POST({ request, locals }: APIContext) {
       // auto-filled slide: the client sends every auto slide except the one
       // being removed, which materializes the auto hero into a custom list).
       const ids = Array.isArray(b.ids) ? b.ids.map((x: unknown) => String(x)) : [];
-      picks = ids.map((id) => ({ kind: "template" as const, id }));
+      picks = ids.map((id: string) => ({ kind: "template" as const, id }));
       break;
     }
     case "clear":
