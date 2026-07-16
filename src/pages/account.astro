@@ -32,7 +32,7 @@ const sections = [
   { k: "plan", name: "Plan & billing", desc: "Subscription · credits" },
   { k: "creations", name: "My creations", desc: "Storage · exports" },
   { k: "notifs", name: "Notifications", desc: "Email · in-app" },
-  { k: "privacy", name: "Privacy & data", desc: "Sharing · downloads" },
+  { k: "privacy", name: "Privacy & data", desc: "Sharing" },
   { k: "help", name: "Help & support", desc: "Docs · contact" },
 ];
 
@@ -162,10 +162,6 @@ const labelStyle = "display:block;margin-bottom:6px;font-family:var(--font-mono)
               <div class="pd-prow" data-label="Shareable links by default" data-hint="Per-item override always available" data-on="true"></div>
               <div class="pd-prow" data-label="Anonymous usage analytics" data-hint="Helps us improve · no creations sent" data-on="true"></div>
             </div>
-          </div>
-          <div style={cardStyle}>
-            <h3 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;">Download your data</h3>
-            <button type="button" class="pd-toast-btn mt-3 rounded-xl font-semibold text-ink" data-toast="Preparing export — we'll email when ready" style="padding:9px 16px;border:0.5px solid var(--pd-hairline2);font-size:12.5px;cursor:pointer;">Request full export</button>
           </div>
         </div>
 

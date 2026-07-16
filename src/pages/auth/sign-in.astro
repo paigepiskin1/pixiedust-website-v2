@@ -40,7 +40,7 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
     style="background:var(--pd-bg);"
   >
     <!-- LEFT: editorial proof -->
-    <aside class="relative overflow-hidden" style="min-height:280px;border-right:0.5px solid var(--pd-hairline);">
+    <aside class="relative overflow-hidden" style="min-height:340px;border-right:0.5px solid var(--pd-hairline);">
       {
         slides.map((sl, idx) => (
           <div
@@ -92,9 +92,9 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
         }
       </div>
 
-      <div class="absolute inset-x-9 bottom-14" style="max-width:560px;">
+      <div class="absolute inset-x-6 bottom-8 lg:inset-x-9 lg:bottom-14" style="max-width:560px;">
         <div id="pd-auth-kicker" class="mb-3 font-mono uppercase" style="font-size:10.5px;color:rgba(255,255,255,0.7);letter-spacing:1.4px;">{slides[0].kicker}</div>
-        <h2 id="pd-auth-title" class="font-display font-medium text-white" style="font-size:52px;letter-spacing:-1.5px;line-height:0.98;">
+        <h2 id="pd-auth-title" class="font-display font-medium text-white" style="font-size:clamp(30px, 8vw, 52px);letter-spacing:-1.5px;line-height:0.98;">
           {slides[0].title.split("\n").map((l, i) => (<>{i > 0 && <br />}{l}</>))}
         </h2>
         <div class="mt-[22px] flex items-center gap-2.5">
@@ -103,7 +103,7 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
         </div>
       </div>
 
-      <div id="pd-auth-pips" class="absolute bottom-14 right-9 flex gap-1.5">
+      <div id="pd-auth-pips" class="absolute bottom-8 right-6 flex gap-1.5 lg:bottom-14 lg:right-9">
         {
           slides.map((_, idx) => (
             <button
