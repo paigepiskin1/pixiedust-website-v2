@@ -64,6 +64,18 @@ const baseJsonLd = {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <script is:inline>
+      // Google OAuth returns to the site root with the credential in the URL
+      // fragment (the root is the registered redirect URI). Forward it to the
+      // sign-in page, which validates it and completes the session. Runs first
+      // so no other script (or analytics) sees the token.
+      (function () {
+        var h = location.hash;
+        if (location.pathname === "/" && h.indexOf("id_token=") !== -1 && h.indexOf("state=pdg1.") !== -1) {
+          location.replace("/auth/sign-in" + h);
+        }
+      })();
+    </script>
 
     <!-- Primary meta -->
     <title>{title}</title>

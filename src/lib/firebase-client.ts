@@ -7,6 +7,7 @@ import {
   OAuthProvider,
   signInWithPopup,
   signInWithRedirect,
+  signInWithCredential,
   getRedirectResult,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -73,50 +74,105 @@ export async function signInWithEmailPassword(email: string, password: string): 
   return cred.user;
 }
 
-/** Mobile browsers block or badly handle auth popups, so we use the redirect
- * flow there and popups on desktop. Redirect navigates away and the result is
- * picked up by completeRedirectSignIn() when the page reloads. */
-function prefersRedirect(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|Opera Mini|Windows Phone/i.test(navigator.userAgent);
+// ── Google sign-in ───────────────────────────────────────────────────────────
+// Firebase's own popup/redirect helpers both round-trip through the authDomain
+// origin, whose storage/messaging mobile browsers partition or block — users
+// bounced back to the login page signed out. So Google uses a DIRECT OAuth
+// redirect instead: out to accounts.google.com and straight back to our own
+// origin (the site root is a registered redirect URI), then the returned
+// id_token signs into Firebase via signInWithCredential — no popup, no
+// second origin, works on every browser. (This web client id is public by
+// design; it appears in every OAuth URL.)
+const GOOGLE_WEB_CLIENT_ID = "676166394107-rnfdthjdkfgljfh9i67mt9ogianlonnv.apps.googleusercontent.com";
+const G_STATE_KEY = "pd_g_state";
+const G_NONCE_KEY = "pd_g_nonce";
+const G_DEST_KEY = "pd_g_dest";
+
+function randomToken(): string {
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function oauthSignIn(provider: GoogleAuthProvider | OAuthProvider): Promise<User | null> {
-  const auth = getFirebaseAuth();
-  if (prefersRedirect()) {
-    await signInWithRedirect(auth, provider);
-    return null; // page is navigating away; result handled on return
+/** Kick off the full-page Google sign-in. Navigates away; the sign-in page
+ * finishes it via completeGoogleRedirect() when Google sends the user back. */
+export function startGoogleSignIn(dest: string): void {
+  const state = "pdg1." + randomToken();
+  const nonce = randomToken();
+  sessionStorage.setItem(G_STATE_KEY, state);
+  sessionStorage.setItem(G_NONCE_KEY, nonce);
+  sessionStorage.setItem(G_DEST_KEY, dest);
+  // The registered redirect URI is the bare production origin. On any other
+  // host (previews, local) fall back to that host's origin — OAuth there is
+  // unregistered anyway, and prod is what matters.
+  const redirectUri = location.hostname.endsWith("pixiedustapp.com") ? "https://pixiedustapp.com" : location.origin;
+  const q = new URLSearchParams({
+    client_id: GOOGLE_WEB_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "id_token",
+    scope: "openid email profile",
+    state,
+    nonce,
+    prompt: "select_account",
+  });
+  location.assign("https://accounts.google.com/o/oauth2/v2/auth?" + q.toString());
+}
+
+/** Complete a Google sign-in round-trip. The site root forwards Google's
+ * response fragment to the sign-in page; this parses + validates it and signs
+ * into Firebase. Returns null when the URL carries no Google response. */
+export async function completeGoogleRedirect(): Promise<{ user: User; dest: string } | null> {
+  const h = location.hash.startsWith("#") ? location.hash.slice(1) : "";
+  if (!h.includes("id_token=") || !h.includes("state=pdg1.")) return null;
+  const frag = new URLSearchParams(h);
+  const idToken = frag.get("id_token") || "";
+  const state = frag.get("state") || "";
+  // Scrub the credential from the URL/history immediately.
+  history.replaceState(null, "", location.pathname + location.search);
+  const wantState = sessionStorage.getItem(G_STATE_KEY);
+  const wantNonce = sessionStorage.getItem(G_NONCE_KEY);
+  const dest = sessionStorage.getItem(G_DEST_KEY) || "/";
+  sessionStorage.removeItem(G_STATE_KEY);
+  sessionStorage.removeItem(G_NONCE_KEY);
+  sessionStorage.removeItem(G_DEST_KEY);
+  const stale = new Error("That sign-in attempt expired — tap Continue with Google again.");
+  if (!idToken || !wantState || state !== wantState) throw stale;
+  try {
+    const payload = JSON.parse(atob(idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (payload.nonce !== wantNonce) throw stale;
+  } catch {
+    throw stale;
   }
+  const res = await signInWithCredential(getFirebaseAuth(), GoogleAuthProvider.credential(idToken));
+  return { user: res.user, dest };
+}
+
+export async function signInWithGoogle(dest: string): Promise<User | null> {
+  startGoogleSignIn(dest);
+  return null; // page is navigating away
+}
+
+// ── Apple sign-in ────────────────────────────────────────────────────────────
+export async function signInWithApple(): Promise<User | null> {
+  const auth = getFirebaseAuth();
+  const provider = new OAuthProvider("apple.com");
+  provider.addScope("email");
+  provider.addScope("name");
   try {
     const cred = await signInWithPopup(auth, provider);
     return cred.user;
   } catch (err) {
-    // Popup blocked or unsupported (strict browsers, embedded webviews) —
-    // fall back to the full-page redirect automatically instead of erroring.
     const code = (err as { code?: string })?.code || "";
     if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
       await signInWithRedirect(auth, provider);
-      return null;
+      return null; // completed by completeRedirectSignIn() on return
     }
     throw err;
   }
 }
 
-/** Returns the signed-in user, or null when the redirect flow kicked in (the
- * page will navigate away and completeRedirectSignIn() finishes it on return). */
-export async function signInWithGoogle(): Promise<User | null> {
-  return oauthSignIn(new GoogleAuthProvider());
-}
-
-export async function signInWithApple(): Promise<User | null> {
-  const provider = new OAuthProvider("apple.com");
-  provider.addScope("email");
-  provider.addScope("name");
-  return oauthSignIn(provider);
-}
-
-/** On page load, resolve a pending redirect-based OAuth sign-in. Returns the
- * user if we just came back from one, or null otherwise. */
+/** On page load, resolve a pending redirect-based OAuth sign-in (Apple path).
+ * Returns the user if we just came back from one, or null otherwise. */
 export async function completeRedirectSignIn(): Promise<User | null> {
   const res = await getRedirectResult(getFirebaseAuth());
   return res?.user ?? null;

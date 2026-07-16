@@ -285,6 +285,7 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
     import {
       signInWithGoogle,
       signInWithApple,
+      completeGoogleRedirect,
       completeRedirectSignIn,
       signUpWithEmail,
       signInWithEmailPassword,
@@ -333,7 +334,29 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
       window.location.href = redirect;
     }
 
-    // Finish a redirect-based OAuth sign-in (mobile) when we land back here.
+    // Finish the direct Google round-trip (credential arrives in the URL
+    // fragment, forwarded here from the site root by Base.astro).
+    (async () => {
+      let done;
+      try {
+        done = await completeGoogleRedirect();
+      } catch (err) {
+        showError((err as Error)?.message || authErrorMessage(err));
+        return;
+      }
+      if (!done) return;
+      busy = true; // block manual actions while we finish
+      const dest = done.dest.startsWith("/") && !done.dest.startsWith("//") ? done.dest : "/";
+      try {
+        await establishSession(done.user);
+        window.location.href = dest;
+      } catch (err) {
+        busy = false;
+        showError(authErrorMessage(err));
+      }
+    })();
+
+    // Finish a Firebase redirect-based OAuth sign-in (Apple fallback path).
     (async () => {
       let user;
       try {
@@ -359,9 +382,8 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
     // ── handlers ──
     document.getElementById("pd-google")!.addEventListener("click", () =>
       withBusy(async () => {
-        sessionStorage.setItem(OAUTH_DEST_KEY, redirect);
-        const user = await signInWithGoogle();
-        if (!user) return; // mobile: redirecting away — finished on return
+        const user = await signInWithGoogle(redirect);
+        if (!user) return; // navigating to Google — finished on return
         await establishSession(user);
         go();
       })

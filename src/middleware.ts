@@ -5,6 +5,21 @@ import { getUserByUid, toPublicUser } from "./lib/users";
 // Populates locals.user from the session cookie for SSR routes. Static
 // (prerendered) routes run this at build time only and hydrate auth client-side.
 export const onRequest: MiddlewareHandler = async (context, next) => {
+  // Same-origin Firebase auth: proxy the reserved /__/* paths (auth handler,
+  // iframe, init.json) to the project's Firebase Hosting so OAuth redirects
+  // complete on OUR origin. Mobile browsers partition third-party storage,
+  // which silently breaks redirect sign-in when authDomain is a different
+  // origin — serving the handler same-origin is Firebase's documented fix.
+  // Returned directly (no next()) so the security headers below (notably
+  // X-Frame-Options: DENY, which would kill the auth iframe) don't apply.
+  {
+    const u = new URL(context.request.url);
+    if (u.pathname.startsWith("/__/")) {
+      const upstream = "https://pixie-dust-apps.firebaseapp.com" + u.pathname + u.search;
+      return fetch(new Request(upstream, context.request));
+    }
+  }
+
   context.locals.user = null;
   try {
     const env = context.locals.runtime?.env;
