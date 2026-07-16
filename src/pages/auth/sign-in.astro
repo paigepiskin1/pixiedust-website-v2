@@ -137,7 +137,12 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
         </p>
 
         <div class="mt-7 flex flex-col gap-2">
-          <button type="button" id="pd-apple" class="pd-oauth flex items-center justify-center gap-2.5 rounded-[11px] font-semibold" style="padding:13px 14px;font-size:14px;">
+          <!-- Hidden until the Apple provider is enabled in Firebase (Authentication →
+               Sign-in method → Apple: needs Services ID, Team ID, Key ID + private key
+               from the Apple Developer account). Firebase currently returns
+               operation-not-allowed, so the button could never complete. To restore:
+               remove display:none. -->
+          <button type="button" id="pd-apple" class="pd-oauth flex items-center justify-center gap-2.5 rounded-[11px] font-semibold" style="padding:13px 14px;font-size:14px;display:none;">
             <svg width="15" height="17" viewBox="0 0 14 17" fill="currentColor"><path d="M11.6 9c0-1.6.9-2.9 2.1-3.6-.7-1-1.7-1.5-3-1.6-1.3-.1-2.6.7-3.1.7-.6 0-1.7-.7-2.7-.7-1.4 0-2.7.8-3.4 2C-.3 8.2.6 12 2.3 14c.7 1 1.5 2.1 2.6 2 .9 0 1.3-.6 2.5-.6 1.1 0 1.5.6 2.6.6 1.1 0 1.8-1 2.5-2 .5-.7.7-1.1 1-1.9-2-.6-2.4-3.4-.4-3.1zM9.5 2.6C10.1 1.9 10.5 1 10.4 0c-.9 0-1.9.6-2.5 1.3C7.3 2 6.9 2.9 7 3.9c1 .1 1.9-.5 2.5-1.3z" transform="translate(0 1)"></path></svg>
             Continue with Apple
           </button>
