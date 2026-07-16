@@ -12,13 +12,24 @@ export async function submitGeneration(
   opts: { provider: string; model: string; input: Record<string, unknown> }
 ): Promise<SubmitResult> {
   const { provider, model, input } = opts;
+  // BytePlus (Ark / Dreamina·Seedance) takes its params at the top level
+  // (content, resolution, ratio, duration, …) rather than nested under `input`.
+  const isByteplus = provider === "byteplus";
   const url =
-    provider === "fal" ? `${BASE}/fal/generate` : provider === "alibaba" ? `${BASE}/alibaba/generate` : `${BASE}/generate`;
+    provider === "fal"
+      ? `${BASE}/fal/generate`
+      : provider === "alibaba"
+        ? `${BASE}/alibaba/generate`
+        : isByteplus
+          ? `${BASE}/byteplus/generate`
+          : `${BASE}/generate`;
+
+  const payload = isByteplus ? { apiKey, model, ...input } : { apiKey, model, input };
 
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey, model, input }),
+    body: JSON.stringify(payload),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, any>;
   if (!res.ok || !data.job_id) {
@@ -54,7 +65,9 @@ export async function pollStatus(apiKey: string, provider: string, jobId: string
       ? `${BASE}/fal/status?${q}`
       : provider === "alibaba"
         ? `${BASE}/alibaba/status?${q}`
-        : `${BASE}/prediction-status?${q}`;
+        : provider === "byteplus"
+          ? `${BASE}/byteplus/status?${q}`
+          : `${BASE}/prediction-status?${q}`;
 
   // SyncNode requires the key on the query string for GET status endpoints.
   // We also send it as a header so migration to header-only auth is seamless
@@ -66,7 +79,7 @@ export async function pollStatus(apiKey: string, provider: string, jobId: string
 
   const rs = data.replicate_status || data.task_status || data.status;
   const succeeded = ["succeeded", "COMPLETED", "SUCCEEDED", "completed"].includes(rs);
-  const failed = ["failed", "FAILED", "CANCELED", "error"].includes(rs);
+  const failed = ["failed", "FAILED", "CANCELED", "CANCELLED", "cancelled", "canceled", "error"].includes(rs);
   const outputs = normalizeOutputs(data.output);
 
   if (succeeded || (outputs.length && !failed)) return { status: "completed", outputs };

@@ -115,6 +115,8 @@ export async function POST({ request, locals }: APIContext) {
     effectiveAspect = /gpt-image/i.test(template.model) ? "auto" : "match_input_image";
   }
   if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
+  // BytePlus (Ark) uses `ratio` instead of `aspect_ratio`.
+  if (effectiveAspect && effectiveAspect !== "match" && "ratio" in input) input.ratio = effectiveAspect;
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
   if (duration && "duration" in input) input.duration = duration;
   // Map the selected quality to the model's native resolution param. Quality
