@@ -177,7 +177,7 @@ export async function listTemplates(db: D1Database, opts: ListOpts = {}): Promis
 export async function searchTemplates(db: D1Database, q: string, limit = 60): Promise<Template[]> {
   const term = `%${q.trim().toLowerCase()}%`;
   const sql =
-    "SELECT * FROM templates WHERE is_hidden = 0 AND (" +
+    "SELECT * FROM templates WHERE is_hidden = 0 AND is_admin_only = 0 AND (" +
     "lower(title) LIKE ? OR lower(coalesce(subtitle,'')) LIKE ? OR lower(coalesce(category,'')) LIKE ? " +
     "OR lower(coalesce(tags_json,'')) LIKE ? OR lower(coalesce(description,'')) LIKE ?) " +
     "ORDER BY is_featured DESC, sort_order ASC, title ASC LIMIT " + Math.max(1, Math.floor(limit));

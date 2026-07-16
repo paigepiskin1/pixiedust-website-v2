@@ -13,6 +13,7 @@ export type IconName =
   | "beauty"
   | "sparkle"
   | "ad"
+  | "scissors"
   | "gift";
 
 export interface NavItem {
@@ -47,7 +48,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/motion", name: "Motion Transfer", icon: "motion", accent: "--pd-lilac" },
       { href: "/fashion", name: "Fashion Try-on", icon: "shirt", accent: "--pd-pink" },
       { href: "/beauty", name: "Beauty Studio", icon: "beauty", accent: "--pd-mint" },
-      { href: "/avatar", name: "Avatar Studio", icon: "sparkle", accent: "--pd-lilac" },
+      { href: "/avatar", name: "Tattoo Studio", icon: "sparkle", accent: "--pd-lilac" },
+      { href: "/hair", name: "Hair Studio", icon: "scissors", accent: "--pd-teal" },
       { href: "/ad", name: "Ad Studio", icon: "ad", accent: "--pd-amber" },
     ],
   },

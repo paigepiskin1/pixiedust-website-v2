@@ -3,41 +3,32 @@ export const prerender = false;
 import Base from "../../layouts/Base.astro";
 import Media from "../../components/ui/Media.astro";
 import type { Tone } from "../../lib/content";
-import { listTemplates } from "../../lib/templates";
 
 // The post-sign-in redirect (?redirect=) is read + sanitized client-side.
-// Editorial fallback slides (used if no real preview videos are available).
-const fallback: { tone: Tone; kicker: string; title: string; cred: string }[] = [
-  { tone: "lilac", kicker: "Motion · trending", title: "Snakes wrapped,\nin 8 seconds.", cred: "428k creators · this week" },
-  { tone: "pink", kicker: "Photoshoot · 24 shots", title: "A full editorial,\nno set rental.", cred: "Used by 12 of TIME’s 100" },
-  { tone: "dusk", kicker: "Cinema · Kling Pro", title: "Main character\nenergy on tap.", cred: "186k cinematic scenes / week" },
-  { tone: "mint", kicker: "Fashion try-on", title: "Wear the wardrobe.\nKeep your face.", cred: "2 cr · works in seconds" },
+// Curated montage videos for the sign-in left panel (hardcoded, in order).
+const slides: { tone: Tone; kicker: string; title: string; cred: string; video?: string; poster?: string }[] = [
+  {
+    tone: "lilac",
+    kicker: "Motion · trending",
+    title: "Motion that\nstops the scroll.",
+    cred: "Made on PixieDust · in seconds",
+    video: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/eb9f7e39-8980-4d2b-90b3-acfd64a8fff0.mp4",
+  },
+  {
+    tone: "pink",
+    kicker: "Photoshoot · trending",
+    title: "Your best shot,\nno studio needed.",
+    cred: "Made on PixieDust · in seconds",
+    video: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/f6aaf3b6-c283-4204-85f9-26efbc5951ea.mp4",
+  },
+  {
+    tone: "dusk",
+    kicker: "Cinema · Kling Pro",
+    title: "Main character\nenergy on tap.",
+    cred: "Made on PixieDust · in seconds",
+    video: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1780952325124.mp4",
+  },
 ];
-const tones: Tone[] = ["lilac", "pink", "dusk", "mint", "teal", "amber"];
-
-// Pull real, loaded examples: visible templates that have a preview video.
-let slides: { tone: Tone; kicker: string; title: string; cred: string; video?: string; poster?: string }[] = [];
-try {
-  const db = Astro.locals.runtime?.env?.DB;
-  if (db) {
-    const all = await listTemplates(db, {});
-    const withVideo = all.filter((t) => t.previewVideo);
-    // Featured first, then the rest — cap at 6 for the montage.
-    withVideo.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
-    slides = withVideo.slice(0, 6).map((t, i) => ({
-      tone: tones[i % tones.length],
-      kicker: t.category ? `${t.category} · live example` : "Made on PixieDust",
-      title: t.title,
-      cred: t.subtitle || "Made on PixieDust · in seconds",
-      video: t.previewVideo!,
-      poster: t.previewImage || undefined,
-    }));
-  }
-} catch {
-  /* fall back to editorial slides below */
-}
-const usingReal = slides.length >= 2;
-if (!usingReal) slides = fallback;
 const stats: [string, string][] = [["180+", "tools"], ["5 cr", "on signup"], ["$0", "to start"]];
 // Topbar links pass ?mode=login | signup; default to signup (5 free credits).
 const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "signup";
@@ -137,11 +128,11 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
           <span data-when="login" class="hidden">Welcome back</span>
         </div>
         <h1 class="font-display font-medium text-ink" style="font-size:36px;letter-spacing:-1px;line-height:1.05;">
-          <span data-when="signup">Make your dust.</span>
+          <span data-when="signup">✨ Start Creating Free.</span>
           <span data-when="login" class="hidden">Sign in to your studio.</span>
         </h1>
         <p class="mt-3 text-ink-3" style="font-size:14px;letter-spacing:-0.1px;line-height:1.5;">
-          <span data-when="signup">180+ AI creative tools. One credit ledger. Five credits on the house.</span>
+          <span data-when="signup">Create beautiful and trendy content in seconds with the world's best AI tools. 100+ viral photo presets and video templates. Get started totally for free, with 5 free credits!</span>
           <span data-when="login" class="hidden">Pick up where you left off — every project, gallery item, and credit is exactly where you left it.</span>
         </p>
 

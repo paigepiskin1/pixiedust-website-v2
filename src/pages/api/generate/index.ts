@@ -107,7 +107,13 @@ export async function POST({ request, locals }: APIContext) {
   const { input } = resolveInput(template, inputs);
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
-  const effectiveAspect = body.aspect || template.aspects?.[0] || null;
+  let effectiveAspect = body.aspect || template.aspects?.[0] || null;
+  // "match" = keep the uploaded photo's aspect ratio. The value the model
+  // expects differs: GPT-Image uses "auto"; nano-banana / seedream / flux use
+  // "match_input_image".
+  if (effectiveAspect === "match" || effectiveAspect === "match_input_image") {
+    effectiveAspect = /gpt-image/i.test(template.model) ? "auto" : "match_input_image";
+  }
   if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
   if (duration && "duration" in input) input.duration = duration;
