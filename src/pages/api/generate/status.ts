@@ -102,7 +102,8 @@ export async function GET({ url, locals }: APIContext) {
         return json({ id, status: "processing", step: chain.stepIndex + 1, steps: chain.steps.length });
       } catch (err) {
         console.error("[status] chain dispatch error:", err);
-        return refundFail("Pipeline step failed — you weren't charged.");
+        const detail = String((err as Error).message || err || "Pipeline step failed");
+        return refundFail(`Step ${chain.stepIndex + 2} failed to start: ${detail}`);
       }
     }
 
