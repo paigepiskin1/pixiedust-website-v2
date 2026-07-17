@@ -74,9 +74,23 @@ function formatAccept(accept: string) {
             </div>
           </>
         ) : f.type === "select" ? (
-          <select data-field={f.key} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;">
-            {(f.options ?? []).map((o) => <option value={o.value} selected={o.value === String(f.default ?? "")}>{o.label}</option>)}
-          </select>
+          <>
+            <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
+            <div class="pd-opt-segs" style="display:flex;flex-wrap:wrap;gap:6px;">
+              {(f.options ?? []).map((o) => {
+                const active = String(f.default ?? f.options?.[0]?.value ?? "") === o.value;
+                return (
+                  <button
+                    type="button"
+                    class="pd-opt-seg"
+                    data-val={o.value}
+                    data-active={active ? "true" : "false"}
+                    style={`flex:1 1 140px;padding:10px 12px;border-radius:12px;cursor:pointer;text-align:left;font-size:12.5px;font-weight:500;line-height:1.35;transition:border-color 120ms,background 120ms,color 120ms;background:${active ? "var(--pd-ink)" : "var(--pd-bg)"};color:${active ? "var(--pd-bg)" : "var(--pd-ink)"};border:0.5px solid ${active ? "transparent" : "var(--pd-hairline2)"};`}
+                  >{o.label}</button>
+                );
+              })}
+            </div>
+          </>
         ) : f.type === "number" ? (
           <input data-field={f.key} type="number" min={f.min} max={f.max} step={f.step} value={f.default as number | undefined} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;" />
         ) : (
@@ -150,9 +164,25 @@ function formatAccept(accept: string) {
     let input = "";
     if (type === "textarea") {
       input = `<textarea data-field="${key}" rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
+    } else if (type === "select" && Array.isArray(f.options) && f.options.some((o: any) => o && o.image)) {
+      const current = def || String(f.options[0]?.value ?? "");
+      const cards = f.options.map((o: any) => {
+        const val = String(o.value ?? o);
+        const on = val === current;
+        return `<button type="button" class="pd-opt-card" data-val="${escAttr(val)}" data-active="${on?"true":"false"}" style="display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${on?"color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))":"var(--pd-bg)"};border:1px solid ${on?"var(--pd-lilac)":"var(--pd-hairline2)"};">
+          ${o.image?`<img src="${escAttr(String(o.image))}" alt="${escAttr(String(o.label??val))}" loading="lazy" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);" />`:""}
+          <span style="font-size:12px;font-weight:500;color:var(--pd-ink);padding:0 2px 2px;line-height:1.25;">${escHtml(String(o.label??val))}</span>
+        </button>`;
+      }).join("");
+      input = `<input type="hidden" data-field="${key}" value="${escAttr(current)}" /><div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fill,140px);gap:8px;justify-content:start;">${cards}</div>`;
     } else if (type === "select" && Array.isArray(f.options)) {
-      const opts = f.options.map((o: any) => `<option value="${escAttr(String(o.value??o))}"${String(o.value??o)===def?" selected":""}>${escHtml(String(o.label??o.value??o))}</option>`).join("");
-      input = `<select data-field="${key}" style="${S}">${opts}</select>`;
+      const current = def || String(f.options[0]?.value ?? f.options[0] ?? "");
+      const segs = f.options.map((o: any) => {
+        const val = String(o.value ?? o);
+        const on = val === current;
+        return `<button type="button" class="pd-opt-seg" data-val="${escAttr(val)}" data-active="${on?"true":"false"}" style="flex:1 1 140px;padding:10px 12px;border-radius:12px;cursor:pointer;text-align:left;font-size:12.5px;font-weight:500;line-height:1.35;transition:border-color 120ms,background 120ms,color 120ms;background:${on?"var(--pd-ink)":"var(--pd-bg)"};color:${on?"var(--pd-bg)":"var(--pd-ink)"};border:0.5px solid ${on?"transparent":"var(--pd-hairline2)"};">${escHtml(String(o.label??val))}</button>`;
+      }).join("");
+      input = `<input type="hidden" data-field="${key}" value="${escAttr(current)}" /><div class="pd-opt-segs" style="display:flex;flex-wrap:wrap;gap:6px;">${segs}</div>`;
     } else if (type === "number") {
       input = `<input data-field="${key}" type="number"${f.min!=null?` min="${f.min}"`:""}${f.max!=null?` max="${f.max}"`:""}${f.step!=null?` step="${f.step}"`:""}  value="${escAttr(def)}" style="${S}" />`;
     } else {
@@ -367,6 +397,24 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           c.dataset.active = on ? "true" : "false";
           c.style.borderColor = on ? "var(--pd-lilac)" : "var(--pd-hairline2)";
           c.style.background = on ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)";
+        });
+      });
+    });
+  });
+
+  // Segmented button option groups (plain select fields rendered as buttons).
+  root.querySelectorAll<HTMLElement>(".pd-opt-segs").forEach((group) => {
+    const hidden = group.parentElement?.querySelector<HTMLInputElement>('input[type="hidden"][data-field]');
+    const segs = Array.from(group.querySelectorAll<HTMLElement>(".pd-opt-seg"));
+    segs.forEach((seg) => {
+      seg.addEventListener("click", () => {
+        if (hidden) hidden.value = seg.dataset.val ?? "";
+        segs.forEach((s) => {
+          const on = s === seg;
+          s.dataset.active = on ? "true" : "false";
+          s.style.background = on ? "var(--pd-ink)" : "var(--pd-bg)";
+          s.style.color = on ? "var(--pd-bg)" : "var(--pd-ink)";
+          s.style.borderColor = on ? "transparent" : "var(--pd-hairline2)";
         });
       });
     });
