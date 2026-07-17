@@ -54,12 +54,15 @@ export async function POST({ request, locals }: APIContext) {
   if (!deb.ok) return json({ error: "Not enough credits.", needCredits: true }, 402);
 
   const fail = async (err: unknown) => {
+    const detail = String((err as Error).message || err || "Could not start generation");
     await adjustBalance(db, userId, cost, { reason: "generation_refund", refType: "generation", refId: genId, note: "dispatch failed" });
     await db
       .prepare("UPDATE generations SET status='failed', error=?, credits_refunded=?, updated_at=datetime('now') WHERE id=?")
-      .bind(String((err as Error).message || err), cost, genId)
+      .bind(detail, cost, genId)
       .run();
-    return json({ error: "Could not start generation — credits refunded." }, 502);
+    // Pass the provider message through so the studio can show a useful reason
+    // (e.g. BytePlus real-person blocks) instead of a generic network error.
+    return json({ error: detail + " — credits refunded." }, 502);
   };
 
   // ─── Multi-step chain ───

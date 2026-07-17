@@ -45,14 +45,22 @@ export interface PollResult {
   error?: string;
 }
 
+function looksLikeUrl(s: string): boolean {
+  return /^https?:\/\//i.test(s) || /^data:/i.test(s);
+}
+
 function normalizeOutputs(out: unknown): string[] {
   if (!out) return [];
-  if (typeof out === "string") return [out];
-  if (Array.isArray(out)) return out.filter((x): x is string => typeof x === "string");
+  // BytePlus/SyncNode often put failure messages in `output` as a plain string.
+  // Only treat URL-like strings as media so error text isn't shown as a "video".
+  if (typeof out === "string") return looksLikeUrl(out) ? [out] : [];
+  if (Array.isArray(out)) return out.filter((x): x is string => typeof x === "string" && looksLikeUrl(x));
   if (typeof out === "object") {
     const o = out as Record<string, any>;
-    if (typeof o.url === "string") return [o.url];
-    if (Array.isArray(o.images)) return o.images.map((i: any) => i?.url ?? i).filter((x: any) => typeof x === "string");
+    if (typeof o.url === "string" && looksLikeUrl(o.url)) return [o.url];
+    if (Array.isArray(o.images)) {
+      return o.images.map((i: any) => i?.url ?? i).filter((x: any) => typeof x === "string" && looksLikeUrl(x));
+    }
     if (o.output) return normalizeOutputs(o.output);
   }
   return [];
@@ -81,11 +89,20 @@ export async function pollStatus(apiKey: string, provider: string, jobId: string
   const succeeded = ["succeeded", "COMPLETED", "SUCCEEDED", "completed"].includes(rs);
   const failed = ["failed", "FAILED", "CANCELED", "CANCELLED", "cancelled", "canceled", "error"].includes(rs);
   const outputs = normalizeOutputs(data.output);
+  const rawOut = data.output;
+  const messageError =
+    (typeof rawOut === "string" && !looksLikeUrl(rawOut) ? rawOut.trim() : "") ||
+    (typeof data.error === "string" ? data.error.trim() : "") ||
+    "";
 
-  if (succeeded || (outputs.length && !failed)) return { status: "completed", outputs };
   if (failed) {
-    const error = typeof data.output === "string" ? data.output : data.error || "Generation failed";
-    return { status: "failed", outputs: [], error };
+    return { status: "failed", outputs: [], error: messageError || "Generation failed" };
   }
+  // Some providers finish the job as "succeeded" but put a rejection message in
+  // `output` instead of a media URL (BytePlus real-person blocks do this).
+  if (!outputs.length && messageError && (succeeded || /real person|sensitive|moderation|safety|content policy|flagged/i.test(messageError))) {
+    return { status: "failed", outputs: [], error: messageError };
+  }
+  if (succeeded || outputs.length) return { status: "completed", outputs };
   return { status: "processing", outputs: [] };
 }
