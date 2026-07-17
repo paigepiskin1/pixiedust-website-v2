@@ -20,13 +20,18 @@ const fields = allFields(template);
 const accent = template.accent ?? "var(--pd-lilac)";
 
 // Optional rich studio content stored in the template's `meta` JSON:
-//   { "howItWorks": ["Upload your photos", "Add the outfit pieces", ...] }
-// Renders a "How it works" panel in the left column when present.
+//   { "kicker": "Outfit try-on", "howItWorks": ["Upload your photos", ...] }
+// When present, the left column uses a Beauty-style intro (title + sub above
+// the preview, plus a numbered How it works panel).
 let howItWorks: string[] = [];
+let studioKicker = "";
 try {
   const m = template.meta ? JSON.parse(template.meta) : null;
   if (m && Array.isArray(m.howItWorks)) howItWorks = m.howItWorks.filter((s: unknown) => typeof s === "string").slice(0, 6);
+  if (m && typeof m.kicker === "string") studioKicker = m.kicker.trim();
 } catch { /* meta isn't JSON — ignore */ }
+const studioIntro = howItWorks.length > 0 || !!studioKicker;
+const introSub = template.description || template.subtitle || "";
 const credits = Astro.locals.user?.credits ?? 0;
 const signedIn = !!Astro.locals.user;
 
@@ -86,46 +91,74 @@ const config = {
           </span>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5l3-3"/></svg>
         </button>
-        <div class="overflow-hidden rounded-[20px]" style="border:0.5px solid var(--pd-hairline);aspect-ratio:4/3;background:var(--pd-bg2);">
-          {
-            template.previewVideo ? (
-              <video src={template.previewVideo} muted loop autoplay playsinline class="h-full w-full object-cover" />
-            ) : template.previewImage ? (
-              <img src={template.previewImage} alt={template.title} class="h-full w-full object-cover" />
-            ) : (
-              <Media tone={template.tone} angle={130} label={template.title} sub={template.kind ?? undefined} />
-            )
-          }
-        </div>
-        <div class="mt-2.5 flex items-center gap-2">
-          <Pill color={accent} label={template.kind} />
-          {template.type === "video" && <Pill color="var(--pd-pink)" label="Video" />}
-        </div>
-        <h1 class="mt-1.5 font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.4px;line-height:1.15;">{template.title}</h1>
-        {template.subtitle && <div class="mt-1 text-ink-3" style="font-size:11.5px;line-height:1.4;">{template.subtitle}</div>}
-        {template.description && (
-          <p class="mt-1.5 text-ink-3" style="font-size:11.5px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{template.description}</p>
-        )}
-        <div class="mt-2.5 flex flex-wrap gap-1.5">
-          {[["ETA", template.eta], ["Cost", `${template.creditCost} cr`], ["Type", template.type]].filter(([, v]) => v).map(([k, v]) => (
-            <span class="rounded-md font-mono" style="padding:4px 8px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:10px;color:var(--pd-ink2);">
-              <span style="color:var(--pd-ink4);">{k}</span> {v}
-            </span>
-          ))}
-        </div>
 
-        {howItWorks.length > 0 && (
-          <div class="mt-3.5 rounded-2xl" style="padding:15px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
-            <div class="mb-2.5 font-mono uppercase" style="font-size:9px;color:var(--pd-ink3);letter-spacing:0.7px;">How it works</div>
-            <ol class="flex flex-col gap-2.5" style="list-style:none;padding:0;margin:0;">
-              {howItWorks.map((step, i) => (
-                <li class="flex items-start gap-2.5">
-                  <span class="flex shrink-0 items-center justify-center rounded-full font-mono font-semibold" style={`width:18px;height:18px;font-size:10px;background:color-mix(in srgb,${accent} 18%,transparent);color:${accent};margin-top:1px;`}>{i + 1}</span>
-                  <span class="text-ink-2" style="font-size:12px;line-height:1.4;">{step}</span>
-                </li>
+        {studioIntro ? (
+          <>
+            {(studioKicker || template.kind) && (
+              <div class="mb-[7px] flex items-center gap-[7px]">
+                <span class="inline-block shrink-0 rounded-full" style={`width:5px;height:5px;background:${accent === "var(--pd-lilac)" ? "var(--pd-mint)" : accent};box-shadow:0 0 10px color-mix(in srgb,${accent === "var(--pd-lilac)" ? "var(--pd-mint)" : accent} 50%,transparent);`}></span>
+                <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:1.1px;">{studioKicker || template.kind}</span>
+              </div>
+            )}
+            <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.8px;line-height:1.05;">{template.title}</h1>
+            {introSub && (
+              <p class="mt-2 text-ink-3" style="font-size:13px;line-height:1.5;">{introSub}</p>
+            )}
+            <div class="mt-3 overflow-hidden rounded-[18px]" style="border:0.5px solid var(--pd-hairline);aspect-ratio:3/4;background:var(--pd-bg2);">
+              {
+                template.previewVideo ? (
+                  <video src={template.previewVideo} muted loop autoplay playsinline class="h-full w-full object-cover" />
+                ) : template.previewImage ? (
+                  <img src={template.previewImage} alt={template.title} class="h-full w-full object-cover" />
+                ) : (
+                  <Media tone={template.tone} angle={130} label={template.title} sub={template.kind ?? undefined} />
+                )
+              }
+            </div>
+            {howItWorks.length > 0 && (
+              <div class="mt-3.5 rounded-2xl" style="padding:15px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+                <div class="mb-2.5 font-mono uppercase" style="font-size:9px;color:var(--pd-ink3);letter-spacing:0.7px;">How it works</div>
+                <ol class="flex flex-col gap-2.5" style="list-style:none;padding:0;margin:0;">
+                  {howItWorks.map((step, i) => (
+                    <li class="flex items-start gap-2.5">
+                      <span class="flex shrink-0 items-center justify-center rounded-full font-mono font-semibold" style="width:18px;height:18px;font-size:10px;background:color-mix(in srgb,var(--pd-mint) 18%,transparent);color:var(--pd-mint);margin-top:1px;">{i + 1}</span>
+                      <span class="text-ink-2" style="font-size:12px;line-height:1.4;">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div class="overflow-hidden rounded-[20px]" style="border:0.5px solid var(--pd-hairline);aspect-ratio:4/3;background:var(--pd-bg2);">
+              {
+                template.previewVideo ? (
+                  <video src={template.previewVideo} muted loop autoplay playsinline class="h-full w-full object-cover" />
+                ) : template.previewImage ? (
+                  <img src={template.previewImage} alt={template.title} class="h-full w-full object-cover" />
+                ) : (
+                  <Media tone={template.tone} angle={130} label={template.title} sub={template.kind ?? undefined} />
+                )
+              }
+            </div>
+            <div class="mt-2.5 flex items-center gap-2">
+              <Pill color={accent} label={template.kind} />
+              {template.type === "video" && <Pill color="var(--pd-pink)" label="Video" />}
+            </div>
+            <h1 class="mt-1.5 font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.4px;line-height:1.15;">{template.title}</h1>
+            {template.subtitle && <div class="mt-1 text-ink-3" style="font-size:11.5px;line-height:1.4;">{template.subtitle}</div>}
+            {template.description && (
+              <p class="mt-1.5 text-ink-3" style="font-size:11.5px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{template.description}</p>
+            )}
+            <div class="mt-2.5 flex flex-wrap gap-1.5">
+              {[["ETA", template.eta], ["Cost", `${template.creditCost} cr`], ["Type", template.type]].filter(([, v]) => v).map(([k, v]) => (
+                <span class="rounded-md font-mono" style="padding:4px 8px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:10px;color:var(--pd-ink2);">
+                  <span style="color:var(--pd-ink4);">{k}</span> {v}
+                </span>
               ))}
-            </ol>
-          </div>
+            </div>
+          </>
         )}
       </aside>
 
