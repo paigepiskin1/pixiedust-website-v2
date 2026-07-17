@@ -73,6 +73,10 @@ function formatAccept(accept: string) {
               })}
             </div>
           </>
+        ) : f.type === "select" && (f as any).ui === "dropdown" ? (
+          <select data-field={f.key} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;">
+            {(f.options ?? []).map((o) => <option value={o.value} selected={o.value === String(f.default ?? f.options?.[0]?.value ?? "")}>{o.label}</option>)}
+          </select>
         ) : f.type === "select" ? (
           <>
             <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
@@ -175,6 +179,10 @@ function formatAccept(accept: string) {
         </button>`;
       }).join("");
       input = `<input type="hidden" data-field="${key}" value="${escAttr(current)}" /><div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fill,140px);gap:8px;justify-content:start;">${cards}</div>`;
+    } else if (type === "select" && Array.isArray(f.options) && f.ui === "dropdown") {
+      const current = def || String(f.options[0]?.value ?? f.options[0] ?? "");
+      const opts = f.options.map((o: any) => `<option value="${escAttr(String(o.value??o))}"${String(o.value??o)===current?" selected":""}>${escHtml(String(o.label??o.value??o))}</option>`).join("");
+      input = `<select data-field="${key}" style="${S}">${opts}</select>`;
     } else if (type === "select" && Array.isArray(f.options)) {
       const current = def || String(f.options[0]?.value ?? f.options[0] ?? "");
       const segs = f.options.map((o: any) => {

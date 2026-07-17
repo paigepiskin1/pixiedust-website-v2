@@ -29,6 +29,8 @@ export interface TemplateField {
   accept?: string;
   placeholder?: string;
   multiple?: boolean;
+  /** For select fields: "buttons" (default) or "dropdown". */
+  ui?: "buttons" | "dropdown";
 }
 
 export interface TemplateStep {

@@ -25,11 +25,15 @@ const accent = template.accent ?? "var(--pd-lilac)";
 // the preview, plus a numbered How it works panel).
 let howItWorks: string[] = [];
 let studioKicker = "";
+let hideSwitch = false;
 try {
   const m = template.meta ? JSON.parse(template.meta) : null;
   if (m && Array.isArray(m.howItWorks)) howItWorks = m.howItWorks.filter((s: unknown) => typeof s === "string").slice(0, 6);
   if (m && typeof m.kicker === "string") studioKicker = m.kicker.trim();
+  if (m && m.hideSwitch === true) hideSwitch = true;
 } catch { /* meta isn't JSON — ignore */ }
+// Flagship studios (e.g. Fashion) skip the switcher so the page reads like Beauty Studio.
+if (template.id === "outfit-tryon") hideSwitch = true;
 const studioIntro = howItWorks.length > 0 || !!studioKicker;
 const introSub = template.description || template.subtitle || "";
 const credits = Astro.locals.user?.credits ?? 0;
@@ -83,14 +87,15 @@ const config = {
     <div class="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_minmax(0,1fr)] lg:[grid-auto-rows:1fr] lg:min-h-[calc(100vh-128px)]">
       <!-- LEFT: template card -->
       <aside class="lg:sticky lg:top-[88px] lg:self-start">
-        <!-- Switch template (opens gallery modal) -->
-        <button type="button" id="pd-switch-btn" class="mb-3 flex w-full items-center justify-between gap-2 rounded-xl text-ink" style="padding:10px 13px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);cursor:pointer;font-size:13px;">
-          <span class="flex min-w-0 items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
-            <span class="truncate">Switch template</span>
-          </span>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5l3-3"/></svg>
-        </button>
+        {!hideSwitch && (
+          <button type="button" id="pd-switch-btn" class="mb-3 flex w-full items-center justify-between gap-2 rounded-xl text-ink" style="padding:10px 13px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);cursor:pointer;font-size:13px;">
+            <span class="flex min-w-0 items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+              <span class="truncate">Switch template</span>
+            </span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5l3-3"/></svg>
+          </button>
+        )}
 
         {studioIntro ? (
           <>
