@@ -43,13 +43,14 @@ function formatAccept(accept: string) {
             <div class="pd-multi-previews" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
           ) : (
             <div class="pd-file-preview overflow-hidden rounded-xl" style="display:none;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);margin-top:4px;">
-              <img class="pd-preview-img block" style="max-height:300px;max-width:100%;width:auto;height:auto;object-fit:contain;margin:0 auto;" alt="" />
+              <img class="pd-preview-img block" style="max-height:300px;max-width:100%;width:100%;height:auto;object-fit:contain;margin:0 auto;background:var(--pd-bg3);" alt="" />
               <div class="flex items-center justify-between gap-2" style="padding:7px 10px;border-top:0.5px solid var(--pd-hairline);">
                 <span class="pd-preview-status truncate" style="font-size:11px;color:var(--pd-ink3);"></span>
                 <button type="button" class="pd-file-clear flex shrink-0 items-center justify-center rounded-full" style="width:20px;height:20px;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink3);font-size:10px;cursor:pointer;" aria-label="Remove">✕</button>
               </div>
             </div>
           )}
+          <div class="pd-upload-error" style="display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--pd-pink) 12%,transparent);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);font-size:12px;line-height:1.35;"></div>
         </div>
         {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
       </div>
@@ -153,13 +154,14 @@ function formatAccept(accept: string) {
           ${isMulti
             ? `<div class="pd-multi-previews" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>`
             : `<div class="pd-file-preview" style="display:none;overflow:hidden;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);margin-top:4px;">
-                <img class="pd-preview-img" style="display:block;max-width:100%;width:auto;height:auto;max-height:300px;object-fit:contain;margin:0 auto;" alt="" />
+                <img class="pd-preview-img" style="display:block;max-width:100%;width:100%;height:auto;max-height:300px;object-fit:contain;margin:0 auto;background:var(--pd-bg3);" alt="" />
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-top:0.5px solid var(--pd-hairline);">
                   <span class="pd-preview-status" style="font-size:11px;color:var(--pd-ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
                   <button type="button" class="pd-file-clear" style="flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink3);font-size:10px;cursor:pointer;line-height:1;">✕</button>
                 </div>
               </div>`
           }
+          <div class="pd-upload-error" style="display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--pd-pink) 12%,transparent);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);font-size:12px;line-height:1.35;"></div>
         </div>
         ${help}
       </div>`;
@@ -209,6 +211,10 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
 
 // ── File upload wiring ────────────────────────────────────────────────────────
 (window as any).pdInitFieldPanel = function(root: HTMLElement, fileUrls: Record<string, any>) {
+  // Avoid double-binding when Astro re-executes scripts or a page calls init twice.
+  if ((root as any)._pdFieldPanelReady) return;
+  (root as any)._pdFieldPanelReady = true;
+  (root as any)._pdFileUrls = fileUrls;
   // Track in-flight uploads on the panel element so callers (e.g. the studio
   // Generate button) can avoid submitting before files finish uploading.
   (root as any)._pdUploading = Number((root as any)._pdUploading) || 0;
@@ -218,7 +224,8 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
 
   async function handleUpload(file: File, key: string,
     zone: HTMLElement|null, preview: HTMLElement|null,
-    previewImg: HTMLImageElement|null, status: HTMLElement|null
+    previewImg: HTMLImageElement|null, status: HTMLElement|null,
+    errorEl: HTMLElement|null
   ) {
     const localUrl = URL.createObjectURL(file);
     // Videos can't preview in an <img> — swap in a <video> for video uploads.
@@ -243,16 +250,20 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     if (zone) zone.style.display = "none";
     if (preview) { preview.classList.remove("hidden"); preview.style.display = "block"; }
     if (status) { status.textContent = "Uploading…"; status.style.color = "var(--pd-ink3)"; }
+    if (errorEl) { errorEl.style.display = "none"; errorEl.textContent = ""; }
     const fd = new FormData();
     fd.append("file", file);
     bump(1);
     // Restore the upload box so a failed/timed-out upload is never a dead end.
+    // Surface the error on a always-visible banner (the preview status is hidden
+    // when we restore the zone — that made failures look like the photo "vanished").
     const restoreZone = (msg: string) => {
       delete fileUrls[key];
       URL.revokeObjectURL(localUrl);
       if (preview) preview.style.display = "none";
       if (zone) zone.style.display = "";
       if (status) { status.textContent = msg; status.style.color = "var(--pd-pink)"; }
+      if (errorEl) { errorEl.textContent = msg; errorEl.style.display = "block"; }
       (root as any)._pdUploadError = msg; // surfaced by the caller if needed
     };
     const ctrl = new AbortController();
@@ -262,11 +273,36 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.url) {
         fileUrls[key] = d.url;
-        if (mediaEl) mediaEl.src = d.url;
-        URL.revokeObjectURL(localUrl);
+        // Keep the local blob on screen until the hosted URL paints — swapping
+        // immediately + revoking the blob made successful uploads look blank
+        // when the CDN was slow or briefly unavailable.
+        const hosted = String(d.url);
+        if (mediaEl) {
+          const swap = () => {
+            if (mediaEl) mediaEl.src = hosted;
+            URL.revokeObjectURL(localUrl);
+          };
+          if (mediaEl instanceof HTMLImageElement) {
+            const probe = new Image();
+            probe.onload = swap;
+            probe.onerror = () => {
+              // Hosted URL failed to load — keep the local preview so the photo
+              // doesn't disappear; generate still has the CDN url in fileUrls.
+              URL.revokeObjectURL(localUrl);
+            };
+            probe.src = hosted;
+          } else {
+            swap();
+          }
+        } else {
+          URL.revokeObjectURL(localUrl);
+        }
         if (status) { status.textContent = "✓ Uploaded"; status.style.color = "var(--pd-mint)"; }
+        if (errorEl) { errorEl.style.display = "none"; errorEl.textContent = ""; }
       } else {
-        restoreZone(d.error || "Upload failed — try another file.");
+        const msg = d.error || "Upload failed — try another file.";
+        // Auth failures are the most common "photo vanished" report.
+        restoreZone(r.status === 401 ? "Sign in to upload your photo." : msg);
       }
     } catch (err) {
       restoreZone((err as Error)?.name === "AbortError" ? "Upload timed out — try a smaller file." : "Upload failed — try again.");
@@ -313,7 +349,10 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           const r = await fetch("/api/upload", { method: "POST", body: fd });
           const d = await r.json();
           if (r.ok) {
-            urls.push(d.url); img.src = d.url; URL.revokeObjectURL(img.src);
+            const blobSrc = img.src;
+            urls.push(d.url);
+            img.src = d.url;
+            URL.revokeObjectURL(blobSrc);
             spinner.remove();
             const x = document.createElement("button");
             x.type = "button"; x.textContent = "✕";
@@ -367,16 +406,24 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     const previewImg = wrap?.querySelector<HTMLImageElement>(".pd-preview-img");
     const status     = wrap?.querySelector<HTMLElement>(".pd-preview-status");
     const clearBtn   = wrap?.querySelector<HTMLElement>(".pd-file-clear");
+    const errorEl    = wrap?.querySelector<HTMLElement>(".pd-upload-error") ?? null;
 
-    el.addEventListener("change", async () => { const f=el.files?.[0]; if(f) await handleUpload(f, key, zone??null, preview??null, previewImg??null, status??null); });
+    el.addEventListener("change", async () => { const f=el.files?.[0]; if(f) await handleUpload(f, key, zone??null, preview??null, previewImg??null, status??null, errorEl); });
     let dc2 = 0;
     const hl2  = () => { if(zone){zone.style.borderColor="var(--pd-lilac)";zone.style.background="color-mix(in srgb,var(--pd-lilac) 6%,var(--pd-bg))";} };
     const uhl2 = () => { if(zone){zone.style.borderColor="";zone.style.background="";} };
     el.addEventListener("dragenter", e=>{e.preventDefault();if(++dc2===1)hl2();});
     el.addEventListener("dragleave",  ()=>{if(--dc2===0)uhl2();});
     el.addEventListener("dragover",   e=>e.preventDefault());
-    el.addEventListener("drop", async e=>{e.preventDefault();dc2=0;uhl2();const f=(e as DragEvent).dataTransfer?.files?.[0];if(f)await handleUpload(f,key,zone??null,preview??null,previewImg??null,status??null);});
-    clearBtn?.addEventListener("click",()=>{delete fileUrls[key];el.value="";if(previewImg)previewImg.src="";if(preview)preview.style.display="none";if(zone)zone.style.display="";});
+    el.addEventListener("drop", async e=>{e.preventDefault();dc2=0;uhl2();const f=(e as DragEvent).dataTransfer?.files?.[0];if(f)await handleUpload(f,key,zone??null,preview??null,previewImg??null,status??null,errorEl);});
+    clearBtn?.addEventListener("click",()=>{
+      delete fileUrls[key];
+      el.value="";
+      if(previewImg)previewImg.src="";
+      if(preview)preview.style.display="none";
+      if(zone)zone.style.display="";
+      if(errorEl){errorEl.style.display="none";errorEl.textContent="";}
+    });
 
     // Preload a reference image from the field's default.
     try {
