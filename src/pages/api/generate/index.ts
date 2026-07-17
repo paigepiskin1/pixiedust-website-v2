@@ -78,8 +78,8 @@ export async function POST({ request, locals }: APIContext) {
     }));
     // Make workspace controls available to step inputs via {{duration}}/{{aspect}}/{{quantity}}.
     const chainInputs: Record<string, unknown> = { ...inputs };
-    if (duration) chainInputs.duration = duration;
-    if (body.aspect) chainInputs.aspect = body.aspect;
+    chainInputs.duration = duration || template.durations?.[0] || 5;
+    chainInputs.aspect = body.aspect || template.aspects?.[0] || "16:9";
     chainInputs.quantity = qty;
     const chain = { stepIndex: 0, userInputs: chainInputs, steps };
     const step0Input = resolveChainStep(steps[0].input, { user: chainInputs, outputs: {} }) as Record<string, unknown>;
