@@ -479,8 +479,11 @@ const config = {
     // failures (e.g. the model's safety filter) aren't the user's fault.
     function friendlyError(raw: unknown): string {
       const e = String(raw ?? "").replace(/\s*\(refunded\)\s*$/i, "");
-      if (/real person|contain real|likeness|face.*(block|reject)|e005|flagged as sensitive|safety|moderation|content policy|nsfw|sensitive/i.test(e))
+      // BytePlus Seedance uses this exact phrasing — keep it separate from GPT E005/sensitive.
+      if (/real person/i.test(e))
         return "BytePlus blocked this photo — Seedance can't animate real people. You weren't charged; try an illustration, AI portrait, or a different model.";
+      if (/e005|flagged as sensitive|safety|moderation|content policy|nsfw|sensitive/i.test(e))
+        return "The model's safety filter blocked this — it often triggers on real faces or sensitive content. You weren't charged; try a different photo or prompt.";
       if (/rate limit|slow down/i.test(e)) return "Too many requests right now. You weren't charged — try again in a minute.";
       if (/timeout|timed out/i.test(e)) return "This took too long and timed out. You weren't charged — try again.";
       if (/not enough credits/i.test(e)) return "Not enough credits.";
