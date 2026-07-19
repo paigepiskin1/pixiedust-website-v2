@@ -4,6 +4,7 @@ import Sidebar from "../components/shell/Sidebar.astro";
 import Topbar from "../components/shell/Topbar.astro";
 import MobileDrawer from "../components/shell/MobileDrawer.astro";
 import Toast from "../components/ui/Toast.astro";
+import FirstVisitSignup from "../components/FirstVisitSignup.astro";
 
 interface Props {
   title?: string;
@@ -55,6 +56,7 @@ const credits = user?.credits ?? Astro.props.credits ?? 47;
   </div>
   <MobileDrawer credits={credits} user={user} />
   <Toast />
+  {!user && <FirstVisitSignup />}
 
   <script is:inline>
     // Hydrate auth state into the shell (static pages render the logged-out
@@ -74,6 +76,12 @@ const credits = user?.credits ?? Astro.props.credits ?? 47;
           // Topbar CTA: Free → "Upgrade", paid plan → plan badge.
           document.documentElement.setAttribute("data-plan", (plan && plan.id) || "free");
           if (plan && plan.name) set(".pd-plan-name", (e) => (e.textContent = plan.name));
+          // Hide first-visit signup if auth hydrated after paint.
+          var welcome = document.getElementById("pd-welcome");
+          if (welcome) {
+            welcome.style.display = "none";
+            welcome.hidden = true;
+          }
         } else {
           document.documentElement.setAttribute("data-auth", "out");
         }
