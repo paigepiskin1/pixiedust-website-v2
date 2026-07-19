@@ -33,7 +33,15 @@ export async function submitGeneration(
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, any>;
   if (!res.ok || !data.job_id) {
-    throw new Error(data.error || data.detail || `SyncNode submit failed (${res.status})`);
+    const detail =
+      (typeof data.error === "string" && data.error) ||
+      (typeof data.detail === "string" && data.detail) ||
+      (typeof data.message === "string" && data.message) ||
+      (data.error && typeof data.error === "object"
+        ? JSON.stringify(data.error)
+        : "") ||
+      `SyncNode submit failed (${res.status})`;
+    throw new Error(detail);
   }
   return { jobId: data.job_id };
 }

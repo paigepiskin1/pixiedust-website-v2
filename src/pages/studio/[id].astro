@@ -489,6 +489,8 @@ const config = {
       if (/rate limit|slow down/i.test(e)) return "Too many requests right now. You weren't charged — try again in a minute.";
       if (/timeout|timed out/i.test(e)) return "This took too long and timed out. You weren't charged — try again.";
       if (/not enough credits/i.test(e)) return "Not enough credits.";
+      if (/\b422\b|aspect_ratio|invalid.*(aspect|ratio|input)/i.test(e))
+        return "That aspect ratio isn't supported by this model. You weren't charged — try 1:1, 2:3, or 3:2.";
       return (e || "Generation failed") + " — you weren't charged.";
     }
 

@@ -119,6 +119,24 @@ export async function POST({ request, locals }: APIContext) {
   if (effectiveAspect === "match" || effectiveAspect === "match_input_image") {
     effectiveAspect = /gpt-image/i.test(template.model) ? "auto" : "match_input_image";
   }
+  // openai/gpt-image-2 on Replicate only accepts 1:1 | 3:2 | 2:3 | auto.
+  // Map common studio ratios to the nearest supported value so 4:5 / 9:16 / 16:9
+  // don't 422 at submit (shown in the studio as a generic 502).
+  if (effectiveAspect && /gpt-image/i.test(template.model)) {
+    const gptAspect: Record<string, string> = {
+      auto: "auto",
+      "1:1": "1:1",
+      "3:2": "3:2",
+      "2:3": "2:3",
+      "16:9": "3:2",
+      "4:3": "3:2",
+      "9:16": "2:3",
+      "4:5": "2:3",
+      "3:4": "2:3",
+      "5:4": "1:1",
+    };
+    effectiveAspect = gptAspect[effectiveAspect] ?? "1:1";
+  }
   if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
   // BytePlus (Ark) uses `ratio` instead of `aspect_ratio`.
   if (effectiveAspect && effectiveAspect !== "match" && "ratio" in input) input.ratio = effectiveAspect;
