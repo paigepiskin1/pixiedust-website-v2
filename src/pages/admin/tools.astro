@@ -6,11 +6,13 @@ import { QUICK_TOOLS } from "../../lib/content";
 import { getToolCards } from "../../lib/tool-cards";
 import { getHeroPicks } from "../../lib/hero";
 import { getTemplate, listTemplates } from "../../lib/templates";
+import { listAdminMedia } from "../../lib/admin-media";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
 
 const db = Astro.locals.runtime.env.DB;
 const media = await getToolCards(db);
+const library = await listAdminMedia(db, 200);
 const card = "background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;overflow:hidden;";
 
 // Curated homepage hero (#pd-hero) picks — resolve each to a display row
@@ -42,10 +44,54 @@ if (picks.length === 0) {
 
 <AdminShell title="Admin · Homepage" tab="tools">
   <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Homepage</h1>
-  <p class="mt-1 text-ink-3" style="font-size:13.5px;">Everything that shows on the home page — the big rotating hero and the “Start a project” tool cards.</p>
+  <p class="mt-1 text-ink-3" style="font-size:13.5px;">Everything that shows on the home page — the big rotating hero and the “Start a project” tool cards. Plus a media library for CDN links.</p>
+
+  <!-- ── Uploaded media library ───────────────────────────────────────────── -->
+  <div style="margin-top:26px;">
+    <h2 class="font-display font-medium text-ink" style="font-size:22px;letter-spacing:-0.5px;">Uploaded media</h2>
+    <p class="mt-1 text-ink-3" style="font-size:13px;">Upload images or videos to Bunny CDN, then copy the public URL for templates, heroes, or docs.</p>
+
+    <div class="mt-4" style={card + "padding:16px;"}>
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="rounded-lg font-semibold" style="position:relative;padding:9px 14px;font-size:12.5px;background:var(--pd-lilac);color:#0A0A0B;cursor:pointer;overflow:hidden;">
+          <span id="pd-lib-up-label">Upload files</span>
+          <input id="pd-lib-files" type="file" accept="image/*,video/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+        </label>
+        <span id="pd-lib-status" style="font-size:12px;color:var(--pd-ink3);"></span>
+      </div>
+      <div class="mt-2 text-ink-4" style="font-size:10.5px;">PNG, JPG, WebP, GIF, MP4, MOV, WebM · up to 110MB each · multiple files ok</div>
+    </div>
+
+    <div id="pd-lib-grid" class="mt-5 flex flex-wrap gap-3">
+      {library.length === 0 && (
+        <div id="pd-lib-empty" class="text-ink-4" style="font-size:12.5px;">No uploads yet — drop a file above to get a link.</div>
+      )}
+      {library.map((item) => (
+        <div class="pd-lib-item" data-id={item.id} data-url={item.url} style={card + "width:220px;"}>
+          <div style="position:relative;height:120px;background:var(--pd-bg3);overflow:hidden;">
+            {item.kind === "video" ? (
+              <video src={item.url} muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;" />
+            ) : (
+              <img src={item.url} alt={item.filename || "upload"} style="width:100%;height:100%;object-fit:cover;" />
+            )}
+            <span style="position:absolute;top:6px;left:6px;padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font-size:8px;letter-spacing:0.4px;text-transform:uppercase;">{item.kind}</span>
+          </div>
+          <div style="padding:10px 12px;">
+            <div class="truncate font-semibold text-ink" style="font-size:12px;" title={item.filename || item.url}>{item.filename || "Untitled"}</div>
+            <div class="mt-1 truncate font-mono" style="font-size:9.5px;color:var(--pd-ink4);" title={item.url}>{item.url}</div>
+            <div class="mt-2.5 flex items-center gap-1.5">
+              <button type="button" class="pd-lib-copy rounded-lg font-semibold" style="padding:5px 9px;font-size:11px;background:var(--pd-ink);color:var(--pd-bg);border:none;cursor:pointer;">Copy link</button>
+              <a href={item.url} target="_blank" rel="noopener" class="rounded-lg font-mono uppercase" style="padding:5px 8px;font-size:9.5px;letter-spacing:0.4px;color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);text-decoration:none;">Open</a>
+              <button type="button" class="pd-lib-del font-mono uppercase" style="margin-left:auto;font-size:9.5px;letter-spacing:0.4px;color:var(--pd-pink);background:none;border:none;cursor:pointer;">Remove</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
 
   <!-- ── Homepage hero (#pd-hero) ─────────────────────────────────────────── -->
-  <div style="margin-top:26px;">
+  <div style="margin-top:40px;padding-top:28px;border-top:0.5px solid var(--pd-hairline);">
     <h2 class="font-display font-medium text-ink" style="font-size:22px;letter-spacing:-0.5px;">Homepage hero</h2>
     <p class="mt-1 text-ink-3" style="font-size:13px;">The big rotating hero at the top of the home page (<span class="font-mono">#pd-hero</span>). Pick existing templates or add custom slides. Empty = automatic (top video templates).</p>
 
@@ -174,6 +220,117 @@ if (picks.length === 0) {
   </div>
 
   <script>
+    // ── Uploaded media library ──
+    const libGrid = document.getElementById("pd-lib-grid")!;
+    const libStatus = document.getElementById("pd-lib-status")!;
+    const libToast = (m: string, a?: string) => (window as any).pdToast?.(m, a ? { accent: a } : undefined);
+    const libCard = "background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-radius:16px;overflow:hidden;width:220px;";
+
+    function escAttr(s: string) {
+      return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    }
+    function escHtml(s: string) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function wireLibItem(el: HTMLElement) {
+      const url = el.dataset.url || "";
+      el.querySelector(".pd-lib-copy")?.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(url);
+          libToast("Link copied.", "var(--pd-mint)");
+        } catch {
+          prompt("Copy this URL:", url);
+        }
+      });
+      el.querySelector(".pd-lib-del")?.addEventListener("click", async () => {
+        const id = el.dataset.id;
+        if (!id) return;
+        const ok = await (window as any).pdConfirm?.("Remove this media from the library? (CDN file is not deleted.)");
+        if (ok === false) return;
+        const r = await fetch("/api/admin/media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, delete: true }),
+        });
+        if (!r.ok) { libToast("Could not remove.", "var(--pd-pink)"); return; }
+        el.remove();
+        if (!libGrid.querySelector(".pd-lib-item")) {
+          const empty = document.createElement("div");
+          empty.id = "pd-lib-empty";
+          empty.className = "text-ink-4";
+          empty.style.cssText = "font-size:12.5px;";
+          empty.textContent = "No uploads yet — drop a file above to get a link.";
+          libGrid.appendChild(empty);
+        }
+        libToast("Removed from library.", "var(--pd-pink)");
+      });
+    }
+
+    function prependLibItem(item: { id: string; url: string; kind: string; filename?: string | null }) {
+      document.getElementById("pd-lib-empty")?.remove();
+      const name = item.filename || "Untitled";
+      const wrap = document.createElement("div");
+      wrap.className = "pd-lib-item";
+      wrap.dataset.id = item.id;
+      wrap.dataset.url = item.url;
+      wrap.setAttribute("style", libCard);
+      const media = item.kind === "video"
+        ? `<video src="${escAttr(item.url)}" muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>`
+        : `<img src="${escAttr(item.url)}" alt="${escAttr(name)}" style="width:100%;height:100%;object-fit:cover;" />`;
+      wrap.innerHTML =
+        `<div style="position:relative;height:120px;background:var(--pd-bg3);overflow:hidden;">${media}` +
+        `<span style="position:absolute;top:6px;left:6px;padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font-size:8px;letter-spacing:0.4px;text-transform:uppercase;">${escHtml(item.kind)}</span></div>` +
+        `<div style="padding:10px 12px;">` +
+        `<div class="truncate font-semibold text-ink" style="font-size:12px;" title="${escAttr(name)}">${escHtml(name)}</div>` +
+        `<div class="mt-1 truncate font-mono" style="font-size:9.5px;color:var(--pd-ink4);" title="${escAttr(item.url)}">${escHtml(item.url)}</div>` +
+        `<div class="mt-2.5 flex items-center gap-1.5">` +
+        `<button type="button" class="pd-lib-copy rounded-lg font-semibold" style="padding:5px 9px;font-size:11px;background:var(--pd-ink);color:var(--pd-bg);border:none;cursor:pointer;">Copy link</button>` +
+        `<a href="${escAttr(item.url)}" target="_blank" rel="noopener" class="rounded-lg font-mono uppercase" style="padding:5px 8px;font-size:9.5px;letter-spacing:0.4px;color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);text-decoration:none;">Open</a>` +
+        `<button type="button" class="pd-lib-del font-mono uppercase" style="margin-left:auto;font-size:9.5px;letter-spacing:0.4px;color:var(--pd-pink);background:none;border:none;cursor:pointer;">Remove</button>` +
+        `</div></div>`;
+      libGrid.prepend(wrap);
+      wireLibItem(wrap);
+    }
+
+    document.querySelectorAll<HTMLElement>(".pd-lib-item").forEach(wireLibItem);
+
+    document.getElementById("pd-lib-files")?.addEventListener("change", async (ev) => {
+      const input = ev.target as HTMLInputElement;
+      const files = Array.from(input.files || []);
+      if (!files.length) return;
+      const label = document.getElementById("pd-lib-up-label")!;
+      label.textContent = "Uploading…";
+      libStatus.textContent = "";
+      let ok = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        libStatus.textContent = `Uploading ${i + 1}/${files.length}: ${file.name}`;
+        const fd = new FormData();
+        fd.append("file", file);
+        try {
+          const up = await fetch("/api/upload", { method: "POST", body: fd });
+          const upd = await up.json();
+          if (!up.ok) { libToast(upd.error || `Failed: ${file.name}`, "var(--pd-pink)"); continue; }
+          const res = await fetch("/api/admin/media", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: upd.url, kind: upd.kind, filename: file.name, bytes: file.size }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.item) { libToast(data.error || "Save failed", "var(--pd-pink)"); continue; }
+          prependLibItem(data.item);
+          ok++;
+        } catch {
+          libToast(`Upload failed: ${file.name}`, "var(--pd-pink)");
+        }
+      }
+      label.textContent = "Upload files";
+      libStatus.textContent = ok ? `${ok} uploaded.` : "";
+      if (ok) libToast(ok === 1 ? "Uploaded — copy the link below." : `${ok} files uploaded.`, "var(--pd-mint)");
+      input.value = "";
+    });
+
     document.querySelectorAll<HTMLElement>(".pd-tool").forEach((cardEl) => {
       const href = cardEl.dataset.href!;
       const input = cardEl.querySelector<HTMLInputElement>('input[type="file"]')!;
