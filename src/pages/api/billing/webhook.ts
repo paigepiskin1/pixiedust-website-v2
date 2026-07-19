@@ -62,9 +62,9 @@ export async function POST({ request, locals }: APIContext) {
       if (!userId) return ok("no user");
       if (await alreadyProcessed(db, obj.id)) return ok("duplicate");
 
-      if (meta.kind === "pack") {
-        await adjustBalance(db, userId, credits, { reason: "purchase", refType: "purchase", refId: obj.id, note: meta.pack_id });
-        fire(notifyPurchase(env, { kind: "pack", credits, label: meta.pack_id, email: await emailFor(db, userId), amountUsd: obj.amount_total ? obj.amount_total / 100 : null }));
+      if (meta.kind === "pack" || meta.kind === "custom") {
+        await adjustBalance(db, userId, credits, { reason: "purchase", refType: "purchase", refId: obj.id, note: meta.pack_id || "custom" });
+        fire(notifyPurchase(env, { kind: "pack", credits, label: meta.pack_id || "custom", email: await emailFor(db, userId), amountUsd: obj.amount_total ? obj.amount_total / 100 : null }));
       } else if (meta.kind === "sub") {
         await db
           .prepare(
