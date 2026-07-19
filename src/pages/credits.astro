@@ -156,39 +156,69 @@ const creditBoost = packDiscountPct > 0 ? 100 / (100 - packDiscountPct) : 1;
   </div>
 
   <script>
-    const signedIn = !!document.querySelector("[data-auth]") || true;
-    const msg = document.getElementById("pd-billing-msg")!;
+    const msg = document.getElementById("pd-billing-msg");
     const params = new URLSearchParams(location.search);
-    if (params.get("status") === "success") {
+    if (msg && params.get("status") === "success") {
       msg.classList.remove("hidden");
       msg.style.background = "color-mix(in srgb, var(--pd-mint) 12%, transparent)";
       msg.style.color = "var(--pd-mint)";
       msg.textContent = "Payment complete — credits land on your balance once Stripe confirms.";
-    } else if (params.get("status") === "cancel") {
+    } else if (msg && params.get("status") === "cancel") {
       msg.classList.remove("hidden");
       msg.style.background = "var(--pd-bg2)";
       msg.style.color = "var(--pd-ink2)";
       msg.textContent = "Checkout canceled — no charge made.";
     }
 
+    function isSignedIn() {
+      return document.documentElement.getAttribute("data-auth") === "in";
+    }
+
     async function startCheckout(body: Record<string, unknown>, btn: HTMLButtonElement) {
+      if (!isSignedIn()) {
+        window.location.href = "/auth/sign-in?redirect=/credits";
+        return;
+      }
       const orig = btn.textContent;
       btn.disabled = true;
       btn.textContent = "Redirecting…";
       try {
-        const res = await fetch("/api/billing/checkout", {
+        const res = await fetch("/api/credits/checkout", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify(body),
         });
-        const data = await res.json();
-        if (res.status === 401) { window.location.href = "/auth/sign-in?redirect=/credits"; return; }
-        if (data.url) window.location.href = data.url;
-        else { btn.disabled = false; btn.textContent = orig; (window as any).pdToast?.(data.error || "Could not start checkout."); }
-      } catch {
+        let data: { url?: string; error?: string } = {};
+        const text = await res.text();
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          btn.disabled = false;
+          btn.textContent = orig;
+          (window as any).pdToast?.(res.ok ? "Could not start checkout." : `Checkout failed (${res.status}). Try again.`);
+          return;
+        }
+        if (res.status === 401) {
+          window.location.href = "/auth/sign-in?redirect=/credits";
+          return;
+        }
+        if (data.url) {
+          window.location.href = data.url;
+          return;
+        }
         btn.disabled = false;
         btn.textContent = orig;
-        (window as any).pdToast?.("Network error.");
+        (window as any).pdToast?.(data.error || "Could not start checkout.");
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = orig;
+        const blocked = err instanceof TypeError;
+        (window as any).pdToast?.(
+          blocked
+            ? "Could not reach checkout — disable ad blockers for this site and try again."
+            : "Network error — check your connection and try again."
+        );
       }
     }
 
