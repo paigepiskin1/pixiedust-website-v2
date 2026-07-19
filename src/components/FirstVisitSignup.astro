@@ -1,0 +1,166 @@
+---
+// First-visit welcome modal for logged-out visitors — mini signup tease that
+// routes to /auth/sign-in?mode=signup. Shown once via localStorage.
+const preview =
+  "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/f6aaf3b6-c283-4204-85f9-26efbc5951ea.mp4";
+---
+
+<div
+  id="pd-welcome"
+  class="pd-welcome"
+  hidden
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="pd-welcome-title"
+  style="position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(6,6,8,0.72);backdrop-filter:blur(14px);"
+>
+  <div
+    class="pd-welcome-card"
+    style="position:relative;width:min(920px,100%);max-height:min(88vh,720px);overflow:hidden;border-radius:22px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg2);box-shadow:0 40px 100px rgba(0,0,0,0.55);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,0.95fr);"
+  >
+    <button
+      type="button"
+      id="pd-welcome-close"
+      aria-label="Close"
+      style="position:absolute;top:12px;right:12px;z-index:2;width:34px;height:34px;border-radius:999px;border:0.5px solid rgba(255,255,255,0.18);background:rgba(10,10,11,0.45);color:#fff;cursor:pointer;font-size:18px;line-height:1;backdrop-filter:blur(8px);"
+    >×</button>
+
+    <div class="pd-welcome-media" style="position:relative;min-height:220px;overflow:hidden;">
+      <video
+        class="pd-welcome-video"
+        src={preview}
+        muted
+        loop
+        playsinline
+        autoplay
+        preload="metadata"
+        style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"
+      ></video>
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.08) 45%, rgba(0,0,0,0.72) 100%);"></div>
+      <div style="position:absolute;left:18px;top:16px;display:flex;align-items:center;gap:8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="11" stroke="#fff" stroke-width="1.4"></circle>
+          <circle cx="12" cy="12" r="5.5" fill="#fff"></circle>
+          <circle cx="12" cy="12" r="2" fill="rgba(10,10,11,0.9)"></circle>
+        </svg>
+        <span class="font-display font-semibold text-white" style="font-size:15px;letter-spacing:-0.35px;">PixieDust</span>
+      </div>
+      <div style="position:absolute;left:18px;right:18px;bottom:16px;">
+        <div class="font-mono uppercase" style="font-size:9.5px;color:rgba(255,255,255,0.7);letter-spacing:1.1px;">Photoshoots · HD presets</div>
+        <div class="font-display font-medium text-white" style="margin-top:6px;font-size:22px;letter-spacing:-0.55px;line-height:1.05;">Your best shot,<br />no studio needed.</div>
+      </div>
+    </div>
+
+    <div class="pd-welcome-body" style="padding:28px 26px 24px;display:flex;flex-direction:column;justify-content:center;">
+      <div class="font-mono font-semibold uppercase" style="font-size:10px;color:var(--pd-lilac);letter-spacing:1.1px;">Sign up · 5 free credits</div>
+      <h2 id="pd-welcome-title" class="font-display font-medium text-ink" style="margin-top:8px;font-size:clamp(24px,3.4vw,30px);letter-spacing:-0.8px;line-height:1.08;">
+        Want to start creating photoshoots or editing your photos with HD presets?
+      </h2>
+      <p class="text-ink-3" style="margin-top:10px;font-size:13.5px;line-height:1.5;letter-spacing:-0.1px;">
+        Jump into viral looks, photoshoot packs, and pro image edits — free to start with 5 credits.
+      </p>
+
+      <div style="margin-top:18px;display:flex;flex-direction:column;gap:8px;">
+        <a
+          id="pd-welcome-cta"
+          href="/auth/sign-in?mode=signup"
+          class="rounded-[11px] font-bold text-center"
+          style="padding:13px 16px;font-size:14px;background:var(--pd-lilac);color:#0A0A0B;text-decoration:none;"
+        >Start creating free</a>
+        <button
+          type="button"
+          id="pd-welcome-later"
+          class="rounded-[11px] font-semibold"
+          style="padding:11px 16px;font-size:13px;background:transparent;border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);cursor:pointer;"
+        >Maybe later</button>
+      </div>
+
+      <p class="font-mono" style="margin-top:14px;font-size:10px;color:var(--pd-ink4);letter-spacing:0.3px;">
+        Already have an account?
+        <a href="/auth/sign-in?mode=login" id="pd-welcome-login" style="color:var(--pd-ink3);">Sign in</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<style>
+  @media (max-width: 760px) {
+    .pd-welcome-card {
+      grid-template-columns: 1fr !important;
+      max-height: min(92vh, 780px) !important;
+      overflow: auto !important;
+    }
+    .pd-welcome-media {
+      min-height: 190px !important;
+      aspect-ratio: 16 / 10;
+    }
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    var KEY = "pd-welcome-seen";
+    var host = document.getElementById("pd-welcome");
+    if (!host) return;
+    if (localStorage.getItem(KEY)) return;
+    // Skip auth/admin surfaces even if this component is ever mounted there.
+    var path = location.pathname || "";
+    if (path.indexOf("/auth") === 0 || path.indexOf("/admin") === 0) return;
+
+    var shown = false;
+    function markSeen() {
+      try { localStorage.setItem(KEY, "1"); } catch (e) {}
+    }
+    function hide() {
+      host.style.display = "none";
+      host.hidden = true;
+      document.documentElement.style.removeProperty("overflow");
+      var v = host.querySelector(".pd-welcome-video");
+      if (v) try { v.pause(); } catch (e) {}
+    }
+    function show() {
+      if (shown) return;
+      if (document.documentElement.getAttribute("data-auth") === "in") return;
+      if (localStorage.getItem(KEY)) return;
+      shown = true;
+      host.hidden = false;
+      host.style.display = "flex";
+      document.documentElement.style.overflow = "hidden";
+      var v = host.querySelector(".pd-welcome-video");
+      if (v) {
+        var p = v.play();
+        if (p && p.catch) p.catch(function () {});
+      }
+    }
+    function dismiss() {
+      markSeen();
+      hide();
+    }
+
+    document.getElementById("pd-welcome-close")?.addEventListener("click", dismiss);
+    document.getElementById("pd-welcome-later")?.addEventListener("click", dismiss);
+    document.getElementById("pd-welcome-cta")?.addEventListener("click", markSeen);
+    document.getElementById("pd-welcome-login")?.addEventListener("click", markSeen);
+    host.addEventListener("click", function (e) {
+      if (e.target === host) dismiss();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && host.style.display === "flex") dismiss();
+    });
+
+    // Wait for auth hydrate so signed-in users never flash the modal.
+    var started = Date.now();
+    function maybeShow() {
+      if (document.documentElement.getAttribute("data-auth") === "in") return;
+      // Give /api/auth/me a moment; then show for logged-out visitors.
+      if (Date.now() - started < 400 && document.documentElement.getAttribute("data-auth") !== "out") {
+        setTimeout(maybeShow, 120);
+        return;
+      }
+      setTimeout(show, 650);
+    }
+    // If auth script already set out/in, proceed; otherwise poll briefly.
+    if (document.documentElement.getAttribute("data-auth") === "in") return;
+    maybeShow();
+  })();
+</script>
