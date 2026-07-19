@@ -101,12 +101,14 @@ How to build it:
           <li><b>Credit cost</b>: integer. Rule: <b>~5 credits per model/step</b> (≈5× our ~$0.02/gen cost). 1 step = 5, 2 steps = 10.</li>
           <li><b>input_json</b>: the model’s parameters. Put <code style={codeS}>{`{{key}}`}</code> where the USER supplies a value (<code style={codeS}>{`{{key*}}`}</code> = required); leave other params as fixed values.</li>
           <li><b>fields_json</b>: one entry per <code style={codeS}>{`{{key}}`}</code> → <code style={codeS}>{`{ key, type, label, required, help?, options?, default? }`}</code>. Types: text, textarea (prompts), number, select, file, toggle, url. For uploads use <code style={codeS}>file</code> with <code style={codeS}>accept:"image/*"</code> (or <code style={codeS}>video/*</code>); add <code style={codeS}>"multiple":true,"max":4</code> for several files. For a <code style={codeS}>select</code>, options are <code style={codeS}>{`[{value,label}]`}</code> — add <code style={codeS}>"image":"&lt;url&gt;"</code> per option to show preview cards. Use <b>Scaffold fields from placeholders</b> to auto-generate this from the {`{{...}}`} you used.</li>
+          <li><b>Optional prompt with a baked-in default</b>: keep <code style={codeS}>{`{{prompt}}`}</code> in the step’s input, then in fields_json set <code style={codeS}>{`"required": false, "default": "your template prompt…"`}</code>. The studio pre-fills that text; if the user clears it, generate still sends the default.</li>
         </ul>
 
         <p style="margin:14px 0 4px;font-weight:600;color:var(--pd-ink);">🔗 How chains work (steps_json)</p>
         <ul style="margin:0;padding-left:18px;">
           <li>Ordered list; each step = <code style={codeS}>{`{ "id":"shortId", "model":"owner/name", "input": {…} }`}</code>.</li>
           <li>A step’s input may reference user fields as <code style={codeS}>{`{{key}}`}</code> and any earlier step’s output as <code style={codeS}>{`{{stepId.output}}`}</code> (a media URL). The LAST step’s output is the result.</li>
+          <li>Don’t hardcode the motion prompt only inside step 2 and drop the field — keep <code style={codeS}>{`{{prompt}}`}</code> and put the template text in the field’s <code style={codeS}>default</code> so users can still override it.</li>
         </ul>
 
         <p style="margin:14px 0 4px;font-weight:600;color:var(--pd-ink);">🧩 Models to use (+ their image-input key)</p>
