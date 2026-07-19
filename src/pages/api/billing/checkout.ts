@@ -15,24 +15,67 @@ export async function POST({ request, locals, url }: APIContext) {
   const dbUser = await getUserByUid(db, user.uid);
   if (!dbUser) return json({ error: "Account not found." }, 401);
 
-  let body: { kind?: "pack" | "sub"; id?: string };
+  let body: { kind?: "pack" | "sub" | "custom"; id?: string; dollars?: number };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return json({ error: "Invalid body" }, 400);
   }
-  if (!body.id || (body.kind !== "pack" && body.kind !== "sub")) return json({ error: "Bad request" }, 400);
+  if (body.kind !== "pack" && body.kind !== "sub" && body.kind !== "custom") return json({ error: "Bad request" }, 400);
+  if ((body.kind === "pack" || body.kind === "sub") && !body.id) return json({ error: "Bad request" }, 400);
 
   const origin = url.origin;
   const success_url = `${origin}/credits?status=success`;
   const cancel_url = `${origin}/credits?status=cancel`;
+
+  // Custom top-ups use the Starter pack rate: 100 credits / $8 = 12.5 cr per $1.
+  const CR_PER_DOLLAR = 12.5;
 
   try {
     // Reuse the user's Stripe customer so an attached card is offered + reused.
     const customer = await getOrCreateCustomer(env.STRIPE_SECRET_KEY, db, dbUser);
     let params: Record<string, unknown>;
 
-    if (body.kind === "pack") {
+    if (body.kind === "custom") {
+      const dollars = Math.round(Number(body.dollars));
+      if (!Number.isFinite(dollars) || dollars < 5 || dollars > 100) {
+        return json({ error: "Choose an amount between $5 and $100." }, 400);
+      }
+      const sub = await db
+        .prepare("SELECT t.pack_discount_pct FROM subscriptions s JOIN subscription_tiers t ON t.id = s.tier_id WHERE s.user_id = ? AND s.status = 'active'")
+        .bind(dbUser.id)
+        .first<{ pack_discount_pct: number }>();
+      const discount = Math.max(0, Math.min(90, Number(sub?.pack_discount_pct) || 0));
+      // Subscribers get more credits for the same spend (mirrors pack discounts).
+      const credits = Math.max(1, Math.round(dollars * CR_PER_DOLLAR * (100 / (100 - discount))));
+      const amount = dollars * 100;
+
+      params = {
+        mode: "payment",
+        customer,
+        success_url,
+        cancel_url,
+        payment_intent_data: { setup_future_usage: "off_session" },
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: "usd",
+              unit_amount: amount,
+              product_data: { name: `Custom top-up — ${credits} credits` },
+            },
+          },
+        ],
+        metadata: {
+          user_id: String(dbUser.id),
+          user_uid: dbUser.uid,
+          kind: "custom",
+          pack_id: "custom",
+          credits: String(credits),
+          dollars: String(dollars),
+        },
+      };
+    } else if (body.kind === "pack") {
       const pack = await db
         .prepare("SELECT * FROM credit_packs WHERE id = ? AND is_active = 1")
         .bind(body.id)

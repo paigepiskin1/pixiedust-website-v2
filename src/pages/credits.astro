@@ -25,9 +25,15 @@ interface Pack { id: string; name: string; credits: number; price_cents: number;
 const tiers = (await db.prepare("SELECT * FROM subscription_tiers WHERE is_active=1 ORDER BY sort_order").all<Tier>()).results ?? [];
 const packs = (await db.prepare("SELECT * FROM credit_packs WHERE is_active=1 ORDER BY sort_order").all<Pack>()).results ?? [];
 const subscribed = !!activeTier && activeTier !== "free";
+const packDiscountPct = subscribed
+  ? (tiers.find((t) => t.id === activeTier)?.pack_discount_pct ?? 0)
+  : 0;
 
 const usd = (c: number) => "$" + (c / 100).toFixed(c % 100 === 0 ? 0 : 2);
 const feats = (s: string) => { try { return JSON.parse(s) as string[]; } catch { return []; } };
+// Custom dial uses Starter rate (100 cr / $8). Subscribers get a credit boost matching pack %.
+const CR_PER_DOLLAR = 12.5;
+const creditBoost = packDiscountPct > 0 ? 100 / (100 - packDiscountPct) : 1;
 ---
 
 <AppShell title="Credits & Plans — PixieDust" description="Flexible credit plans for PixieDust AI. Start free and scale as you create — pay only for what you generate." credits={user?.credits ?? 47}>
@@ -37,11 +43,61 @@ const feats = (s: string) => { try { return JSON.parse(s) as string[]; } catch {
 
     <div id="pd-billing-msg" class="mb-5 hidden rounded-xl" style="padding:11px 14px;font-size:13px;"></div>
 
-    <!-- Credit packs -->
+    <!-- Custom amount dial -->
     <div class="mb-1">
       <div class="font-display font-semibold text-ink" style="font-size:22px;letter-spacing:-0.4px;">Buy Credit Packs</div>
-      <p class="mt-1 text-ink-3" style="font-size:13.5px;line-height:1.45;">Pay as you go for credits by purchasing credit packs.</p>
+      <p class="mt-1 text-ink-3" style="font-size:13.5px;line-height:1.45;">Pay as you go — dial any amount from $5 to $100, or grab a preset pack below.</p>
     </div>
+
+    <div
+      id="pd-credit-dial"
+      class="mt-4 rounded-2xl"
+      style="padding:26px 24px 22px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+      data-rate={CR_PER_DOLLAR}
+      data-boost={creditBoost}
+    >
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Custom amount</div>
+          <div class="mt-1 flex items-baseline gap-2">
+            <span id="pd-dial-credits" class="font-display font-medium text-ink" style="font-size:44px;letter-spacing:-1.2px;line-height:1;">63</span>
+            <span class="text-ink-3" style="font-size:14px;">credits</span>
+          </div>
+        </div>
+        <div class="text-right">
+          <div id="pd-dial-dollars" class="font-display font-medium text-ink" style="font-size:28px;letter-spacing:-0.7px;">$5</div>
+          {packDiscountPct > 0 && (
+            <div class="font-mono" style="font-size:10px;color:var(--pd-mint);letter-spacing:0.4px;">{packDiscountPct}% subscriber boost</div>
+          )}
+        </div>
+      </div>
+
+      <div class="mt-5">
+        <input
+          id="pd-dial-range"
+          type="range"
+          min="5"
+          max="100"
+          step="1"
+          value="5"
+          aria-label="Credit purchase amount in dollars"
+          style="width:100%;accent-color:var(--pd-lilac);cursor:pointer;"
+        />
+        <div class="mt-1.5 flex justify-between font-mono" style="font-size:10px;color:var(--pd-ink4);letter-spacing:0.3px;">
+          <span>$5</span>
+          <span>$50</span>
+          <span>$100</span>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        id="pd-dial-buy"
+        class="mt-5 w-full rounded-xl font-bold"
+        style="padding:12px;background:var(--pd-ink);color:var(--pd-bg);font-size:13.5px;cursor:pointer;border:none;"
+      >Buy 63 credits · $5</button>
+    </div>
+
     <div class="mt-4 grid gap-4 md:grid-cols-3">
       {
         packs.map((p) => {
@@ -115,27 +171,57 @@ const feats = (s: string) => { try { return JSON.parse(s) as string[]; } catch {
       msg.textContent = "Checkout canceled — no charge made.";
     }
 
+    async function startCheckout(body: Record<string, unknown>, btn: HTMLButtonElement) {
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Redirecting…";
+      try {
+        const res = await fetch("/api/billing/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.status === 401) { window.location.href = "/auth/sign-in?redirect=/credits"; return; }
+        if (data.url) window.location.href = data.url;
+        else { btn.disabled = false; btn.textContent = orig; (window as any).pdToast?.(data.error || "Could not start checkout."); }
+      } catch {
+        btn.disabled = false;
+        btn.textContent = orig;
+        (window as any).pdToast?.("Network error.");
+      }
+    }
+
     document.querySelectorAll<HTMLButtonElement>(".pd-buy").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const orig = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = "Redirecting…";
-        try {
-          const res = await fetch("/api/billing/checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ kind: btn.dataset.kind, id: btn.dataset.id }),
-          });
-          const data = await res.json();
-          if (res.status === 401) { window.location.href = "/auth/sign-in?redirect=/credits"; return; }
-          if (data.url) window.location.href = data.url;
-          else { btn.disabled = false; btn.textContent = orig; (window as any).pdToast?.(data.error || "Could not start checkout."); }
-        } catch {
-          btn.disabled = false;
-          btn.textContent = orig;
-          (window as any).pdToast?.("Network error.");
-        }
-      });
+      btn.addEventListener("click", () => startCheckout({ kind: btn.dataset.kind, id: btn.dataset.id }, btn));
+    });
+
+    // Custom $5–$100 dial
+    const dial = document.getElementById("pd-credit-dial");
+    const range = document.getElementById("pd-dial-range") as HTMLInputElement | null;
+    const creditsEl = document.getElementById("pd-dial-credits");
+    const dollarsEl = document.getElementById("pd-dial-dollars");
+    const dialBuy = document.getElementById("pd-dial-buy") as HTMLButtonElement | null;
+    const rate = Number(dial?.dataset.rate) || 12.5;
+    const boost = Number(dial?.dataset.boost) || 1;
+
+    function dialCredits(dollars: number) {
+      return Math.max(1, Math.round(dollars * rate * boost));
+    }
+    function refreshDial() {
+      if (!range || !creditsEl || !dollarsEl || !dialBuy) return;
+      const dollars = Math.max(5, Math.min(100, Math.round(Number(range.value) || 5)));
+      const credits = dialCredits(dollars);
+      creditsEl.textContent = String(credits);
+      dollarsEl.textContent = "$" + dollars;
+      dialBuy.textContent = `Buy ${credits} credits · $${dollars}`;
+      dialBuy.dataset.dollars = String(dollars);
+    }
+    range?.addEventListener("input", refreshDial);
+    refreshDial();
+    dialBuy?.addEventListener("click", () => {
+      const dollars = Number(dialBuy.dataset.dollars) || Number(range?.value) || 5;
+      startCheckout({ kind: "custom", dollars }, dialBuy);
     });
   </script>
 </AppShell>
