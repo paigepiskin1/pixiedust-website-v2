@@ -174,6 +174,7 @@ export async function POST({ request, locals, url }: APIContext) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Could not create checkout session.";
     console.error("[credits/checkout]", msg);
-    return json({ error: msg || "Could not create checkout session. Please try again." }, 502);
+    // Keep Stripe/internal detail out of the client; log it server-side instead.
+    return json({ error: "Could not create checkout session. Please try again." }, 502);
   }
 }
