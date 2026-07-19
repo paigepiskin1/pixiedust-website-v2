@@ -262,6 +262,24 @@ export function computeCost(t: Template, opts: { quality?: string; quantity?: nu
 }
 
 /**
+ * Fill missing/empty user inputs from each field's `default`. Used so optional
+ * prompts can stay blank in the UI while the template still sends a baked-in
+ * prompt to the model (works for single-step and multi-step chains).
+ */
+export function applyFieldDefaults(
+  t: Template,
+  inputs: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...inputs };
+  for (const f of allFields(t)) {
+    if (f.default == null || f.default === "") continue;
+    const v = out[f.key];
+    if (v == null || v === "") out[f.key] = f.default;
+  }
+  return out;
+}
+
+/**
  * Resolve a single chain step's input. Substitutes `{{key}}` from user inputs
  * and `{{stepId.output}}` from prior step outputs. Used by the multi-step pipeline.
  */

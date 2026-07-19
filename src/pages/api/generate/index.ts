@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep } from "../../../lib/templates";
+import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
@@ -30,7 +30,9 @@ export async function POST({ request, locals }: APIContext) {
   const template = body.templateId ? await getTemplate(db, body.templateId) : null;
   // Hidden templates are runnable by admins (for testing before publish).
   if (!template || (template.isHidden && !user.isAdmin)) return json({ error: "Template not found." }, 404);
-  const inputs = body.inputs ?? {};
+  // Apply field defaults before validation/resolve so optional prompts with a
+  // baked-in `default` still reach the model when the user leaves them blank.
+  const inputs = applyFieldDefaults(template, body.inputs ?? {});
 
   // Validate required fields (covers single + multi-step via allFields).
   const missing = allFields(template).filter((f) => f.required && (inputs[f.key] == null || inputs[f.key] === ""));
