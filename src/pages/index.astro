@@ -7,26 +7,40 @@ import QuickLaunch from "../components/home/QuickLaunch.astro";
 import CardRail from "../components/home/CardRail.astro";
 import FeatureBanner from "../components/home/FeatureBanner.astro";
 import Reveal from "../components/motion/Reveal.tsx";
-import { listTemplates, templateToRail } from "../lib/templates";
+import { getTemplate, listTemplates, templateToRail } from "../lib/templates";
 import { getToolCards } from "../lib/tool-cards";
 import { getHeroPicks, resolveHeroSlides } from "../lib/hero";
 
 const db = Astro.locals.runtime.env.DB;
-const [trending, presets, beauty, videoPool, toolMedia] = await Promise.all([
-  listTemplates(db, { featured: true, limit: 8 }),
+
+// Pinned "Trending this week" order (homepage rail). Keep in sync with product.
+const TRENDING_PIN = [
+  "change-hair-color-grid",
+  "tumblr-aesthetic",
+  "subway-platform-copy-2-copy-copy",
+  "old-korean-baseball-trend",
+  "i2v-petals-bloom",
+  "byteplus-seedance-fast-i2v",
+] as const;
+
+const [trending, presets, beauty, videoPool, toolMedia, pinnedRaw] = await Promise.all([
+  listTemplates(db, { featured: true, limit: 16 }),
   listTemplates(db, { kind: "preset", limit: 8 }),
   listTemplates(db, { kind: "beauty", limit: 8 }),
   listTemplates(db, { kinds: ["i2v", "video", "motion", "cinema"], limit: 40 }),
   getToolCards(db),
+  Promise.all(TRENDING_PIN.map((id) => getTemplate(db, id))),
 ]);
 
-// Surface templates that actually have a generated preview video first, so the
-// hero and trending rail play real motion (the featured query alone is ordered
-// by sort_order/title and often buries the video ones past the limit).
+// Surface templates that actually have a generated preview video first for the
+// auto hero (when no curated hero picks are set).
 const videoTemplates = videoPool.filter((t) => t.previewVideo);
 
-// Trending rail = video-preview templates first, then the rest of featured.
-const trendingMerged = [...videoTemplates, ...trending].filter(
+const pinnedTrending = pinnedRaw.filter(
+  (t): t is NonNullable<typeof t> => !!t && !t.isHidden && !t.isAdminOnly
+);
+// Trending rail = pinned order first, then other featured fills.
+const trendingMerged = [...pinnedTrending, ...trending].filter(
   (t, i, arr) => arr.findIndex((x) => x.id === t.id) === i
 ).slice(0, 8);
 const trendingCards = trendingMerged.map(templateToRail);
