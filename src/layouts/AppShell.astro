@@ -5,6 +5,9 @@ import Topbar from "../components/shell/Topbar.astro";
 import MobileDrawer from "../components/shell/MobileDrawer.astro";
 import Toast from "../components/ui/Toast.astro";
 import FirstVisitSignup from "../components/FirstVisitSignup.astro";
+import type { WelcomeSlide } from "../components/FirstVisitSignup.astro";
+import { getToolCards } from "../lib/tool-cards";
+import { getTemplate } from "../lib/templates";
 
 interface Props {
   title?: string;
@@ -29,6 +32,40 @@ const autoNoindex =
 // first paint (no flash of the logged-out default on navigation).
 const user = Astro.locals.user ?? null;
 const credits = user?.credits ?? Astro.props.credits ?? 47;
+
+// Welcome popup slideshow for logged-out visitors — live homepage covers.
+let welcomeSlides: WelcomeSlide[] = [];
+if (!user) {
+  try {
+    const db = Astro.locals.runtime.env.DB;
+    const [toolMedia, hair] = await Promise.all([
+      getToolCards(db),
+      getTemplate(db, "change-hair-color-grid"),
+    ]);
+    const push = (m: { url: string; type: string } | undefined, kicker: string, titleLine: string) => {
+      if (!m?.url) return;
+      welcomeSlides.push({
+        type: m.type === "video" ? "video" : "image",
+        url: m.url,
+        kicker,
+        title: titleLine,
+      });
+    };
+    push(toolMedia["/presets"], "Presets", "100+ HD filters\nin one tap.");
+    if (hair?.previewImage) {
+      welcomeSlides.push({
+        type: "image",
+        url: hair.previewImage,
+        kicker: "Hair color",
+        title: "Try every shade\nbefore you commit.",
+      });
+    }
+    push(toolMedia["/beauty"], "Makeup", "Glow-up looks\nin seconds.");
+    push(toolMedia["/video"], "Video", "Motion that\nstops the scroll.");
+  } catch {
+    // Fall back to hardcoded slides inside FirstVisitSignup.
+  }
+}
 ---
 
 <Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd}>
@@ -56,7 +93,7 @@ const credits = user?.credits ?? Astro.props.credits ?? 47;
   </div>
   <MobileDrawer credits={credits} user={user} />
   <Toast />
-  {!user && <FirstVisitSignup />}
+  {!user && <FirstVisitSignup slides={welcomeSlides} />}
 
   <script is:inline>
     // Hydrate auth state into the shell (static pages render the logged-out
