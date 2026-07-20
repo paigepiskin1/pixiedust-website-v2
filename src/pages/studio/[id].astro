@@ -223,8 +223,9 @@ const config = {
                 <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Aspect ratio</span>
                 <div class="flex flex-wrap gap-1.5" data-controls="aspect">
                   {template.aspects.map((a, i) => {
-                    const isMatch = a === "match" || a === "match_input_image";
+                    const isMatch = a === "match" || a === "match_input_image" || a === "original" || a === "auto";
                     const b = aspectBox(a);
+                    const label = a === "original" || a === "auto" ? "Original" : isMatch ? "Match original" : a;
                     return (
                       <button type="button" class="pd-seg inline-flex items-center gap-1.5 rounded-lg font-mono" data-val={a} data-active={i === 0 ? "true" : "false"} style="padding:6px 11px;font-size:11px;cursor:pointer;">
                         {isMatch ? (
@@ -232,7 +233,7 @@ const config = {
                         ) : (
                           <span style={`display:inline-block;width:${b.w}px;height:${b.h}px;border:1.5px solid currentColor;border-radius:2px;opacity:0.65;`}></span>
                         )}
-                        <span>{isMatch ? "Match original" : a}</span>
+                        <span>{label}</span>
                       </button>
                     );
                   })}
@@ -465,6 +466,41 @@ const config = {
       return (window as any).pdCollectFieldValues?.(fieldPanel, fileUrls) ?? {};
     }
 
+    /** First uploaded image URL from the form (used to resolve Original aspect). */
+    function firstImageUrl(inputs: Record<string, unknown>): string | null {
+      for (const key of ["files", "image", "input_image", "photo"]) {
+        const v = inputs[key];
+        if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
+        if (Array.isArray(v)) {
+          const u = v.find((x) => typeof x === "string" && /^https?:\/\//i.test(x));
+          if (u) return String(u);
+        }
+      }
+      return null;
+    }
+
+    function measureImage(url: string): Promise<{ w: number; h: number } | null> {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const w = img.naturalWidth || 0;
+          const h = img.naturalHeight || 0;
+          resolve(w > 0 && h > 0 ? { w, h } : null);
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    }
+
+    async function imageDimsForAspect(aspect: string | undefined, inputs: Record<string, unknown>) {
+      if (!aspect || !["original", "match", "match_input_image", "auto"].includes(aspect)) return {};
+      const url = firstImageUrl(inputs);
+      if (!url) return {};
+      const size = await measureImage(url);
+      if (!size) return {};
+      return { imageWidth: size.w, imageHeight: size.h };
+    }
+
     const errEl = $("#pd-gen-error");
     const emptyEl = $("#pd-out-empty");
     const jobsEl = $("#pd-jobs");
@@ -490,7 +526,7 @@ const config = {
       if (/timeout|timed out/i.test(e)) return "This took too long and timed out. You weren't charged — try again.";
       if (/not enough credits/i.test(e)) return "Not enough credits.";
       if (/\b422\b|aspect_ratio|invalid.*(aspect|ratio|input)/i.test(e))
-        return "That aspect ratio isn't supported by this model. You weren't charged — try 1:1, 2:3, or 3:2.";
+        return "That aspect ratio isn't supported by this model. You weren't charged — try Original, 1:1, 2:3, or 3:2.";
       return (e || "Generation failed") + " — you weren't charged.";
     }
 
@@ -689,6 +725,8 @@ const config = {
       credits -= per; // optimistic debit
       refreshButton();
       try {
+        const aspect = controlValue("aspect") || undefined;
+        const dims = await imageDimsForAspect(aspect, inputs);
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -697,8 +735,9 @@ const config = {
             inputs,
             quality: qualityTiers.length ? undefined : (controlValue("quality") || undefined),
             quantity: 1,
-            aspect: controlValue("aspect") || undefined,
+            aspect,
             duration: duration() || undefined,
+            ...dims,
           }),
         });
         let data: any = {};
