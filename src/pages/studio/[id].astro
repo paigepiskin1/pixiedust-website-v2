@@ -225,7 +225,7 @@ const config = {
                   {template.aspects.map((a, i) => {
                     const isMatch = a === "match" || a === "match_input_image" || a === "original" || a === "auto";
                     const b = aspectBox(a);
-                    const label = a === "original" || a === "auto" ? "Original" : isMatch ? "Match original" : a;
+                    const label = isMatch ? "Original" : a;
                     return (
                       <button type="button" class="pd-seg inline-flex items-center gap-1.5 rounded-lg font-mono" data-val={a} data-active={i === 0 ? "true" : "false"} style="padding:6px 11px;font-size:11px;cursor:pointer;">
                         {isMatch ? (
