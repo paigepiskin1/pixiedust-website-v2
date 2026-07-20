@@ -263,16 +263,8 @@ const slides = (Astro.props.slides?.length ? Astro.props.slides : fallbackSlides
       if (e.key === "Escape" && host.style.display === "flex") dismiss();
     });
 
-    var started = Date.now();
-    function maybeShow() {
-      if (document.documentElement.getAttribute("data-auth") === "in") return;
-      if (Date.now() - started < 400 && document.documentElement.getAttribute("data-auth") !== "out") {
-        setTimeout(maybeShow, 120);
-        return;
-      }
-      setTimeout(show, 650);
-    }
+    // Delay so new visitors can browse before the signup tease.
     if (document.documentElement.getAttribute("data-auth") === "in") return;
-    maybeShow();
+    setTimeout(show, 30000);
   })();
 </script>
