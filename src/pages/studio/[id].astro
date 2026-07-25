@@ -60,6 +60,8 @@ const studioIntro = howItWorks.length > 0 || !!studioKicker;
 const introSub = template.description || template.subtitle || "";
 const credits = Astro.locals.user?.credits ?? 0;
 const signedIn = !!Astro.locals.user;
+// Fashion / outfit try-on: let people paste a product URL instead of uploading.
+const hasOutfitLink = fields.some((f) => f.key === "outfit" && f.type === "file" && !!f.multiple);
 
 const defaultTier = qualityTiers.find((t) => t.id === defaultTierId) ?? qualityTiers[0] ?? null;
 // GPT-Image models (openai/gpt-image-2, gpt-image-1.5, …) on Replicate are
@@ -216,6 +218,48 @@ const config = {
           )}
 
           <FieldPanel fields={fields} id="pd-field-panel" />
+
+          {hasOutfitLink && (
+            <div id="pd-product-link" class="mt-4 rounded-xl" style="padding:14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);">
+              <div class="mb-1.5 flex items-center justify-between gap-2">
+                <span class="font-medium text-ink" style="font-size:12.5px;">Or paste a product link</span>
+                <span class="font-mono uppercase" style="font-size:9px;color:var(--pd-ink4);letter-spacing:0.5px;">Checked for safety</span>
+              </div>
+              <p class="mb-2.5 text-ink-4" style="font-size:11px;line-height:1.4;">
+                We’ll verify the URL, pull product photos, and surface fit details — then you pick which images to try on.
+              </p>
+              <div class="flex gap-2">
+                <input
+                  id="pd-product-url"
+                  type="url"
+                  inputmode="url"
+                  placeholder="https://shop.com/products/…"
+                  autocomplete="off"
+                  class="min-w-0 flex-1 rounded-xl text-ink outline-none"
+                  style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);font-size:13px;"
+                />
+                <button
+                  id="pd-product-fetch"
+                  type="button"
+                  class="shrink-0 rounded-xl font-semibold"
+                  style="padding:10px 14px;font-size:12.5px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;"
+                >Check link</button>
+              </div>
+              <div id="pd-product-status" class="mt-2 text-ink-4" style="display:none;font-size:11.5px;line-height:1.4;"></div>
+              <div id="pd-product-result" style="display:none;margin-top:12px;">
+                <div id="pd-product-details" class="mb-3 rounded-lg" style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:12px;line-height:1.45;"></div>
+                <div class="mb-1.5 font-medium text-ink" style="font-size:12px;">Pick photos to try on</div>
+                <div id="pd-product-images" class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(88px,1fr));"></div>
+                <button
+                  id="pd-product-add"
+                  type="button"
+                  class="mt-3 flex w-full items-center justify-center rounded-xl font-semibold"
+                  style="padding:11px 14px;font-size:13px;background:var(--pd-lilac);color:#0A0A0B;border:none;cursor:pointer;"
+                  disabled
+                >Add selected to outfit</button>
+              </div>
+            </div>
+          )}
 
           <div class="mt-4 flex flex-col gap-4">
             {template.aspects && template.aspects.length > 0 && (
@@ -464,6 +508,191 @@ const config = {
     function collectInputs(): Record<string, unknown> {
       return (window as any).pdCollectFieldValues?.(fieldPanel, fileUrls) ?? {};
     }
+
+    // ── Product link → outfit items ─────────────────────────────────────────
+    (function initProductLink() {
+      const host = document.getElementById("pd-product-link");
+      if (!host) return;
+      const urlEl = document.getElementById("pd-product-url") as HTMLInputElement | null;
+      const fetchBtn = document.getElementById("pd-product-fetch") as HTMLButtonElement | null;
+      const statusEl = document.getElementById("pd-product-status") as HTMLElement | null;
+      const resultEl = document.getElementById("pd-product-result") as HTMLElement | null;
+      const detailsEl = document.getElementById("pd-product-details") as HTMLElement | null;
+      const imagesEl = document.getElementById("pd-product-images") as HTMLElement | null;
+      const addBtn = document.getElementById("pd-product-add") as HTMLButtonElement | null;
+      if (!urlEl || !fetchBtn || !statusEl || !resultEl || !detailsEl || !imagesEl || !addBtn) return;
+      const urlInput = urlEl;
+      const fetchButton = fetchBtn;
+      const status = statusEl;
+      const result = resultEl;
+      const details = detailsEl;
+      const images = imagesEl;
+      const addButton = addBtn;
+
+      let selected = new Set<string>();
+      let lastDetails: Record<string, unknown> | null = null;
+
+      function setStatus(msg: string, tone: "ink" | "mint" | "pink" = "ink") {
+        status.style.display = msg ? "block" : "none";
+        status.textContent = msg;
+        status.style.color =
+          tone === "mint" ? "var(--pd-mint)" : tone === "pink" ? "var(--pd-pink)" : "var(--pd-ink3)";
+      }
+
+      function refreshAdd() {
+        const n = selected.size;
+        addButton.disabled = n === 0;
+        addButton.style.opacity = n === 0 ? "0.45" : "1";
+        addButton.textContent = n === 0 ? "Add selected to outfit" : `Add ${n} photo${n === 1 ? "" : "s"} to outfit`;
+      }
+
+      function esc(s: string): string {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function renderDetails(d: any, pageUrl: string) {
+        const bits: string[] = [];
+        if (d?.title) bits.push(`<div class="font-semibold text-ink" style="font-size:13px;margin-bottom:4px;">${esc(d.title)}</div>`);
+        const meta: string[] = [];
+        if (d?.brand) meta.push(esc(d.brand));
+        if (d?.price) meta.push(esc(d.price));
+        if (meta.length) bits.push(`<div class="text-ink-3" style="font-size:11.5px;margin-bottom:6px;">${meta.join(" · ")}</div>`);
+        if (d?.description) bits.push(`<div class="text-ink-2" style="font-size:11.5px;margin-bottom:6px;">${esc(String(d.description).slice(0, 280))}</div>`);
+        if (Array.isArray(d?.sizes) && d.sizes.length) {
+          bits.push(`<div class="text-ink-2" style="font-size:11.5px;"><span class="text-ink-4">Sizes</span> · ${d.sizes.map((s: string) => esc(s)).join(", ")}</div>`);
+        }
+        if (Array.isArray(d?.colors) && d.colors.length) {
+          bits.push(`<div class="text-ink-2" style="font-size:11.5px;"><span class="text-ink-4">Colors</span> · ${d.colors.map((s: string) => esc(s)).join(", ")}</div>`);
+        }
+        if (d?.material) bits.push(`<div class="text-ink-2" style="font-size:11.5px;"><span class="text-ink-4">Material</span> · ${esc(d.material)}</div>`);
+        if (Array.isArray(d?.fitNotes) && d.fitNotes.length) {
+          bits.push(`<ul style="margin:8px 0 0;padding-left:16px;color:var(--pd-ink2);font-size:11.5px;">${d.fitNotes.map((n: string) => `<li style="margin-bottom:3px;">${esc(n)}</li>`).join("")}</ul>`);
+        }
+        bits.push(`<div class="mt-2 font-mono text-ink-4" style="font-size:10px;word-break:break-all;">${esc(pageUrl)}</div>`);
+        details.innerHTML = bits.join("") || `<div class="text-ink-3">No fit details found — you can still pick photos below.</div>`;
+      }
+
+      function renderImages(list: { url: string }[]) {
+        selected = new Set();
+        images.innerHTML = "";
+        list.forEach((img) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.dataset.url = img.url;
+          btn.style.cssText =
+            "position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;padding:0;cursor:pointer;border:1.5px solid var(--pd-hairline2);background:var(--pd-bg2);";
+          btn.innerHTML = `<img src="${esc(img.url)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" />`;
+          const mark = document.createElement("span");
+          mark.textContent = "✓";
+          mark.style.cssText =
+            "display:none;position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:50%;background:var(--pd-mint);color:#0A0A0B;font-size:11px;font-weight:700;align-items:center;justify-content:center;line-height:18px;text-align:center;";
+          btn.appendChild(mark);
+          btn.addEventListener("click", () => {
+            if (selected.has(img.url)) {
+              selected.delete(img.url);
+              btn.style.borderColor = "var(--pd-hairline2)";
+              mark.style.display = "none";
+            } else {
+              selected.add(img.url);
+              btn.style.borderColor = "var(--pd-mint)";
+              mark.style.display = "block";
+            }
+            refreshAdd();
+          });
+          images.appendChild(btn);
+        });
+        refreshAdd();
+      }
+
+      async function runInspect() {
+        const url = urlInput.value.trim();
+        if (!url) {
+          setStatus("Paste a product link first.", "pink");
+          return;
+        }
+        if (!cfg.signedIn) {
+          setStatus("Sign in to check a product link.", "pink");
+          return;
+        }
+        fetchButton.disabled = true;
+        fetchButton.textContent = "Checking…";
+        setStatus("Verifying link & pulling product photos…");
+        result.style.display = "none";
+        try {
+          const res = await fetch("/api/product-link/inspect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            setStatus(data.error || "Couldn’t read that link.", "pink");
+            return;
+          }
+          lastDetails = data.details || null;
+          renderDetails(data.details || {}, data.pageUrl || url);
+          renderImages(Array.isArray(data.images) ? data.images : []);
+          result.style.display = "block";
+          setStatus(`Found ${(data.images || []).length} photo${(data.images || []).length === 1 ? "" : "s"} — pick what to try on.`, "mint");
+        } catch {
+          setStatus("Network error — try again.", "pink");
+        } finally {
+          fetchButton.disabled = false;
+          fetchButton.textContent = "Check link";
+        }
+      }
+
+      fetchButton.addEventListener("click", () => void runInspect());
+      urlInput.addEventListener("keydown", (e) => {
+        if ((e as KeyboardEvent).key === "Enter") {
+          e.preventDefault();
+          void runInspect();
+        }
+      });
+
+      addButton.addEventListener("click", () => {
+        const wrap = fieldPanel?.querySelector('.pd-file-wrap[data-fieldkey="outfit"]') as any;
+        const addUrl = wrap?._pdAddUrl as ((u: string) => boolean) | undefined;
+        if (!addUrl) {
+          setStatus("Outfit upload isn’t ready yet — try again in a second.", "pink");
+          return;
+        }
+        let added = 0;
+        let skipped = 0;
+        for (const u of selected) {
+          if (addUrl(u)) added++;
+          else skipped++;
+        }
+        if (added === 0) {
+          setStatus(skipped ? "Outfit slots are full — remove one first." : "Nothing selected.", "pink");
+          return;
+        }
+        // Prefill fit notes into style_notes when empty, so generate sees them.
+        const notes = fieldPanel?.querySelector<HTMLTextAreaElement>('textarea[data-field="style_notes"]');
+        if (notes && !notes.value.trim() && lastDetails) {
+          const parts: string[] = [];
+          const d = lastDetails as any;
+          if (d.title) parts.push(String(d.title));
+          if (d.brand) parts.push(`Brand: ${d.brand}`);
+          if (d.material) parts.push(`Material: ${d.material}`);
+          if (Array.isArray(d.fitNotes)) parts.push(...d.fitNotes.map(String));
+          if (Array.isArray(d.sizes) && d.sizes.length) parts.push(`Available sizes: ${d.sizes.join(", ")}`);
+          if (parts.length) notes.value = parts.join(". ").slice(0, 500);
+        }
+        setStatus(`Added ${added} photo${added === 1 ? "" : "s"} to your outfit.`, "mint");
+        selected = new Set();
+        images.querySelectorAll<HTMLElement>("button[data-url]").forEach((b) => {
+          b.style.borderColor = "var(--pd-hairline2)";
+          const mark = b.querySelector("span");
+          if (mark) (mark as HTMLElement).style.display = "none";
+        });
+        refreshAdd();
+      });
+    })();
 
     const errEl = $("#pd-gen-error");
     const emptyEl = $("#pd-out-empty");
