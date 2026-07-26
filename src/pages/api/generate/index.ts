@@ -9,6 +9,7 @@ import {
   resolveChainStep,
   applyFieldDefaults,
   appendSelectedOptionRefs,
+  isUploadLook,
 } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
@@ -147,6 +148,12 @@ export async function POST({ request, locals }: APIContext) {
   }
 
   // ─── Single step ───
+  if (isUploadLook(template, inputs)) {
+    const outfit = inputs.outfit;
+    if (typeof outfit !== "string" || !/^https?:\/\//i.test(outfit)) {
+      return json({ error: "Upload an outfit photo, or pick Keep / Female / Male instead." }, 400);
+    }
+  }
   const resolved = resolveInput(template, inputs);
   const input = appendSelectedOptionRefs(template, inputs, resolved.input as Record<string, unknown>);
   // Prefer the explicit aspect selection; fall back to the template's first

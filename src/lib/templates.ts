@@ -38,6 +38,8 @@ export interface TemplateField {
   multiple?: boolean;
   /** For select fields: "buttons" (default) or "dropdown". */
   ui?: "buttons" | "dropdown";
+  /** Optionally show this field only when another field's value matches. */
+  showWhen?: { field: string; includes?: string; equals?: string };
 }
 
 export interface TemplateStep {
@@ -264,37 +266,63 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
   return { input: subst(t.input) as Record<string, unknown>, errors };
 }
 
+function imageInputKey(input: Record<string, unknown>): "input_images" | "image_input" | null {
+  if ("input_images" in input) return "input_images";
+  if ("image_input" in input) return "image_input";
+  return null;
+}
+
+function cleanImageUrls(cur: unknown): string[] {
+  return (Array.isArray(cur) ? cur : cur ? [cur] : [])
+    .flatMap((x) => (Array.isArray(x) ? x : [x]))
+    .filter((x): x is string => typeof x === "string" && /^https?:\/\//i.test(x));
+}
+
+/** True when the selected look asks the user to upload their own outfit photo. */
+export function isUploadLook(t: Template, inputs: Record<string, unknown>): boolean {
+  const lookField = allFields(t).find((f) => f.key === "look" && f.type === "select");
+  if (!lookField?.options?.length) return false;
+  const selected = String(inputs.look ?? lookField.default ?? "");
+  if (/uploaded outfit/i.test(selected)) return true;
+  const opt = lookField.options.find((o) => o.value === selected);
+  return /upload/i.test(opt?.label ?? "");
+}
+
 /**
- * When a select option carries a `ref` (or `image`) URL and the user picked a
- * non-empty value, append that URL to the model's image input list. Used for
- * backend outfit/style references that shouldn't appear as a user upload field.
+ * Attach look/outfit reference images for the model:
+ * - preset male/female options → backend `ref`/`image`
+ * - "Upload my own outfit" → user `outfit` file URL
+ * Also strips empty placeholders from image arrays.
  */
 export function appendSelectedOptionRefs(
   t: Template,
   inputs: Record<string, unknown>,
   input: Record<string, unknown>
 ): Record<string, unknown> {
-  const imageKey =
-    "input_images" in input ? "input_images" : "image_input" in input ? "image_input" : null;
+  const imageKey = imageInputKey(input);
   if (!imageKey) return input;
 
-  const extra: string[] = [];
-  for (const f of allFields(t)) {
-    if (f.type !== "select" || !f.options?.length) continue;
-    const selected = String(inputs[f.key] ?? f.default ?? "");
-    if (!selected.trim()) continue; // "keep original" style blank values
-    const opt = f.options.find((o) => o.value === selected);
-    const ref = opt?.ref || opt?.image;
-    if (typeof ref === "string" && /^https?:\/\//i.test(ref)) extra.push(ref);
-  }
-  if (!extra.length) return input;
+  const list = cleanImageUrls(input[imageKey]);
+  // Drop a stray user outfit URL if the template inlined {{outfit}} while the
+  // user picked keep/original or a preset look — we re-add it only for upload.
+  const outfitUrl =
+    typeof inputs.outfit === "string" && /^https?:\/\//i.test(inputs.outfit) ? inputs.outfit : null;
+  const withoutOutfit = outfitUrl ? list.filter((u) => u !== outfitUrl) : list;
 
-  const cur = input[imageKey];
-  const list = (Array.isArray(cur) ? cur : cur ? [cur] : [])
-    .flatMap((x) => (Array.isArray(x) ? x : [x]))
-    .filter((x): x is string => typeof x === "string" && /^https?:\/\//i.test(x));
-  for (const u of extra) if (!list.includes(u)) list.push(u);
-  return { ...input, [imageKey]: list };
+  const lookField = allFields(t).find((f) => f.key === "look" && f.type === "select");
+  const selected = String(inputs.look ?? lookField?.default ?? "");
+  const opt = lookField?.options?.find((o) => o.value === selected);
+  const upload = isUploadLook(t, inputs);
+
+  const out = [...withoutOutfit];
+  if (upload) {
+    if (outfitUrl && !out.includes(outfitUrl)) out.push(outfitUrl);
+  } else if (selected.trim()) {
+    const ref = opt?.ref || opt?.image;
+    if (typeof ref === "string" && /^https?:\/\//i.test(ref) && !out.includes(ref)) out.push(ref);
+  }
+
+  return { ...input, [imageKey]: out };
 }
 
 /**

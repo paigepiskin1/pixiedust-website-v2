@@ -30,7 +30,13 @@ function formatAccept(accept: string) {
 <div class="pd-field-panel flex flex-col gap-4" id={id}>
   {fields.map((f) => (
     f.type === "file" ? (
-      <div class="block">
+      <div
+        class="block"
+        data-show-when-field={f.showWhen?.field}
+        data-show-when-includes={f.showWhen?.includes}
+        data-show-when-equals={f.showWhen?.equals}
+        style={f.showWhen ? "display:none;" : undefined}
+      >
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
           <div class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
@@ -56,7 +62,13 @@ function formatAccept(accept: string) {
         {f.key === "outfit" && <slot name="after-outfit" />}
       </div>
     ) : (
-      <label class="block">
+      <label
+        class="block"
+        data-show-when-field={f.showWhen?.field}
+        data-show-when-includes={f.showWhen?.includes}
+        data-show-when-equals={f.showWhen?.equals}
+        style={f.showWhen ? "display:none;" : undefined}
+      >
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         {f.type === "textarea" ? (
           <textarea data-field={f.key} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
@@ -453,6 +465,22 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     } catch { /* ignore bad default */ }
   });
 
+  const applyShowWhen = () => {
+    root.querySelectorAll<HTMLElement>("[data-show-when-field]").forEach((el) => {
+      const field = el.dataset.showWhenField || "";
+      if (!field) return;
+      const src =
+        root.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`[data-field="${field}"]`);
+      const val = src ? String((src as HTMLInputElement).value ?? "") : "";
+      const includes = el.dataset.showWhenIncludes || "";
+      const equals = el.dataset.showWhenEquals;
+      let show = true;
+      if (equals != null && equals !== "") show = val === equals;
+      else if (includes) show = val.toLowerCase().includes(includes.toLowerCase());
+      el.style.display = show ? "" : "none";
+    });
+  };
+
   // Thumbnail-card option groups (a <select> whose options carry images). Clicks
   // update the sibling hidden input so pdCollectFieldValues picks up the value.
   root.querySelectorAll<HTMLElement>(".pd-opt-cards").forEach((group) => {
@@ -467,6 +495,7 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           c.style.borderColor = on ? "var(--pd-lilac)" : "var(--pd-hairline2)";
           c.style.background = on ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)";
         });
+        applyShowWhen();
       });
     });
   });
@@ -485,9 +514,15 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           s.style.color = on ? "var(--pd-bg)" : "var(--pd-ink)";
           s.style.borderColor = on ? "transparent" : "var(--pd-hairline2)";
         });
+        applyShowWhen();
       });
     });
   });
+
+  root.querySelectorAll<HTMLSelectElement>("select[data-field]").forEach((sel) => {
+    sel.addEventListener("change", applyShowWhen);
+  });
+  applyShowWhen();
 };
 
 // ── Collect all field values ──────────────────────────────────────────────────
