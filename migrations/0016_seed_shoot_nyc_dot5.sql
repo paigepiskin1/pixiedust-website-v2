@@ -10,7 +10,7 @@ INSERT INTO templates (
 (
   'nyc-dot5-stairwell',
   'NYC Stairwell .5',
-  'shoot', 'image', 'Street', 'replicate', 'openai/gpt-image-2',
+  'shoot', 'image', 'Selfie', 'replicate', 'openai/gpt-image-2',
   '{"prompt":"Generate a portrait of her as a cool-vibe .5 iPhone photo of me — selfie angle in a NYC apartment building stairwell, daytime. Ultra-wide front-camera perspective, arm slightly extended holding the phone, concrete steps and metal handrail behind, painted stairwell walls, soft window light from landings mixed with harsh digital flash on the face, candid cool energy, sharp facial likeness to the reference photos, natural skin texture, slightly distorted .5 lens look, authentic phone snapshot, no text overlays.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
   '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Clear face + upper-body shots work best for selfie angle"}]',
   5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
@@ -24,7 +24,7 @@ INSERT INTO templates (
 (
   'nyc-dot5-subway',
   'NYC Subway Seat .5',
-  'shoot', 'image', 'Street', 'replicate', 'openai/gpt-image-2',
+  'shoot', 'image', 'Selfie', 'replicate', 'openai/gpt-image-2',
   '{"prompt":"Generate a portrait of her as a cool-vibe .5 iPhone photo of me — selfie angle sitting on a crowded NYC subway seat, daytime underground car lighting. Ultra-wide front-camera selfie, arm extended, other passengers blurred beside and across the aisle, orange/yellow subway seats, metal poles and ads in the background, fluorescent train light mixed with digital flash on the face, candid cool commute energy, sharp facial likeness to the reference photos, natural skin texture, slightly distorted .5 lens look, authentic phone snapshot, no text overlays.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
   '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Clear face shots look best in the crowded car"}]',
   5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
@@ -38,7 +38,7 @@ INSERT INTO templates (
 (
   'nyc-dot5-cafe',
   'NYC Cafe Coffee .5',
-  'shoot', 'image', 'Lifestyle', 'replicate', 'openai/gpt-image-2',
+  'shoot', 'image', 'Selfie', 'replicate', 'openai/gpt-image-2',
   '{"prompt":"Generate a portrait of her as a cool-vibe .5 iPhone photo of me — selfie angle in a NYC cafe holding a coffee, daytime. Ultra-wide front-camera selfie, arm extended, paper coffee cup in the other hand near the lens, marble or wood cafe table edge, large windows with blurred city street behind, soft daylight mixed with digital flash on the face, iced or hot coffee visible, candid cool cafe energy, sharp facial likeness to the reference photos, natural skin texture, slightly distorted .5 lens look, authentic phone snapshot, no text overlays.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
   '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Face-forward photos work great with the coffee cup in frame"}]',
   5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
