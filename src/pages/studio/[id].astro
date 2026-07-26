@@ -217,49 +217,49 @@ const config = {
             </div>
           )}
 
-          <FieldPanel fields={fields} id="pd-field-panel" />
-
-          {hasOutfitLink && (
-            <div id="pd-product-link" class="mt-4 rounded-xl" style="padding:14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);">
-              <div class="mb-1.5 flex items-center justify-between gap-2">
-                <span class="font-medium text-ink" style="font-size:12.5px;">Or paste a product link</span>
-                <span class="font-mono uppercase" style="font-size:9px;color:var(--pd-ink4);letter-spacing:0.5px;">Checked for safety</span>
+          <FieldPanel fields={fields} id="pd-field-panel">
+            {hasOutfitLink && (
+              <div slot="after-outfit" id="pd-product-link" class="mt-3 rounded-xl" style="padding:14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);">
+                <div class="mb-1.5 flex items-center justify-between gap-2">
+                  <span class="font-medium text-ink" style="font-size:12.5px;">Or paste a product link</span>
+                  <span class="font-mono uppercase" style="font-size:9px;color:var(--pd-ink4);letter-spacing:0.5px;">Checked for safety</span>
+                </div>
+                <p class="mb-2.5 text-ink-4" style="font-size:11px;line-height:1.4;">
+                  We’ll verify the URL, pull product photos, and surface fit details — then you pick which images to try on.
+                </p>
+                <div class="flex gap-2">
+                  <input
+                    id="pd-product-url"
+                    type="url"
+                    inputmode="url"
+                    placeholder="https://shop.com/products/…"
+                    autocomplete="off"
+                    class="min-w-0 flex-1 rounded-xl text-ink outline-none"
+                    style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);font-size:13px;"
+                  />
+                  <button
+                    id="pd-product-fetch"
+                    type="button"
+                    class="shrink-0 rounded-xl font-semibold"
+                    style="padding:10px 14px;font-size:12.5px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;"
+                  >Check link</button>
+                </div>
+                <div id="pd-product-status" class="mt-2 text-ink-4" style="display:none;font-size:11.5px;line-height:1.4;"></div>
+                <div id="pd-product-result" style="display:none;margin-top:12px;">
+                  <div id="pd-product-details" class="mb-3 rounded-lg" style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:12px;line-height:1.45;"></div>
+                  <div class="mb-1.5 font-medium text-ink" style="font-size:12px;">Pick photos to try on</div>
+                  <div id="pd-product-images" class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(88px,1fr));"></div>
+                  <button
+                    id="pd-product-add"
+                    type="button"
+                    class="mt-3 flex w-full items-center justify-center rounded-xl font-semibold"
+                    style="padding:11px 14px;font-size:13px;background:var(--pd-lilac);color:#0A0A0B;border:none;cursor:pointer;"
+                    disabled
+                  >Add selected to outfit</button>
+                </div>
               </div>
-              <p class="mb-2.5 text-ink-4" style="font-size:11px;line-height:1.4;">
-                We’ll verify the URL, pull product photos, and surface fit details — then you pick which images to try on.
-              </p>
-              <div class="flex gap-2">
-                <input
-                  id="pd-product-url"
-                  type="url"
-                  inputmode="url"
-                  placeholder="https://shop.com/products/…"
-                  autocomplete="off"
-                  class="min-w-0 flex-1 rounded-xl text-ink outline-none"
-                  style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);font-size:13px;"
-                />
-                <button
-                  id="pd-product-fetch"
-                  type="button"
-                  class="shrink-0 rounded-xl font-semibold"
-                  style="padding:10px 14px;font-size:12.5px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);cursor:pointer;"
-                >Check link</button>
-              </div>
-              <div id="pd-product-status" class="mt-2 text-ink-4" style="display:none;font-size:11.5px;line-height:1.4;"></div>
-              <div id="pd-product-result" style="display:none;margin-top:12px;">
-                <div id="pd-product-details" class="mb-3 rounded-lg" style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:12px;line-height:1.45;"></div>
-                <div class="mb-1.5 font-medium text-ink" style="font-size:12px;">Pick photos to try on</div>
-                <div id="pd-product-images" class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(88px,1fr));"></div>
-                <button
-                  id="pd-product-add"
-                  type="button"
-                  class="mt-3 flex w-full items-center justify-center rounded-xl font-semibold"
-                  style="padding:11px 14px;font-size:13px;background:var(--pd-lilac);color:#0A0A0B;border:none;cursor:pointer;"
-                  disabled
-                >Add selected to outfit</button>
-              </div>
-            </div>
-          )}
+            )}
+          </FieldPanel>
 
           <div class="mt-4 flex flex-col gap-4">
             {template.aspects && template.aspects.length > 0 && (

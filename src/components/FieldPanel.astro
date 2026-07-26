@@ -53,6 +53,7 @@ function formatAccept(accept: string) {
           <div class="pd-upload-error" style="display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--pd-pink) 12%,transparent);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);font-size:12px;line-height:1.35;"></div>
         </div>
         {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
+        {f.key === "outfit" && <slot name="after-outfit" />}
       </div>
     ) : (
       <label class="block">
