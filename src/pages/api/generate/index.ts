@@ -5,6 +5,11 @@ import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
+import {
+  buildSyncnodeWebhookUrl,
+  finishGenerationInBackground,
+  syncnodeWebhookKey,
+} from "../../../lib/generations";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -16,6 +21,17 @@ export async function POST({ request, locals }: APIContext) {
 
   const env = locals.runtime.env;
   const db = env.DB;
+  const webhookKey = await syncnodeWebhookKey(env.SYNCNODE_API_KEY);
+  const webhookUrl = buildSyncnodeWebhookUrl(new URL(request.url).origin, webhookKey);
+  const scheduleFinish = (genId: string) => {
+    // Keep polling SyncNode after the HTTP response so leaving the studio
+    // page doesn't leave the generation stuck as "processing".
+    const ctx = (locals.runtime as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } }).ctx;
+    const p = finishGenerationInBackground(env, genId, { webhookUrl }).catch((err) => {
+      console.error("[generate] background finish error:", err);
+    });
+    if (ctx?.waitUntil) ctx.waitUntil(p);
+  };
   const dbUser = await getUserByUid(db, user.uid);
   if (!dbUser) return json({ error: "Account not found." }, 401);
   const userId = dbUser.id;
@@ -95,13 +111,19 @@ export async function POST({ request, locals }: APIContext) {
       .run();
 
     try {
-      const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: steps[0].provider, model: steps[0].model, input: step0Input });
+      const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, {
+        provider: steps[0].provider,
+        model: steps[0].model,
+        input: step0Input,
+        webhookUrl,
+      });
       steps[0].jobId = jobId;
       steps[0].status = "processing";
       await db
         .prepare("UPDATE generations SET status='processing', provider_job_id=?, chain_json=?, updated_at=datetime('now') WHERE id=?")
         .bind(jobId, JSON.stringify(chain), genId)
         .run();
+      scheduleFinish(genId);
       return json({ id: genId, status: "processing", balance: deb.balance, cost, steps: steps.length });
     } catch (err) {
       return fail(err);
@@ -158,11 +180,17 @@ export async function POST({ request, locals }: APIContext) {
     .run();
 
   try {
-    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
+    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, {
+      provider: template.provider,
+      model: template.model,
+      input,
+      webhookUrl,
+    });
     await db
       .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
       .bind(jobId, genId)
       .run();
+    scheduleFinish(genId);
     return json({ id: genId, status: "processing", balance: deb.balance, cost });
   } catch (err) {
     return fail(err);
