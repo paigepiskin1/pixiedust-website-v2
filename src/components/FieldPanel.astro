@@ -63,13 +63,17 @@ function formatAccept(accept: string) {
         ) : f.type === "select" && (f.options ?? []).some((o) => (o as any).image) ? (
           <>
             <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
-            <div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fill,140px);gap:8px;justify-content:start;">
+            <div class="pd-opt-cards" style="display:flex;flex-direction:column;gap:6px;">
               {(f.options ?? []).map((o) => {
                 const active = String(f.default ?? f.options?.[0]?.value ?? "") === o.value;
                 return (
-                  <button type="button" class="pd-opt-card" data-val={o.value} data-active={active ? "true" : "false"} style={`display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${active ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)"};border:1px solid ${active ? "var(--pd-lilac)" : "var(--pd-hairline2)"};`}>
-                    {(o as any).image && <img src={(o as any).image} alt={o.label} loading="lazy" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);" />}
-                    <span style="font-size:12px;font-weight:500;color:var(--pd-ink);padding:0 2px 2px;line-height:1.25;">{o.label}</span>
+                  <button type="button" class="pd-opt-card" data-val={o.value} data-active={active ? "true" : "false"} style={`display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${active ? "color-mix(in srgb,var(--pd-lilac) 10%,var(--pd-bg))" : "var(--pd-bg)"};border:0.5px solid ${active ? "var(--pd-lilac)" : "var(--pd-hairline2)"};`}>
+                    {(o as any).image ? (
+                      <img src={(o as any).image} alt="" loading="lazy" style="width:36px;height:36px;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);flex:none;border:0.5px solid var(--pd-hairline);" />
+                    ) : (
+                      <span style="width:36px;height:36px;border-radius:8px;display:block;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex:none;"></span>
+                    )}
+                    <span style="font-size:12.5px;font-weight:500;color:var(--pd-ink);line-height:1.3;">{o.label}</span>
                   </button>
                 );
               })}
@@ -176,12 +180,12 @@ function formatAccept(accept: string) {
       const cards = f.options.map((o: any) => {
         const val = String(o.value ?? o);
         const on = val === current;
-        return `<button type="button" class="pd-opt-card" data-val="${escAttr(val)}" data-active="${on?"true":"false"}" style="display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${on?"color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))":"var(--pd-bg)"};border:1px solid ${on?"var(--pd-lilac)":"var(--pd-hairline2)"};">
-          ${o.image?`<img src="${escAttr(String(o.image))}" alt="${escAttr(String(o.label??val))}" loading="lazy" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);" />`:""}
-          <span style="font-size:12px;font-weight:500;color:var(--pd-ink);padding:0 2px 2px;line-height:1.25;">${escHtml(String(o.label??val))}</span>
+        return `<button type="button" class="pd-opt-card" data-val="${escAttr(val)}" data-active="${on?"true":"false"}" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${on?"color-mix(in srgb,var(--pd-lilac) 10%,var(--pd-bg))":"var(--pd-bg)"};border:0.5px solid ${on?"var(--pd-lilac)":"var(--pd-hairline2)"};">
+          ${o.image?`<img src="${escAttr(String(o.image))}" alt="" loading="lazy" style="width:36px;height:36px;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);flex:none;border:0.5px solid var(--pd-hairline);" />`:`<span style="width:36px;height:36px;border-radius:8px;display:block;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex:none;"></span>`}
+          <span style="font-size:12.5px;font-weight:500;color:var(--pd-ink);line-height:1.3;">${escHtml(String(o.label??val))}</span>
         </button>`;
       }).join("");
-      input = `<input type="hidden" data-field="${key}" value="${escAttr(current)}" /><div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fill,140px);gap:8px;justify-content:start;">${cards}</div>`;
+      input = `<input type="hidden" data-field="${key}" value="${escAttr(current)}" /><div class="pd-opt-cards" style="display:flex;flex-direction:column;gap:6px;">${cards}</div>`;
     } else if (type === "select" && Array.isArray(f.options) && f.ui === "dropdown") {
       const current = def || String(f.options[0]?.value ?? f.options[0] ?? "");
       const opts = f.options.map((o: any) => `<option value="${escAttr(String(o.value??o))}"${String(o.value??o)===current?" selected":""}>${escHtml(String(o.label??o.value??o))}</option>`).join("");
