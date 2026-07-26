@@ -1,6 +1,4 @@
--- Same SQL as migrations/0016_seed_shoot_nyc_dot5.sql — kept here for
--- one-shot remote seeding via: node scripts/seed-shoot-nyc-dot5.mjs
--- Migration 0016: five NYC .5 iPhone photoshoot presets for /shoots.
+-- Same as migrations/0016 (with NYC Walk outfit options). One-shot remote seed.
 
 INSERT INTO templates (
   id, title, kind, type, category, provider, model,
@@ -68,14 +66,14 @@ INSERT INTO templates (
   'nyc-dot5-walk',
   'NYC Walk .5',
   'shoot', 'image', 'Street', 'replicate', 'openai/gpt-image-2',
-  '{"prompt":"Generate a portrait of her as a cool-vibe .5 iPhone photo of me walking in New York City, daytime. Fashion street shot mid-stride on a busy NYC sidewalk, ultra-wide .5 rear-camera perspective, yellow cabs and brownstones or glass towers softly blurred behind, crosswalk stripes optional, digital flash firing in daylight for that harsh cool snapshot look, wind in hair, candid walking energy, sharp facial likeness to the reference photos, natural skin texture, slightly distorted .5 lens look, authentic phone photography, no text overlays.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
-  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Full-body walking shots or clear face + outfit photos work best"}]',
+  '{"prompt":"Generate a cool-vibe .5 iPhone photo of me{{look}} walking in New York City, daytime. Fashion street shot mid-stride on a busy NYC sidewalk, ultra-wide .5 rear-camera perspective, yellow cabs and brownstones or glass towers softly blurred behind, crosswalk stripes optional, digital flash firing in daylight for that harsh cool snapshot look, wind in hair, candid walking energy, sharp facial likeness to the reference photos, natural skin texture, slightly distorted .5 lens look, authentic phone photography, no text overlays.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Full-body walking shots or clear face + outfit photos work best"},{"key":"look","type":"select","label":"Outfit","required":true,"default":" ","help":"Keep the clothes in your photo, or switch into our NYC street look (male / female).","options":[{"value":" ","label":"Keep my original outfit"},{"value":", wearing a cropped asymmetrical one-shoulder tight black top, baggy black jeans, chrome glasses, and a black leather belt with a chrome D-ring buckle. Match the outfit reference image closely","label":"Female — one-shoulder top + baggy jeans","image":"https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785102889634.png","ref":"https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785102889634.png"},{"value":", wearing a loose black tank top, baggy black jeans, chrome glasses, and a black leather belt with a chrome D-ring buckle. Match the outfit reference image closely","label":"Male — loose tank + baggy jeans","image":"https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785102892530.png","ref":"https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785102892530.png"}]}]',
   5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
   '~2 min', '["nyc",".5","walk","street","fashion","flash"]', 'ice', 'var(--pd-mint)',
-  'Street · mid-stride · digital flash',
-  'Cool .5 fashion walk through NYC daytime streets — flash, sidewalks, city blur.',
+  'Street walk · keep or change outfit',
+  'Cool .5 NYC daytime walk with digital flash — keep your outfit, or switch into our black street look (female or male).',
   NULL,
-  '{"kicker":"Photoshoot · NYC .5 Street","howItWorks":["Upload photos of yourself","We put you mid-stride on a NYC sidewalk","Generate the walking fashion still"]}',
+  '{"kicker":"Photoshoot · NYC .5 Street","howItWorks":["Upload photos of yourself","Keep your outfit or pick the female / male street look","We put you mid-stride on a NYC sidewalk"]}',
   1, 0, 0, 0, 14, datetime('now')
 )
 ON CONFLICT(id) DO UPDATE SET
