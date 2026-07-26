@@ -1,6 +1,15 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults } from "../../../lib/templates";
+import {
+  getTemplate,
+  resolveInput,
+  computeCost,
+  isChain,
+  allFields,
+  resolveChainStep,
+  applyFieldDefaults,
+  appendSelectedOptionRefs,
+} from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
@@ -131,7 +140,8 @@ export async function POST({ request, locals }: APIContext) {
   }
 
   // ─── Single step ───
-  const { input } = resolveInput(template, inputs);
+  const resolved = resolveInput(template, inputs);
+  const input = appendSelectedOptionRefs(template, inputs, resolved.input as Record<string, unknown>);
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;
