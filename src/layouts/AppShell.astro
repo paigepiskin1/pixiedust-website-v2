@@ -132,7 +132,13 @@ if (!user) {
       // page — keeps My creations up to date without requiring an open poll tab.
       (function () {
         var run = function () {
-          fetch("/api/generate/reconcile", { method: "POST", credentials: "same-origin" }).catch(function () {});
+          // JSON Content-Type avoids CF/Astro treating this as a cross-site form POST.
+          fetch("/api/generate/reconcile", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          }).catch(function () {});
         };
         if (document.readyState === "complete") run();
         else window.addEventListener("load", run, { once: true });

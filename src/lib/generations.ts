@@ -160,20 +160,80 @@ export async function advanceGenerationByJobId(
   return advanceGeneration(env, gen, webhookUrl);
 }
 
-/** Keep polling SyncNode until the generation finishes or maxMs elapses. */
+/**
+ * Poll SyncNode for one Worker time-slice, then chain a fresh invocation if the
+ * job is still open. Cloudflare waitUntil dies long before GPT Image (~2 min)
+ * finishes, so we re-hit `/api/generate/continue` to keep finalizing after the
+ * user leaves the page.
+ */
 export async function finishGenerationInBackground(
   env: EnvLike,
   id: string,
-  opts?: { webhookUrl?: string; maxMs?: number; intervalMs?: number }
+  opts?: {
+    webhookUrl?: string;
+    origin?: string;
+    continueKey?: string;
+    /** Wall time for THIS isolate slice (keep under CF waitUntil budget). */
+    sliceMs?: number;
+    intervalMs?: number;
+    /** Hop counter — stop chaining after this many continue requests. */
+    hop?: number;
+    maxHops?: number;
+  }
 ): Promise<void> {
-  const maxMs = opts?.maxMs ?? 12 * 60 * 1000;
-  const intervalMs = opts?.intervalMs ?? 3000;
+  const sliceMs = opts?.sliceMs ?? 20_000;
+  const intervalMs = opts?.intervalMs ?? 2500;
+  const hop = opts?.hop ?? 0;
+  const maxHops = opts?.maxHops ?? 40; // ~40 × 20s ≈ 13 min of coverage
   const start = Date.now();
-  while (Date.now() - start < maxMs) {
+
+  while (Date.now() - start < sliceMs) {
     const result = await advanceGenerationById(env, id, opts?.webhookUrl);
     if (result.status === "completed" || result.status === "failed" || result.status === "missing") return;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
+
+  // Still open — wake a new Worker to continue (GET avoids CSRF origin checks).
+  if (hop >= maxHops || !opts?.origin || !opts?.continueKey) return;
+  const url = new URL("/api/generate/continue", opts.origin);
+  url.searchParams.set("id", id);
+  url.searchParams.set("k", opts.continueKey);
+  url.searchParams.set("hop", String(hop + 1));
+  try {
+    await fetch(url.toString(), {
+      method: "GET",
+      headers: { "X-PD-Continue": "1" },
+    });
+  } catch (err) {
+    console.error("[generations] continue chain failed:", err);
+  }
+}
+
+/** Advance every open generation that still has a SyncNode job id. */
+export async function reconcileOpenGenerations(
+  env: EnvLike,
+  opts?: { limit?: number; webhookUrl?: string }
+): Promise<{ advanced: number; completed: number; failed: number }> {
+  const limit = opts?.limit ?? 25;
+  const { results } = await env.DB
+    .prepare(
+      `SELECT * FROM generations
+       WHERE status IN ('pending','processing') AND provider_job_id IS NOT NULL
+       ORDER BY updated_at ASC LIMIT ?`
+    )
+    .bind(limit)
+    .all<GenRow>();
+
+  let advanced = 0;
+  let completed = 0;
+  let failed = 0;
+  for (const gen of results ?? []) {
+    const r = await advanceGeneration(env, gen, opts?.webhookUrl);
+    advanced += 1;
+    if (r.status === "completed") completed += 1;
+    if (r.status === "failed") failed += 1;
+  }
+  return { advanced, completed, failed };
 }
 
 /** Finalize all still-open generations for a user (gallery / app-shell sweep). */

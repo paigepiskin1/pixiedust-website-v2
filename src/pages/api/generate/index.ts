@@ -31,15 +31,22 @@ export async function POST({ request, locals }: APIContext) {
   const env = locals.runtime.env;
   const db = env.DB;
   const webhookKey = await syncnodeWebhookKey(env.SYNCNODE_API_KEY);
-  const webhookUrl = buildSyncnodeWebhookUrl(new URL(request.url).origin, webhookKey);
+  const origin = new URL(request.url).origin;
+  const webhookUrl = buildSyncnodeWebhookUrl(origin, webhookKey);
   const scheduleFinish = (genId: string) => {
-    // Keep polling SyncNode after the HTTP response so leaving the studio
-    // page doesn't leave the generation stuck as "processing".
+    // Poll SyncNode after the response, then self-chain /api/generate/continue
+    // so long jobs (GPT Image) still finalize after the user leaves the page.
     const ctx = (locals.runtime as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } }).ctx;
-    const p = finishGenerationInBackground(env, genId, { webhookUrl }).catch((err) => {
+    const p = finishGenerationInBackground(env, genId, {
+      webhookUrl,
+      origin,
+      continueKey: webhookKey,
+      hop: 0,
+    }).catch((err) => {
       console.error("[generate] background finish error:", err);
     });
     if (ctx?.waitUntil) ctx.waitUntil(p);
+    else p.catch(() => {});
   };
   const dbUser = await getUserByUid(db, user.uid);
   if (!dbUser) return json({ error: "Account not found." }, 401);
