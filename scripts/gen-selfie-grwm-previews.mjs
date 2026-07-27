@@ -12,15 +12,12 @@ if (!SYNCNODE_KEY || !CF_TOKEN) {
   process.exit(1);
 }
 
-const SUBJECTS = (() => {
-  try {
-    if (existsSync("scripts/subjects.json")) {
-      const arr = JSON.parse(readFileSync("scripts/subjects.json", "utf8"));
-      if (Array.isArray(arr) && arr.length) return arr;
-    }
-  } catch {}
-  return ["https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1779890226156.png"];
-})();
+const SUBJECTS = [
+  "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/355c2fcb-45ce-4523-a81a-90e1cddda0a4.png",
+  "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/5055cf92-d177-4be1-9d81-33333e9b057d.png",
+  "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/9387528e-3f14-4bd6-8055-ff3b4dacd02b.png",
+];
+const FORCE = process.argv.includes("--force");
 
 const IDS = [
   "grwm-lipgloss-selfie",
@@ -92,11 +89,10 @@ for (let i = 0; i < IDS.length; i++) {
     console.log(`skip ${id} (missing)`);
     continue;
   }
-  if (t.preview_image) {
+  if (t.preview_image && !FORCE) {
     console.log(`skip ${id} (has preview)`);
     continue;
   }
-  const subject = SUBJECTS[i % SUBJECTS.length];
   let input;
   try {
     input = JSON.parse(t.input_json);
@@ -105,7 +101,8 @@ for (let i = 0; i < IDS.length; i++) {
     failed++;
     continue;
   }
-  input.input_images = [subject];
+  input.input_images = SUBJECTS;
+  input.moderation = input.moderation || "low";
   input.aspect_ratio = "2:3";
   delete input.number_of_images; // keep if model wants it
   process.stdout.write(`${id} … `);
