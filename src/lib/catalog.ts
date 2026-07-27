@@ -87,12 +87,12 @@ export const SHOOT_CATS = [
   "All",
   "Selfie",
   "Street",
+  "Lifestyle",
   "Movies",
   "Broadcast Trends",
   "Editorial",
   "Professional",
   "Glamour",
-  "Lifestyle",
   "Fantasy",
 ];
 const shootRaw: Omit<CatalogItem, "accent" | "href">[] = [

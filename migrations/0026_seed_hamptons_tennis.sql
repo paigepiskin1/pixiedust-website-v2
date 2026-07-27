@@ -1,0 +1,75 @@
+-- Three Hamptons tennis Lifestyle photoshoots — Canon G7X look,
+-- white tennis fit (skirt, cami, sneakers, headband).
+
+INSERT INTO templates (
+  id, title, kind, type, category, provider, model,
+  input_json, fields_json, credit_cost, quality_json, aspects_json, quantities_json,
+  eta, tags_json, tone, accent, subtitle, description, preview_image, meta,
+  is_featured, is_hidden, is_admin_only, is_adult, sort_order, updated_at
+) VALUES
+(
+  'hamptons-tennis-play',
+  'Hamptons Tennis Play',
+  'shoot', 'image', 'Lifestyle', 'replicate', 'openai/gpt-image-2',
+  '{"prompt":"Generate a candid Canon PowerShot G7X Mark II lifestyle photoshoot still of me playing tennis on a manicured Hamptons tennis court. Mid-rally action — swinging a racket toward a yellow tennis ball, athletic movement, white tennis skirt, white cami top, white sneakers, white sport headband. Bright East Hampton summer daylight, tree-lined court, clipped hedges, white court lines, coastal country-club atmosphere. Natural G7X look — slightly warm tones, soft contrast, gentle compact-camera compression, authentic lifestyle photography, sharp facial likeness to the reference photos, natural skin texture, no text overlays.","quality":"auto","background":"auto","moderation":"low","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Clear face + full or three-quarter body photos work best"},{"key":"outfit","type":"file","label":"Change outfit (optional)","required":false,"multiple":true,"max":4,"accept":"image/*","help":"Optional — upload outfit photos to wear instead of the white tennis fit."}]',
+  5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
+  '~2 min', '["tennis","hamptons","lifestyle","g7x","court","sport"]', 'mint', 'var(--pd-mint)',
+  'Lifestyle · Hamptons · mid-rally',
+  'Canon G7X tennis action on a manicured Hamptons court — white skirt, cami, sneakers, headband.',
+  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785163378634.png'"kicker":"Photoshoot · Hamptons Tennis","howItWorks":["Upload clear photos of yourself","We put you mid-rally on a Hamptons tennis court in the white tennis fit","Pick a ratio and generate"]}',
+  1, 0, 0, 0, 30, datetime('now')
+),
+(
+  'hamptons-tennis-court-lay',
+  'Hamptons Tennis Court Lay',
+  'shoot', 'image', 'Lifestyle', 'replicate', 'openai/gpt-image-2',
+  '{"prompt":"Generate a candid Canon PowerShot G7X Mark II lifestyle photoshoot still of me lying on a manicured Hamptons tennis court. Reclined on the green hard court surface next to a tennis racket and a few yellow tennis balls, relaxed cute pose looking toward the camera, wearing a white tennis skirt, white cami top, white sneakers, white sport headband. Soft late-afternoon Hamptons sun, tree line and hedges beyond the fence, coastal country-club vibe. Natural G7X look — slightly warm tones, soft contrast, gentle compact-camera compression, authentic lifestyle photography, sharp facial likeness to the reference photos, natural skin texture, no text overlays.","quality":"auto","background":"auto","moderation":"low","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Clear face photos work great for the court lay pose"},{"key":"outfit","type":"file","label":"Change outfit (optional)","required":false,"multiple":true,"max":4,"accept":"image/*","help":"Optional — upload outfit photos to wear instead of the white tennis fit."}]',
+  5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
+  '~2 min', '["tennis","hamptons","lifestyle","g7x","court","lay"]', 'amber', 'var(--pd-amber)',
+  'Lifestyle · Hamptons · court lay',
+  'Canon G7X court lay — racket + tennis balls beside you, white tennis fit, Hamptons summer light.',
+  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785163510687.png'"kicker":"Photoshoot · Hamptons Tennis","howItWorks":["Upload clear photos of yourself","We place you lying on a Hamptons court with racket and balls","Generate the still"]}',
+  1, 0, 0, 0, 31, datetime('now')
+),
+(
+  'hamptons-tennis-pose',
+  'Hamptons Tennis Pose',
+  'shoot', 'image', 'Lifestyle', 'replicate', 'openai/gpt-image-2',
+  '{"prompt":"Generate a candid Canon PowerShot G7X Mark II lifestyle photoshoot still of me in a cute tennis pose on a manicured Hamptons tennis court. Standing near the net, racket resting casually over one shoulder, soft smile toward the camera, wearing a white tennis skirt, white cami top, white sneakers, white sport headband. Bright East Hampton summer daylight, clipped hedges and trees framing the court, coastal country-club atmosphere. Natural G7X look — slightly warm tones, soft contrast, gentle compact-camera compression, authentic lifestyle photography, sharp facial likeness to the reference photos, natural skin texture, no text overlays.","quality":"auto","background":"auto","moderation":"low","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Clear face + full or three-quarter body photos work best"},{"key":"outfit","type":"file","label":"Change outfit (optional)","required":false,"multiple":true,"max":4,"accept":"image/*","help":"Optional — upload outfit photos to wear instead of the white tennis fit."}]',
+  5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
+  '~2 min', '["tennis","hamptons","lifestyle","g7x","pose","court"]', 'lilac', 'var(--pd-lilac)',
+  'Lifestyle · Hamptons · cute pose',
+  'Canon G7X tennis portrait — racket over shoulder, white tennis fit, manicured Hamptons court.',
+  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785163592860.png'"kicker":"Photoshoot · Hamptons Tennis","howItWorks":["Upload clear photos of yourself","We put you in a cute Hamptons tennis pose in the white fit","Generate the still"]}',
+  1, 0, 0, 0, 32, datetime('now')
+)
+ON CONFLICT(id) DO UPDATE SET
+  title=excluded.title,
+  kind=excluded.kind,
+  type=excluded.type,
+  category=excluded.category,
+  provider=excluded.provider,
+  model=excluded.model,
+  input_json=excluded.input_json,
+  fields_json=excluded.fields_json,
+  credit_cost=excluded.credit_cost,
+  quality_json=excluded.quality_json,
+  aspects_json=excluded.aspects_json,
+  quantities_json=excluded.quantities_json,
+  eta=excluded.eta,
+  tags_json=excluded.tags_json,
+  tone=excluded.tone,
+  accent=excluded.accent,
+  subtitle=excluded.subtitle,
+  description=excluded.description,
+  preview_image=COALESCE(excluded.preview_image, templates.preview_image),
+  meta=excluded.meta,
+  is_featured=excluded.is_featured,
+  is_hidden=excluded.is_hidden,
+  is_admin_only=excluded.is_admin_only,
+  is_adult=excluded.is_adult,
+  sort_order=excluded.sort_order,
+  updated_at=excluded.updated_at;
