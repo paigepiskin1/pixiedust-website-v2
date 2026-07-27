@@ -25,11 +25,122 @@ const { fields = [], id } = Astro.props;
 function formatAccept(accept: string) {
   return accept.replace(/image\//g, "").replace(/video\//g, "").replace(/,\s*/g, ", ").toUpperCase();
 }
+
+function isSquareFile(f: TemplateField) {
+  return f.type === "file" && !f.multiple && f.ui === "square";
+}
+
+type FieldGroup =
+  | { kind: "pair"; a: TemplateField; b: TemplateField }
+  | { kind: "single"; f: TemplateField };
+
+function groupFields(list: TemplateField[]): FieldGroup[] {
+  const out: FieldGroup[] = [];
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    const n = list[i + 1];
+    if (isSquareFile(f) && n && isSquareFile(n)) {
+      out.push({ kind: "pair", a: f, b: n });
+      i++;
+    } else {
+      out.push({ kind: "single", f });
+    }
+  }
+  return out;
+}
+
+const grouped = groupFields(fields);
 ---
 
+{/* Square dual-upload tiles (You + Friend) sit side by side. */}
+<style is:global>
+  .pd-file-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .pd-file-square .pd-upload-zone {
+    aspect-ratio: 1;
+    justify-content: center;
+    padding: 12px 8px !important;
+  }
+  .pd-file-square .pd-upload-zone .pd-square-hint {
+    font-size: 10.5px;
+    color: var(--pd-ink4);
+    pointer-events: none;
+    line-height: 1.25;
+  }
+  .pd-file-square .pd-file-preview {
+    aspect-ratio: 1;
+    margin-top: 0 !important;
+    position: relative;
+  }
+  .pd-file-square .pd-file-preview .pd-preview-img {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    object-fit: cover !important;
+  }
+  .pd-file-square .pd-file-preview .pd-square-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 8px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.55));
+    border-top: none !important;
+  }
+  .pd-file-square .pd-file-preview .pd-preview-status {
+    color: #fff !important;
+    font-size: 10px !important;
+  }
+</style>
+
 <div class="pd-field-panel flex flex-col gap-4" id={id}>
-  {fields.map((f) => (
-    f.type === "file" ? (
+  {grouped.map((g) => {
+    if (g.kind === "pair") {
+      const renderSquare = (f: TemplateField) => (
+        <div
+          class="block pd-file-square"
+          data-show-when-field={f.showWhen?.field}
+          data-show-when-includes={f.showWhen?.includes}
+          data-show-when-equals={f.showWhen?.equals}
+          data-hide-when-field={f.hideWhen?.field}
+          data-hide-when-truthy={f.hideWhen ? String(f.hideWhen.truthy !== false) : undefined}
+          style={f.showWhen || f.hideWhen ? "display:none;" : undefined}
+        >
+          <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
+          <div class="pd-file-wrap" data-fieldkey={f.key} data-ui="square" data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
+            <div class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
+              <span class="pd-square-hint">Upload photo</span>
+              <input data-field={f.key} type="file" accept={f.accept} class="absolute inset-0 cursor-pointer opacity-0" style="z-index:1;" />
+            </div>
+            <div class="pd-file-preview overflow-hidden rounded-xl" style="display:none;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+              <img class="pd-preview-img block" style="background:var(--pd-bg3);" alt="" />
+              <div class="pd-square-bar flex items-center justify-between gap-2">
+                <span class="pd-preview-status truncate" style="font-size:11px;"></span>
+                <button type="button" class="pd-file-clear flex shrink-0 items-center justify-center rounded-full" style="width:20px;height:20px;background:rgba(255,255,255,0.9);border:none;color:var(--pd-ink);font-size:10px;cursor:pointer;" aria-label="Remove">✕</button>
+              </div>
+            </div>
+            <div class="pd-upload-error" style="display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--pd-pink) 12%,transparent);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);font-size:12px;line-height:1.35;"></div>
+          </div>
+          {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
+        </div>
+      );
+      return (
+        <div class="pd-file-pair">
+          {renderSquare(g.a)}
+          {renderSquare(g.b)}
+        </div>
+      );
+    }
+    const f = g.f;
+    return f.type === "file" ? (
       <div
         class="block"
         data-show-when-field={f.showWhen?.field}
@@ -146,8 +257,8 @@ function formatAccept(accept: string) {
         )}
         {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
       </label>
-    )
-  ))}
+    );
+  })}
 </div>
 
 <script>
@@ -172,7 +283,36 @@ function formatAccept(accept: string) {
     return;
   }
   const S = "padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);border-radius:12px;font-size:13.5px;color:var(--pd-ink);outline:none;width:100%;box-sizing:border-box;";
-  container.innerHTML = fields.map((f: any) => {
+  const isSquare = (f: any) => String(f?.type ?? "") === "file" && !f.multiple && f.ui === "square";
+
+  function renderSquareFile(f: any): string {
+    const key = String(f.key ?? "");
+    const label = String(f.label ?? key);
+    const accept = String(f.accept ?? "");
+    const help = f.help ? `<span style="display:block;margin-top:4px;font-size:11px;color:var(--pd-ink4);">${escHtml(f.help)}</span>` : "";
+    const sw = showWhenAttrs(f);
+    return `<div class="pd-file-square"${sw}>
+      <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
+      <div class="pd-file-wrap" data-fieldkey="${key}" data-ui="square"${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
+        <div class="pd-upload-zone" style="position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;aspect-ratio:1;padding:12px 8px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);border-radius:12px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
+          <span class="pd-square-hint" style="font-size:10.5px;color:var(--pd-ink4);pointer-events:none;">Upload photo</span>
+          <input data-field="${key}" type="file"${accept?` accept="${accept}"`:""} style="position:absolute;inset:0;opacity:0;cursor:pointer;z-index:1;" />
+        </div>
+        <div class="pd-file-preview" style="display:none;overflow:hidden;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);aspect-ratio:1;position:relative;">
+          <img class="pd-preview-img" style="display:block;width:100%;height:100%;object-fit:cover;background:var(--pd-bg3);" alt="" />
+          <div class="pd-square-bar" style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;background:linear-gradient(transparent,rgba(0,0,0,.55));">
+            <span class="pd-preview-status" style="font-size:10px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+            <button type="button" class="pd-file-clear" style="flex-shrink:0;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.9);border:none;color:var(--pd-ink);font-size:10px;cursor:pointer;line-height:1;">✕</button>
+          </div>
+        </div>
+        <div class="pd-upload-error" style="display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--pd-pink) 12%,transparent);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);font-size:12px;line-height:1.35;"></div>
+      </div>
+      ${help}
+    </div>`;
+  }
+
+  function renderOne(f: any): string {
     const key = String(f.key ?? "");
     const label = String(f.label ?? key);
     const type = String(f.type ?? "text");
@@ -181,6 +321,7 @@ function formatAccept(accept: string) {
     const help = f.help ? `<span style="display:block;margin-top:4px;font-size:11px;color:var(--pd-ink4);">${escHtml(f.help)}</span>` : "";
 
     if (type === "file") {
+      if (isSquare(f)) return renderSquareFile(f);
       const isMulti = !!f.multiple;
       const maxFiles = Number(f.max ?? 4);
       const accept = String(f.accept ?? "");
@@ -260,7 +401,20 @@ function formatAccept(accept: string) {
       <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
       ${input}${help}
     </label>`;
-  }).join("");
+  }
+
+  const parts: string[] = [];
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    const n = fields[i + 1];
+    if (isSquare(f) && n && isSquare(n)) {
+      parts.push(`<div class="pd-file-pair">${renderSquareFile(f)}${renderSquareFile(n)}</div>`);
+      i++;
+    } else {
+      parts.push(renderOne(f));
+    }
+  }
+  container.innerHTML = parts.join("");
 };
 
 function showWhenAttrs(f: any): string {

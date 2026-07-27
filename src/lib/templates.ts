@@ -36,8 +36,8 @@ export interface TemplateField {
   accept?: string;
   placeholder?: string;
   multiple?: boolean;
-  /** For select fields: "buttons" (default) or "dropdown". */
-  ui?: "buttons" | "dropdown";
+  /** For select fields: "buttons" (default) or "dropdown". For file fields: "square" = compact square upload tile (used in side-by-side You/Friend pairs). */
+  ui?: "buttons" | "dropdown" | "square";
   /** Optionally show this field only when another field's value matches. */
   showWhen?: { field: string; includes?: string; equals?: string };
   /** Optionally hide this field when another field is truthy (e.g. keep_outfit). */
@@ -409,9 +409,13 @@ export function ensureOptionalOutfitUpload(t: Template): Template {
   }
 
   if (keepIdx < 0) {
-    // Insert keep checkbox right after the primary photo upload field.
-    const filesIdx = fields.findIndex((f) => f.key === "files" || f.key === "person" || f.type === "file");
-    const insertAt = filesIdx >= 0 ? filesIdx + 1 : 0;
+    // Insert keep checkbox after the primary photo upload(s) — prefer after
+    // "friend" so With Friends You/Friend squares stay adjacent.
+    const friendIdx = fields.findIndex((f) => f.key === "friend" && f.type === "file");
+    const personIdx = fields.findIndex((f) => f.key === "person" && f.type === "file");
+    const filesIdx = fields.findIndex((f) => f.key === "files" || f.type === "file");
+    const anchor = friendIdx >= 0 ? friendIdx : personIdx >= 0 ? personIdx : filesIdx;
+    const insertAt = anchor >= 0 ? anchor + 1 : 0;
     fields.splice(insertAt, 0, { ...KEEP_OUTFIT_FIELD });
   } else {
     fields[keepIdx] = {

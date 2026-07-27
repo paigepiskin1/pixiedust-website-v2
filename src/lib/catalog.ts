@@ -86,6 +86,7 @@ export const PRESETS: CatalogItem[] = presetRaw.map((p) => ({ ...p, accent: AMBE
 export const SHOOT_CATS = [
   "All",
   "Selfie",
+  "With Friends",
   "Street",
   "Lifestyle",
   "Movies",
