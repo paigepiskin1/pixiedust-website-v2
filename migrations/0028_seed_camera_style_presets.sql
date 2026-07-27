@@ -17,7 +17,8 @@ INSERT INTO templates (
   '~2 min', '["y2k","digicam","flash","camera","grade"]', 'pink', 'var(--pd-pink)',
   'Y2K · digicam flash',
   'Early-2000s digicam flash look — jpeg crunch, cool whites. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165220152.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166216445.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 10, datetime('now')
 ),
 (
@@ -30,7 +31,8 @@ INSERT INTO templates (
   '~2 min', '["y2k","chrome","cyan","grade","camera"]', 'ice', 'var(--pd-mint)',
   'Y2K · cyber chrome grade',
   'Icy cyan-silver Y2K chrome grade. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165224093.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166202428.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 11, datetime('now')
 ),
 (
@@ -43,7 +45,8 @@ INSERT INTO templates (
   '~2 min', '["y2k","webcam","pink","soft","grade"]', 'dusk', 'var(--pd-lilac)',
   'Y2K · pink webcam',
   'Soft pink webcam nostalgia. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165223977.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166164428.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 12, datetime('now')
 ),
 (
@@ -56,7 +59,8 @@ INSERT INTO templates (
   '~2 min', '["night","flash","party","camera","lighting"]', 'noir', 'var(--pd-lilac)',
   'Night · party flash',
   'Harsh night flash, crushed blacks. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165228142.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166136876.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 13, datetime('now')
 ),
 (
@@ -69,7 +73,8 @@ INSERT INTO templates (
   '~2 min', '["night","flash","noir","mood","lighting"]', 'noir', 'var(--pd-amber)',
   'Night · dark flash',
   'Moody dark flash with long falloff. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165276118.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166537664.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 14, datetime('now')
 ),
 (
@@ -82,7 +87,8 @@ INSERT INTO templates (
   '~2 min', '["sunset","golden","hour","lighting","mood"]', 'amber', 'var(--pd-amber)',
   'Sunset · golden hour',
   'Warm amber sunset wrap light. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165262823.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166306138.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 15, datetime('now')
 ),
 (
@@ -95,7 +101,8 @@ INSERT INTO templates (
   '~2 min', '["sunset","flare","magic","hour","lighting"]', 'dusk', 'var(--pd-pink)',
   'Sunset · magic hour flare',
   'Peach sunset light with soft flare. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165281610.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166307280.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 16, datetime('now')
 ),
 (
@@ -108,7 +115,8 @@ INSERT INTO templates (
   '~2 min', '["bluehour","sunset","cool","lighting","mood"]', 'ice', 'var(--pd-teal)',
   'Sunset · blue hour',
   'Deep cobalt post-sunset light. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165282908.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166383925.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 17, datetime('now')
 ),
 (
@@ -121,7 +129,8 @@ INSERT INTO templates (
   '~2 min', '["fisheye","wide","lens","camera","distortion"]', 'teal', 'var(--pd-teal)',
   'Lens · fisheye',
   'Ultra-wide fisheye barrel distortion. Face identity + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165337267.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166692329.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 18, datetime('now')
 ),
 (
@@ -134,7 +143,8 @@ INSERT INTO templates (
   '~2 min', '["fisheye","peephole","lens","camera","wide"]', 'noir', 'var(--pd-lilac)',
   'Lens · peephole fisheye',
   'Extreme circular peephole fisheye. Face identity + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165344107.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166606558.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 19, datetime('now')
 ),
 (
@@ -147,7 +157,8 @@ INSERT INTO templates (
   '~2 min', '["highangle","angle","camera","perspective","creative"]', 'mint', 'var(--pd-mint)',
   'Angle · high looking down',
   'Elevated high-angle perspective. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165338913.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166679119.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 20, datetime('now')
 ),
 (
@@ -160,7 +171,8 @@ INSERT INTO templates (
   '~2 min', '["lowangle","hero","angle","camera","perspective"]', 'teal', 'var(--pd-teal)',
   'Angle · low hero up',
   'Dramatic low-angle hero look. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165338721.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166597497.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 21, datetime('now')
 ),
 (
@@ -173,7 +185,8 @@ INSERT INTO templates (
   '~2 min', '["dutch","tilt","angle","camera","creative"]', 'lilac', 'var(--pd-lilac)',
   'Angle · dutch tilt',
   'Canted dutch-tilt framing. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165400379.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166843094.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 22, datetime('now')
 ),
 (
@@ -186,7 +199,8 @@ INSERT INTO templates (
   '~2 min', '["zoom","wide","framing","camera","creative"]', 'mint', 'var(--pd-mint)',
   'Framing · zoom out',
   'Pull-back wider environmental framing. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165384613.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166831439.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 23, datetime('now')
 ),
 (
@@ -199,7 +213,8 @@ INSERT INTO templates (
   '~2 min', '["selfie","distortion","fix","lens","camera"]', 'ice', 'var(--pd-mint)',
   'Lens · selfie fix',
   'Corrects selfie wide-angle warp. Identity + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165400575.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166824778.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 24, datetime('now')
 ),
 (
@@ -212,7 +227,8 @@ INSERT INTO templates (
   '~2 min', '["50mm","portrait","lens","camera","prime"]', 'amber', 'var(--pd-amber)',
   'Lens · 50mm portrait',
   'Classic 50mm compression and separation. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165392565.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166811026.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 25, datetime('now')
 ),
 (
@@ -225,7 +241,8 @@ INSERT INTO templates (
   '~2 min', '["anamorphic","flare","cinema","lens","camera"]', 'dusk', 'var(--pd-lilac)',
   'Lens · anamorphic',
   'Cinematic anamorphic streak flares. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165447992.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166992903.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 26, datetime('now')
 ),
 (
@@ -238,7 +255,8 @@ INSERT INTO templates (
   '~2 min', '["teal","orange","cinema","grade","color"]', 'teal', 'var(--pd-teal)',
   'Grade · teal & orange',
   'Blockbuster teal-orange cinema grade. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165447023.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166987374.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 27, datetime('now')
 ),
 (
@@ -251,7 +269,8 @@ INSERT INTO templates (
   '~2 min', '["softbox","beauty","lighting","studio","grade"]', 'lilac', 'var(--pd-lilac)',
   'Light · softbox beauty',
   'Large soft beauty key light. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165432101.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166899091.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 28, datetime('now')
 ),
 (
@@ -264,7 +283,8 @@ INSERT INTO templates (
   '~2 min', '["disposable","flash","film","camera","grain"]', 'amber', 'var(--pd-amber)',
   'Camera · disposable flash',
   'Grainy disposable flash snapshot. Face + outfit locked.',
-  NULL'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785165452061.png'"kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
+  'https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785166902879.png',
+  '{""kicker":"Preset · Camera Style","howItWorks":["Upload your photo","We restyle camera, lighting, and grade only","Face and outfit stay the same"]}',
   1, 0, 0, 0, 29, datetime('now')
 )
 ON CONFLICT(id) DO UPDATE SET
