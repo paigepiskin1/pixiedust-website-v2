@@ -12,6 +12,7 @@ import {
   isUploadLook,
   ensureOptionalOutfitUpload,
   collectOutfitUrls,
+  isKeepOriginalOutfit,
 } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
@@ -68,7 +69,11 @@ export async function POST({ request, locals }: APIContext) {
   const template = ensureOptionalOutfitUpload(templateRaw);
   // Apply field defaults before validation/resolve so optional prompts with a
   // baked-in `default` still reach the model when the user leaves them blank.
-  const inputs = applyFieldDefaults(template, body.inputs ?? {});
+  let inputs = applyFieldDefaults(template, body.inputs ?? {});
+  if (isKeepOriginalOutfit(inputs)) {
+    // Force the "keep clothes" look token and ignore any uploaded outfit refs.
+    inputs = { ...inputs, look: " ", outfit: undefined };
+  }
 
   // Validate required fields (covers single + multi-step via allFields).
   const missing = allFields(template).filter((f) => f.required && (inputs[f.key] == null || inputs[f.key] === ""));

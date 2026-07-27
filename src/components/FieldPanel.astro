@@ -35,7 +35,9 @@ function formatAccept(accept: string) {
         data-show-when-field={f.showWhen?.field}
         data-show-when-includes={f.showWhen?.includes}
         data-show-when-equals={f.showWhen?.equals}
-        style={f.showWhen ? "display:none;" : undefined}
+        data-hide-when-field={f.hideWhen?.field}
+        data-hide-when-truthy={f.hideWhen ? String(f.hideWhen.truthy !== false) : undefined}
+        style={f.showWhen || f.hideWhen ? "display:none;" : undefined}
       >
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
@@ -61,13 +63,37 @@ function formatAccept(accept: string) {
         {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
         {f.key === "outfit" && <slot name="after-outfit" />}
       </div>
+    ) : f.type === "toggle" ? (
+      <label
+        class="flex cursor-pointer items-start gap-3 rounded-xl"
+        data-show-when-field={f.showWhen?.field}
+        data-show-when-includes={f.showWhen?.includes}
+        data-show-when-equals={f.showWhen?.equals}
+        data-hide-when-field={f.hideWhen?.field}
+        data-hide-when-truthy={f.hideWhen ? String(f.hideWhen.truthy !== false) : undefined}
+        style={`padding:12px 14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);${f.showWhen || f.hideWhen ? "display:none;" : ""}`}
+      >
+        <input
+          data-field={f.key}
+          type="checkbox"
+          checked={f.default === true || f.default === "true"}
+          class="mt-0.5"
+          style="width:16px;height:16px;accent-color:var(--pd-ink);flex:none;"
+        />
+        <span class="min-w-0">
+          <span class="block font-medium text-ink" style="font-size:12.5px;">{f.label}</span>
+          {f.help && <span class="mt-0.5 block text-ink-4" style="font-size:11px;">{f.help}</span>}
+        </span>
+      </label>
     ) : (
       <label
         class="block"
         data-show-when-field={f.showWhen?.field}
         data-show-when-includes={f.showWhen?.includes}
         data-show-when-equals={f.showWhen?.equals}
-        style={f.showWhen ? "display:none;" : undefined}
+        data-hide-when-field={f.hideWhen?.field}
+        data-hide-when-truthy={f.hideWhen ? String(f.hideWhen.truthy !== false) : undefined}
+        style={f.showWhen || f.hideWhen ? "display:none;" : undefined}
       >
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         {f.type === "textarea" ? (
@@ -159,7 +185,8 @@ function formatAccept(accept: string) {
       const maxFiles = Number(f.max ?? 4);
       const accept = String(f.accept ?? "");
       const acceptLabel = accept ? accept.replace(/image\//g,"").replace(/video\//g,"").replace(/,\s*/g,", ").toUpperCase() : "";
-      return `<div>
+      const sw = showWhenAttrs(f);
+      return `<div${sw}>
         <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
         <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
           <div class="pd-upload-zone" style="position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);border-radius:12px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;">
@@ -182,6 +209,18 @@ function formatAccept(accept: string) {
         </div>
         ${help}
       </div>`;
+    }
+
+    if (type === "toggle") {
+      const on = f.default === true || f.default === "true";
+      const sw = showWhenAttrs(f);
+      return `<label${sw} style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);border-radius:12px;cursor:pointer;">
+        <input data-field="${key}" type="checkbox"${on ? " checked" : ""} style="width:16px;height:16px;margin-top:2px;accent-color:var(--pd-ink);flex:none;" />
+        <span style="min-width:0;">
+          <span style="display:block;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}</span>
+          ${help}
+        </span>
+      </label>`;
     }
 
     let input = "";
@@ -216,12 +255,28 @@ function formatAccept(accept: string) {
       const t = type === "url" ? "url" : type === "email" ? "email" : "text";
       input = `<input data-field="${key}" type="${t}" placeholder="${escAttr(ph)}" value="${escAttr(def)}" style="${S}" />`;
     }
-    return `<label style="display:block;">
+    const sw = showWhenAttrs(f);
+    return `<label${sw} style="display:block;">
       <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
       ${input}${help}
     </label>`;
   }).join("");
 };
+
+function showWhenAttrs(f: any): string {
+  const bits: string[] = [];
+  if (f?.showWhen?.field) {
+    bits.push(`data-show-when-field="${escAttr(String(f.showWhen.field))}"`);
+    if (f.showWhen.includes) bits.push(`data-show-when-includes="${escAttr(String(f.showWhen.includes))}"`);
+    if (f.showWhen.equals != null) bits.push(`data-show-when-equals="${escAttr(String(f.showWhen.equals))}"`);
+  }
+  if (f?.hideWhen?.field) {
+    bits.push(`data-hide-when-field="${escAttr(String(f.hideWhen.field))}"`);
+    bits.push(`data-hide-when-truthy="${f.hideWhen.truthy === false ? "false" : "true"}"`);
+  }
+  if (!bits.length) return "";
+  return ` ${bits.join(" ")} style="display:none;"`;
+}
 
 function escHtml(s: string) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
@@ -465,18 +520,36 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     } catch { /* ignore bad default */ }
   });
 
+  const fieldValue = (field: string): string => {
+    const src = root.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+      `[data-field="${field}"]`
+    );
+    if (!src) return "";
+    if ((src as HTMLInputElement).type === "checkbox") {
+      return (src as HTMLInputElement).checked ? "true" : "false";
+    }
+    return String((src as HTMLInputElement).value ?? "");
+  };
+
   const applyShowWhen = () => {
-    root.querySelectorAll<HTMLElement>("[data-show-when-field]").forEach((el) => {
-      const field = el.dataset.showWhenField || "";
-      if (!field) return;
-      const src =
-        root.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`[data-field="${field}"]`);
-      const val = src ? String((src as HTMLInputElement).value ?? "") : "";
-      const includes = el.dataset.showWhenIncludes || "";
-      const equals = el.dataset.showWhenEquals;
+    root.querySelectorAll<HTMLElement>("[data-show-when-field], [data-hide-when-field]").forEach((el) => {
       let show = true;
-      if (equals != null && equals !== "") show = val === equals;
-      else if (includes) show = val.toLowerCase().includes(includes.toLowerCase());
+      const field = el.dataset.showWhenField || "";
+      if (field) {
+        const val = fieldValue(field);
+        const includes = el.dataset.showWhenIncludes || "";
+        const equals = el.dataset.showWhenEquals;
+        if (equals != null && equals !== "") show = val === equals;
+        else if (includes) show = val.toLowerCase().includes(includes.toLowerCase());
+      }
+      const hideField = el.dataset.hideWhenField || "";
+      if (hideField) {
+        const hv = fieldValue(hideField);
+        const truthy = el.dataset.hideWhenTruthy !== "false";
+        const isOn = hv === "true" || hv === "1" || hv === "on";
+        if (truthy && isOn) show = false;
+        if (!truthy && !isOn) show = false;
+      }
       el.style.display = show ? "" : "none";
     });
   };
@@ -522,6 +595,9 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
   root.querySelectorAll<HTMLSelectElement>("select[data-field]").forEach((sel) => {
     sel.addEventListener("change", applyShowWhen);
   });
+  root.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-field]').forEach((box) => {
+    box.addEventListener("change", applyShowWhen);
+  });
   applyShowWhen();
 };
 
@@ -532,6 +608,10 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     const key = (el as HTMLInputElement).dataset.field!;
     if ((el as HTMLInputElement).type === "file") {
       if (fileUrls[key] != null) out[key] = fileUrls[key];
+      return;
+    }
+    if ((el as HTMLInputElement).type === "checkbox") {
+      out[key] = (el as HTMLInputElement).checked;
       return;
     }
     out[key] = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
