@@ -59,7 +59,7 @@ const TEMPLATES = [
     tags: ["friends", "concert", "selfie", "night", "duo"],
     tone: "lilac",
     accent: "var(--pd-lilac)",
-    pair: [GIRL_A, GIRL_B],
+    pair: [GIRL_A, GIRL_C],
     sort: 40,
   },
   {
@@ -83,7 +83,7 @@ const TEMPLATES = [
     tags: ["friends", "car", "passenger", "wide", "selfie", "duo"],
     tone: "mint",
     accent: "var(--pd-mint)",
-    pair: [GIRL_B, GIRL_C],
+    pair: [GIRL_A, GIRL_C],
     sort: 42,
   },
   {
@@ -95,7 +95,7 @@ const TEMPLATES = [
     tags: ["friends", "car", "overhead", "selfie", "duo"],
     tone: "teal",
     accent: "var(--pd-teal)",
-    pair: [GIRL_A, GIRL_B],
+    pair: [GIRL_A, GIRL_C],
     sort: 43,
   },
   {
@@ -119,7 +119,7 @@ const TEMPLATES = [
     tags: ["friends", "pilates", "cafe", "pink", "athleisure", "duo"],
     tone: "pink",
     accent: "var(--pd-pink)",
-    pair: [GIRL_B, GIRL_C],
+    pair: [GIRL_A, GIRL_C],
     sort: 45,
   },
   {
@@ -131,7 +131,7 @@ const TEMPLATES = [
     tags: ["friends", "digicam", "street", "standing", "duo"],
     tone: "noir",
     accent: "var(--pd-ink)",
-    pair: [GIRL_A, GIRL_B],
+    pair: [GIRL_A, GIRL_C],
     sort: 46,
   },
   {
@@ -155,7 +155,7 @@ const TEMPLATES = [
     tags: ["friends", "mirror", "bathroom", "selfie", "duo"],
     tone: "pink",
     accent: "var(--pd-pink)",
-    pair: [GIRL_B, GIRL_C],
+    pair: [GIRL_A, GIRL_C],
     sort: 48,
   },
   {
@@ -167,7 +167,7 @@ const TEMPLATES = [
     tags: ["friends", "mall", "digicam", "standing", "duo"],
     tone: "lilac",
     accent: "var(--pd-lilac)",
-    pair: [GIRL_A, GIRL_B],
+    pair: [GIRL_A, GIRL_C],
     sort: 49,
   },
 ];
