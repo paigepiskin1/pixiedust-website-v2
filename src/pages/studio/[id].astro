@@ -6,12 +6,13 @@ import Pill from "../../components/ui/Pill.astro";
 import Media from "../../components/ui/Media.astro";
 import CreditChip from "../../components/ui/CreditChip.astro";
 import FieldPanel from "../../components/FieldPanel.astro";
-import { getTemplate, allFields, computeCost, listTemplates } from "../../lib/templates";
+import { getTemplate, allFields, computeCost, listTemplates, ensureOptionalOutfitUpload } from "../../lib/templates";
 
 const { id } = Astro.params;
 const db = Astro.locals.runtime.env.DB;
-const template = id ? await getTemplate(db, id) : null;
-if (!template) return new Response(null, { status: 302, headers: { Location: "/" } });
+const templateRaw = id ? await getTemplate(db, id) : null;
+if (!templateRaw) return new Response(null, { status: 302, headers: { Location: "/" } });
+const template = ensureOptionalOutfitUpload(templateRaw);
 
 // Other templates the user can jump to without leaving the studio.
 const switchList = await listTemplates(db, { isAdmin: false });

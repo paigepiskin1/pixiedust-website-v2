@@ -278,21 +278,129 @@ function cleanImageUrls(cur: unknown): string[] {
     .filter((x): x is string => typeof x === "string" && /^https?:\/\//i.test(x));
 }
 
-/** True when the selected look asks the user to upload their own outfit photo. */
+export const UPLOAD_OUTFIT_LOOK_VALUE =
+  ", wearing the exact outfit shown in the uploaded outfit reference image. Match that outfit closely";
+
+const OPTIONAL_OUTFIT_FIELD: TemplateField = {
+  key: "outfit",
+  type: "file",
+  label: "Change outfit (optional)",
+  required: false,
+  multiple: true,
+  max: 4,
+  accept: "image/*",
+  help: "Optional — upload flat lays or outfit photos to wear instead of what's in your photos.",
+};
+
+/** Collect uploaded outfit CDN URLs (single string or multi-file array). */
+export function collectOutfitUrls(inputs: Record<string, unknown>): string[] {
+  const v = inputs.outfit;
+  if (Array.isArray(v)) return cleanImageUrls(v);
+  if (typeof v === "string" && /^https?:\/\//i.test(v)) return [v];
+  return [];
+}
+
+/** True when the selected look asks the user to upload their own outfit photo,
+ *  or when an always-optional outfit field has files (no gated look select). */
 export function isUploadLook(t: Template, inputs: Record<string, unknown>): boolean {
+  const urls = collectOutfitUrls(inputs);
   const lookField = allFields(t).find((f) => f.key === "look" && f.type === "select");
-  if (!lookField?.options?.length) return false;
+  if (!lookField?.options?.length) return urls.length > 0;
+
   const selected = String(inputs.look ?? lookField.default ?? "");
   if (/uploaded outfit/i.test(selected)) return true;
   const opt = lookField.options.find((o) => o.value === selected);
-  return /upload/i.test(opt?.label ?? "");
+  if (/upload/i.test(opt?.label ?? "")) return true;
+  // Look select without an Upload option: treat optional outfit files as upload.
+  const hasUploadOpt = lookField.options.some(
+    (o) => /upload/i.test(o.label ?? "") || /uploaded outfit/i.test(o.value ?? "")
+  );
+  return !hasUploadOpt && urls.length > 0;
+}
+
+/**
+ * Ensure every photoshoot template exposes optional outfit upload:
+ * - If a `look` select exists → add "Upload my own outfit" + gated outfit files
+ * - Otherwise → always-visible optional multi outfit file field
+ */
+export function ensureOptionalOutfitUpload(t: Template): Template {
+  if (t.kind !== "shoot") return t;
+  const fields: TemplateField[] = (t.fields ?? []).map((f) => ({
+    ...f,
+    options: f.options ? f.options.map((o) => ({ ...o })) : undefined,
+  }));
+  const lookIdx = fields.findIndex((f) => f.key === "look" && f.type === "select");
+  const outfitIdx = fields.findIndex((f) => f.key === "outfit" && f.type === "file");
+
+  if (lookIdx >= 0) {
+    const look = fields[lookIdx];
+    const opts = [...(look.options ?? [])];
+    const hasUpload = opts.some((o) => /upload/i.test(o.label ?? "") || /uploaded outfit/i.test(o.value ?? ""));
+    if (!hasUpload) {
+      opts.push({ value: UPLOAD_OUTFIT_LOOK_VALUE, label: "Upload my own outfit" });
+      fields[lookIdx] = {
+        ...look,
+        options: opts,
+        help: look.help || "Keep your clothes, pick a styled look, or upload your own outfit photo.",
+      };
+    }
+    const gated: TemplateField = {
+      ...OPTIONAL_OUTFIT_FIELD,
+      label: "Outfit photo(s)",
+      help: "Flat lays or outfit photos — required when you pick Upload my own outfit.",
+      showWhen: { field: "look", includes: "uploaded outfit" },
+    };
+    if (outfitIdx >= 0) {
+      const cur = fields[outfitIdx];
+      fields[outfitIdx] = {
+        ...cur,
+        ...gated,
+        // Keep an existing custom label if the admin set one, but force multi + gate.
+        label: cur.label || gated.label,
+        help: cur.help || gated.help,
+        required: false,
+        multiple: true,
+        max: Math.max(4, Number(cur.max) || 4),
+        accept: cur.accept || "image/*",
+        showWhen: gated.showWhen,
+      };
+    } else {
+      fields.push(gated);
+    }
+  } else if (outfitIdx >= 0) {
+    const cur = fields[outfitIdx];
+    fields[outfitIdx] = {
+      ...cur,
+      required: false,
+      multiple: true,
+      max: Math.max(4, Number(cur.max) || 4),
+      accept: cur.accept || "image/*",
+      label: cur.label || OPTIONAL_OUTFIT_FIELD.label,
+      help: cur.help || OPTIONAL_OUTFIT_FIELD.help,
+      showWhen: undefined,
+    };
+  } else {
+    fields.push({ ...OPTIONAL_OUTFIT_FIELD });
+  }
+
+  return { ...t, fields };
+}
+
+/** Inject outfit-match wording into the prompt when upload refs are in play and
+ *  the look token did not already supply it. */
+export function injectOutfitPromptHint(prompt: string, inputs: Record<string, unknown>): string {
+  if (!collectOutfitUrls(inputs).length) return prompt;
+  if (/uploaded outfit reference/i.test(prompt)) return prompt;
+  const hint = UPLOAD_OUTFIT_LOOK_VALUE;
+  if (/\bof me\b/i.test(prompt)) return prompt.replace(/\bof me\b/i, `of me${hint}`);
+  return `${prompt}${hint}`;
 }
 
 /**
  * Attach look/outfit reference images for the model:
  * - preset male/female options → backend `ref`/`image`
- * - "Upload my own outfit" → user `outfit` file URL
- * Also strips empty placeholders from image arrays.
+ * - "Upload my own outfit" / optional outfit files → user outfit URL(s)
+ * Also strips empty placeholders from image arrays and hints the prompt.
  */
 export function appendSelectedOptionRefs(
   t: Template,
@@ -303,11 +411,10 @@ export function appendSelectedOptionRefs(
   if (!imageKey) return input;
 
   const list = cleanImageUrls(input[imageKey]);
-  // Drop a stray user outfit URL if the template inlined {{outfit}} while the
-  // user picked keep/original or a preset look — we re-add it only for upload.
-  const outfitUrl =
-    typeof inputs.outfit === "string" && /^https?:\/\//i.test(inputs.outfit) ? inputs.outfit : null;
-  const withoutOutfit = outfitUrl ? list.filter((u) => u !== outfitUrl) : list;
+  const outfitUrls = collectOutfitUrls(inputs);
+  // Drop stray user outfit URLs if the template inlined {{outfit}} while the
+  // user picked keep/original or a preset look — we re-add only for upload.
+  const withoutOutfit = outfitUrls.length ? list.filter((u) => !outfitUrls.includes(u)) : list;
 
   const lookField = allFields(t).find((f) => f.key === "look" && f.type === "select");
   const selected = String(inputs.look ?? lookField?.default ?? "");
@@ -316,13 +423,17 @@ export function appendSelectedOptionRefs(
 
   const out = [...withoutOutfit];
   if (upload) {
-    if (outfitUrl && !out.includes(outfitUrl)) out.push(outfitUrl);
+    for (const u of outfitUrls) if (!out.includes(u)) out.push(u);
   } else if (selected.trim()) {
     const ref = opt?.ref || opt?.image;
     if (typeof ref === "string" && /^https?:\/\//i.test(ref) && !out.includes(ref)) out.push(ref);
   }
 
-  return { ...input, [imageKey]: out };
+  let next: Record<string, unknown> = { ...input, [imageKey]: out };
+  if (upload && typeof next.prompt === "string") {
+    next = { ...next, prompt: injectOutfitPromptHint(next.prompt, inputs) };
+  }
+  return next;
 }
 
 /**

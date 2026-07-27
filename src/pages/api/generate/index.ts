@@ -10,6 +10,8 @@ import {
   applyFieldDefaults,
   appendSelectedOptionRefs,
   isUploadLook,
+  ensureOptionalOutfitUpload,
+  collectOutfitUrls,
 } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
@@ -60,9 +62,10 @@ export async function POST({ request, locals }: APIContext) {
     return json({ error: "Invalid request body." }, 400);
   }
 
-  const template = body.templateId ? await getTemplate(db, body.templateId) : null;
+  const templateRaw = body.templateId ? await getTemplate(db, body.templateId) : null;
   // Hidden templates are runnable by admins (for testing before publish).
-  if (!template || (template.isHidden && !user.isAdmin)) return json({ error: "Template not found." }, 404);
+  if (!templateRaw || (templateRaw.isHidden && !user.isAdmin)) return json({ error: "Template not found." }, 404);
+  const template = ensureOptionalOutfitUpload(templateRaw);
   // Apply field defaults before validation/resolve so optional prompts with a
   // baked-in `default` still reach the model when the user leaves them blank.
   const inputs = applyFieldDefaults(template, body.inputs ?? {});
@@ -149,9 +152,8 @@ export async function POST({ request, locals }: APIContext) {
 
   // ─── Single step ───
   if (isUploadLook(template, inputs)) {
-    const outfit = inputs.outfit;
-    if (typeof outfit !== "string" || !/^https?:\/\//i.test(outfit)) {
-      return json({ error: "Upload an outfit photo, or pick Keep / Female / Male instead." }, 400);
+    if (!collectOutfitUrls(inputs).length) {
+      return json({ error: "Upload an outfit photo, or leave Change outfit empty to keep your clothes." }, 400);
     }
   }
   const resolved = resolveInput(template, inputs);
