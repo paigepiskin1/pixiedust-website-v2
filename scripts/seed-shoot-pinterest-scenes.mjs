@@ -47,6 +47,7 @@ const ID =
 const TEMPLATES = [
   {
     id: "street-elevator-fur-flash",
+    preview: "https://i.pinimg.com/1200x/e7/e2/7a/e7e27a0ed21ab65518c3874c3478f83b.jpg",
     title: "Elevator Fur Flash",
     category: "Street",
     subtitle: "Street · elevator · direct flash",
@@ -61,6 +62,7 @@ const TEMPLATES = [
   },
   {
     id: "street-bodega-snack-fisheye",
+    preview: "https://i.pinimg.com/1200x/38/88/f6/3888f691069d6210be6986d4f95b81b9.jpg",
     title: "Bodega Snack Fisheye",
     category: "Street",
     subtitle: "Street · bodega aisle · digicam",
@@ -75,6 +77,7 @@ const TEMPLATES = [
   },
   {
     id: "street-bodega-cooler-pose",
+    preview: "https://i.pinimg.com/1200x/88/6e/5a/886e5a5e739cbfb74dadb6f09a6bfc5f.jpg",
     title: "Bodega Cooler Pose",
     category: "Street",
     subtitle: "Street · fridge aisle · film grain",
@@ -89,6 +92,7 @@ const TEMPLATES = [
   },
   {
     id: "street-stone-leather-editorial",
+    preview: "https://i.pinimg.com/736x/4e/f6/14/4ef61460b6ab738ec2e146c368575406.jpg",
     title: "Stone Portico Editorial",
     category: "Street",
     subtitle: "Street · classical facade · leather",
@@ -103,6 +107,7 @@ const TEMPLATES = [
   },
   {
     id: "studio-overhead-denim-digicam",
+    preview: "https://i.pinimg.com/736x/6c/16/2e/6c162ead95aefa6a1807b14b6e616002.jpg",
     title: "Overhead Denim Digicam",
     category: "Lifestyle",
     subtitle: "Lifestyle · bird's-eye · digicam",
@@ -117,6 +122,7 @@ const TEMPLATES = [
   },
   {
     id: "street-times-square-lowbag",
+    preview: "https://i.pinimg.com/736x/0c/f2/97/0cf29739e5da683c27bf2de09750eaeb.jpg",
     title: "Times Square Low Bag",
     category: "Street",
     subtitle: "Street · Times Square · ultra-wide",
@@ -131,6 +137,7 @@ const TEMPLATES = [
   },
   {
     id: "street-clocktower-butterfly-heels",
+    preview: "https://i.pinimg.com/1200x/d9/bd/47/d9bd472ed1c8d754709b978f023cc23d.jpg",
     title: "Clocktower Butterfly Heels",
     category: "Street",
     subtitle: "Street · low angle · Y2K platforms",
@@ -189,7 +196,7 @@ function rowSql(t) {
   '~2 min', ${sqlStr(tags)}, ${sqlStr(t.tone)}, ${sqlStr(t.accent)},
   ${sqlStr(t.subtitle)},
   ${sqlStr(t.description)},
-  NULL,
+  ${t.preview ? sqlStr(t.preview) : 'NULL'},
   ${sqlStr(meta)},
   1, 0, 0, 0, ${t.sort}, datetime('now')
 )`;
@@ -222,7 +229,7 @@ ON CONFLICT(id) DO UPDATE SET
   accent=excluded.accent,
   subtitle=excluded.subtitle,
   description=excluded.description,
-  preview_image=COALESCE(templates.preview_image, excluded.preview_image),
+  preview_image=COALESCE(excluded.preview_image, templates.preview_image),
   meta=excluded.meta,
   is_featured=excluded.is_featured,
   is_hidden=excluded.is_hidden,

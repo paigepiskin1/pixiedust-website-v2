@@ -16,7 +16,7 @@ INSERT INTO templates (
   '~2 min', '["street","elevator","fur","flash","editorial","y2k"]', 'noir', 'var(--pd-ink)',
   'Street · elevator · direct flash',
   'Arms out against brushed-metal elevator walls — shaggy fur jacket, patent mini, elbow gloves, slim shades, harsh flash.',
-  NULL,
+  'https://i.pinimg.com/1200x/e7/e2/7a/e7e27a0ed21ab65518c3874c3478f83b.jpg',
   '{"kicker":"Photoshoot · Elevator Fur Flash","howItWorks":["Upload clear photos of yourself","We recreate this exact scene, pose, and outfit on you","Pick a ratio and generate"]}',
   1, 0, 0, 0, 50, datetime('now')
 ),
@@ -30,7 +30,7 @@ INSERT INTO templates (
   '~2 min', '["street","bodega","fisheye","digicam","snack","y2k"]', 'amber', 'var(--pd-amber)',
   'Street · bodega aisle · digicam',
   'Ultra-wide digicam flash in a packed snack aisle — acid-wash crop jacket, low-rise mini, knee boots.',
-  NULL,
+  'https://i.pinimg.com/1200x/38/88/f6/3888f691069d6210be6986d4f95b81b9.jpg',
   '{"kicker":"Photoshoot · Bodega Snack Fisheye","howItWorks":["Upload clear photos of yourself","We recreate this exact scene, pose, and outfit on you","Pick a ratio and generate"]}',
   1, 0, 0, 0, 51, datetime('now')
 ),
@@ -44,7 +44,7 @@ INSERT INTO templates (
   '~2 min', '["street","bodega","cooler","film","ripped-jeans"]', 'mint', 'var(--pd-mint)',
   'Street · fridge aisle · film grain',
   'Hand on the cooler frame in a bodega drink aisle — white front-tie crop, oversized ripped jeans, sweater at the hips.',
-  NULL,
+  'https://i.pinimg.com/1200x/88/6e/5a/886e5a5e739cbfb74dadb6f09a6bfc5f.jpg',
   '{"kicker":"Photoshoot · Bodega Cooler Pose","howItWorks":["Upload clear photos of yourself","We recreate this exact scene, pose, and outfit on you","Pick a ratio and generate"]}',
   1, 0, 0, 0, 52, datetime('now')
 ),
@@ -58,7 +58,7 @@ INSERT INTO templates (
   '~2 min', '["street","editorial","leather","burgundy","classical"]', 'dusk', 'var(--pd-lilac)',
   'Street · classical facade · leather',
   'Leaning on a classical stone ledge — black turtleneck, leather blazer on shoulders, leather shorts, burgundy tights and heels.',
-  NULL,
+  'https://i.pinimg.com/736x/4e/f6/14/4ef61460b6ab738ec2e146c368575406.jpg',
   '{"kicker":"Photoshoot · Stone Portico Editorial","howItWorks":["Upload clear photos of yourself","We recreate this exact scene, pose, and outfit on you","Pick a ratio and generate"]}',
   1, 0, 0, 0, 53, datetime('now')
 ),
@@ -72,7 +72,7 @@ INSERT INTO templates (
   '~2 min', '["lifestyle","studio","overhead","denim","digicam","y2k"]', 'ice', 'var(--pd-teal)',
   'Lifestyle · bird''s-eye · digicam',
   'Extreme high-angle wide shot leaning toward camera — denim halter + shorts, white socks, buckled heels, holding a digicam.',
-  NULL,
+  'https://i.pinimg.com/736x/6c/16/2e/6c162ead95aefa6a1807b14b6e616002.jpg',
   '{"kicker":"Photoshoot · Overhead Denim Digicam","howItWorks":["Upload clear photos of yourself","We recreate this exact scene, pose, and outfit on you","Pick a ratio and generate"]}',
   1, 0, 0, 0, 54, datetime('now')
 ),
@@ -86,7 +86,7 @@ INSERT INTO templates (
   '~2 min', '["street","nyc","times-square","fisheye","bag","silver-boots"]', 'lilac', 'var(--pd-lilac)',
   'Street · Times Square · ultra-wide',
   'Extreme low fisheye looking up mid-stride in a crosswalk — baby-blue set, silver platform boots, glossy pink tote filling the frame.',
-  NULL,
+  'https://i.pinimg.com/736x/0c/f2/97/0cf29739e5da683c27bf2de09750eaeb.jpg',
   '{"kicker":"Photoshoot · Times Square Low Bag","howItWorks":["Upload clear photos of yourself","We recreate this exact scene, pose, and outfit on you","Pick a ratio and generate"]}',
   1, 0, 0, 0, 55, datetime('now')
 ),
@@ -100,7 +100,7 @@ INSERT INTO templates (
   '~2 min', '["street","y2k","butterfly","platforms","clocktower","low-angle"]', 'pink', 'var(--pd-pink)',
   'Street · low angle · Y2K platforms',
   'Dramatic low-angle wide stance under a brick clock tower — brown wrap crop, denim cutoffs, yellow wrap platforms with butterfly charms.',
-  NULL,
+  'https://i.pinimg.com/1200x/d9/bd/47/d9bd472ed1c8d754709b978f023cc23d.jpg',
   '{"kicker":"Photoshoot · Clocktower Butterfly Heels","howItWorks":["Upload clear photos of yourself","We recreate this exact scene, pose, and outfit on you","Pick a ratio and generate"]}',
   1, 0, 0, 0, 56, datetime('now')
 )
@@ -123,7 +123,7 @@ ON CONFLICT(id) DO UPDATE SET
   accent=excluded.accent,
   subtitle=excluded.subtitle,
   description=excluded.description,
-  preview_image=COALESCE(templates.preview_image, excluded.preview_image),
+  preview_image=COALESCE(excluded.preview_image, templates.preview_image),
   meta=excluded.meta,
   is_featured=excluded.is_featured,
   is_hidden=excluded.is_hidden,
