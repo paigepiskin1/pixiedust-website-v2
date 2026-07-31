@@ -121,7 +121,9 @@ function adaptForModel(input, model, subjectUrl) {
 
 async function generateOne(t, subjectUrl) {
   const input = prepareInput(t.input_json, subjectUrl);
-  const models = [t.model || "openai/gpt-image-2", "google/nano-banana", "google/nano-banana-pro"].filter(
+  // Prefer nano-banana first for these editorial street prompts — GPT Image often
+  // trips sensitive flags on heels/fur/bodega flash looks.
+  const models = ["google/nano-banana", t.model || "openai/gpt-image-2", "google/nano-banana-pro"].filter(
     (m, i, a) => m && a.indexOf(m) === i
   );
   let lastErr;
