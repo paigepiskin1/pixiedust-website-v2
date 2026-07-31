@@ -3,6 +3,8 @@
  * Generate before/after slider preview videos for presets and set them as
  * catalog thumbnails (preview_video + preview_image poster).
  *
+ * Behavior: play wipe once in view → freeze on after → replay from start on hover.
+ *
  * Usage:
  *   node scripts/dev.mjs node scripts/gen-preset-ba-sliders.mjs
  */
@@ -19,16 +21,27 @@ const ZONE = process.env.BUNNY_STORAGE_ZONE || "pixiecdn";
 const BKEY = process.env.BUNNY_API_KEY;
 const PULL = (process.env.BUNNY_PULL_ZONE_URL || "https://pixiecdn.b-cdn.net").replace(/\/$/, "");
 
-const BEFORE_URL =
-  process.env.SUBJECT_URL ||
-  "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784545458904.png";
+const SUBJECTS = [
+  "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784545434857.png",
+  "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784460312296.png",
+  "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785163341156.png",
+];
+
+// kodak-gold built via join to avoid environment string mangling in some shells/editors
+const KODAK_GOLD = ["kodak", "-", "gold"].join("");
 
 const IDS = [
-  "old-fisheye-lens",
-  "preset-y2k-digicam-flash",
-  "preset-y2k-pink-webcam",
-  "preset-y2k-cyber-chrome",
-  "preset-night-party-flash",
+  "subway-platform-copy-2-copy-copy-copy",
+  "polaroid-instant",
+  KODAK_GOLD,
+  "cinestill-night",
+  "preset-fisheye-ultra-wide",
+  "preset-magic-hour-flare",
+  "preset-fisheye-peephole",
+  "preset-portrait-50mm",
+  "preset-anamorphic-flare",
+  "subway-platform-copy-2-copy-copy-copy-3",
+  "preset-disposable-flash",
 ];
 
 if (!SYNCNODE_KEY || !CF_TOKEN || !BKEY) {
@@ -65,7 +78,7 @@ async function submit(model, input) {
   return d.job_id;
 }
 
-async function poll(jobId, maxMs = 300000) {
+async function poll(jobId, maxMs = 360000) {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 5000));
@@ -97,12 +110,10 @@ async function download(url, dest) {
   // Normalize to PNG via ffmpeg (handles webp)
   if (!dest.endsWith(".png") || buf.slice(0, 4).toString() !== "\x89PNG") {
     const png = dest.replace(/\.[^.]+$/, "") + ".norm.png";
-    const res = spawnSync(
-      "ffmpeg",
-      ["-y", "-i", dest, png],
-      { encoding: "utf8" }
-    );
-    if (res.status !== 0 || !existsSync(png)) throw new Error(`ffmpeg convert failed: ${res.stderr?.slice(-200)}`);
+    const res = spawnSync("ffmpeg", ["-y", "-i", dest, png], { encoding: "utf8" });
+    if (res.status !== 0 || !existsSync(png)) {
+      throw new Error(`ffmpeg convert failed: ${res.stderr?.slice(-200)}`);
+    }
     return png;
   }
   return dest;
@@ -119,14 +130,29 @@ async function uploadBunny(localPath, remotePath, contentType) {
   return `${PULL}/${remotePath}`;
 }
 
-function prepareInput(raw) {
+function prepareInput(raw, subjectUrl) {
   const input = JSON.parse(raw);
   if (input.aspect_ratio === "{{aspect}}" || !input.aspect_ratio) input.aspect_ratio = "1:1";
-  if ("input_images" in input) input.input_images = [BEFORE_URL];
-  if ("image_input" in input) input.image_input = [BEFORE_URL];
-  if ("image" in input && typeof input.image === "string") input.image = BEFORE_URL;
+  if ("input_images" in input) input.input_images = [subjectUrl];
+  if ("image_input" in input) input.image_input = [subjectUrl];
+  if ("image" in input && typeof input.image === "string") input.image = subjectUrl;
   input.moderation = input.moderation || "low";
   return input;
+}
+
+/** Soften prompt wording that often trips GPT Image safety filters. */
+function softenPrompt(input) {
+  const next = { ...input };
+  if (typeof next.prompt === "string") {
+    next.prompt = next.prompt
+      .replace(/\bsexy\b/gi, "stylish")
+      .replace(/\bseductive\b/gi, "confident")
+      .replace(/\bnude\b/gi, "fully clothed")
+      .replace(/\bnaked\b/gi, "fully clothed")
+      .replace(/\bcleavage\b/gi, "neckline")
+      .replace(/\bskin-tight\b/gi, "fitted");
+  }
+  return next;
 }
 
 /** Build a one-way before→after wipe MP4 + after still poster (for play-once + hover replay). */
@@ -137,7 +163,6 @@ function buildSlider(beforePng, afterPng, outBase) {
   const framesDir = `${outBase}-frames`;
   mkdirSync(framesDir, { recursive: true });
 
-  // One-way wipe: hold before → slide to after → hold after (ends on after).
   const py = `
 from PIL import Image, ImageDraw
 import os
@@ -196,13 +221,16 @@ print(len(seq))
   );
   if (r1.status !== 0) throw new Error(`mp4 failed: ${r1.stderr?.slice(-400)}`);
 
-  // Optional short GIF of the one-way wipe (not used as catalog thumb anymore).
   const r2 = spawnSync(
     "ffmpeg",
     [
-      "-y", "-i", mp4,
-      "-vf", "fps=10,scale=540:540:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=160[p];[s1][p]paletteuse=dither=bayer",
-      "-loop", "0",
+      "-y",
+      "-i",
+      mp4,
+      "-vf",
+      "fps=10,scale=540:540:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=160[p];[s1][p]paletteuse=dither=bayer",
+      "-loop",
+      "0",
       gif,
     ],
     { encoding: "utf8" }
@@ -212,89 +240,108 @@ print(len(seq))
   return { mp4, gif, poster };
 }
 
-// Download before
-const beforeRaw = join(WORK, "before-src.bin");
-const beforePng = await download(BEFORE_URL, beforeRaw);
-console.log("before:", beforePng);
+function adaptForModel(input, model, subjectUrl) {
+  const payload = softenPrompt({ ...input });
+  if (model.includes("nano-banana")) {
+    if (!payload.image_input && payload.input_images) {
+      payload.image_input = payload.input_images;
+      delete payload.input_images;
+    }
+    if (!payload.image_input) payload.image_input = [subjectUrl];
+    delete payload.quality;
+    delete payload.background;
+    delete payload.moderation;
+    delete payload.number_of_images;
+    delete payload.output_compression;
+    payload.output_format = payload.output_format || "jpg";
+  } else if (model.includes("gpt-image")) {
+    if (!payload.input_images && payload.image_input) {
+      payload.input_images = payload.image_input;
+      delete payload.image_input;
+    }
+    if (!payload.input_images) payload.input_images = [subjectUrl];
+    payload.moderation = "low";
+  }
+  return payload;
+}
 
-const rows = await d1(
-  `SELECT id, title, model, input_json FROM templates WHERE id IN (${IDS.map((i) => `'${i}'`).join(",")})`
-);
-const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
-
-// Optional cache of already-generated afters (from a prior partial run).
-const AFTER_CACHE = {
-  "old-fisheye-lens":
-    "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785501615497.jpg",
-  "preset-y2k-digicam-flash":
-    "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785501644738.png",
-};
-
-const results = {};
-let ok = 0;
-let fail = 0;
-
-async function generateAfter(t) {
-  if (AFTER_CACHE[t.id]) return AFTER_CACHE[t.id];
-  const input = prepareInput(t.input_json);
-  // Prefer template model; on sensitive flag, fall back to nano-banana-pro.
-  const models = [t.model, "google/nano-banana-pro"].filter(
+async function generateAfter(t, subjectUrl) {
+  const input = prepareInput(t.input_json, subjectUrl);
+  // Prefer template model; fall back through safer nano-banana variants on flags/timeouts.
+  const models = [t.model, "google/nano-banana", "google/nano-banana-pro"].filter(
     (m, i, arr) => m && arr.indexOf(m) === i
   );
   let lastErr;
   for (const model of models) {
     try {
-      // Adapt image field for nano-banana-pro if needed
-      const payload = { ...input };
-      if (model.includes("nano-banana")) {
-        if (!payload.image_input && payload.input_images) {
-          payload.image_input = payload.input_images;
-          delete payload.input_images;
-        }
-        delete payload.quality;
-        delete payload.background;
-        delete payload.moderation;
-        delete payload.number_of_images;
-        delete payload.output_compression;
-        payload.output_format = payload.output_format || "jpg";
-      }
+      const payload = adaptForModel(input, model, subjectUrl);
+      process.stdout.write(`[${model}] `);
       const jobId = await submit(model, payload);
       return await poll(jobId);
     } catch (e) {
       lastErr = e;
-      console.log(`\n    retry with ${model} failed: ${e.message.slice(0, 100)}`);
+      console.log(`\n    retry failed (${model}): ${String(e.message).slice(0, 140)}`);
+      process.stdout.write("  ");
     }
   }
   throw lastErr || new Error("generate failed");
 }
 
-for (const id of IDS) {
+// Pre-download all subjects
+const subjectPngs = {};
+for (let i = 0; i < SUBJECTS.length; i++) {
+  const url = SUBJECTS[i];
+  const raw = join(WORK, `subject-${i}.bin`);
+  subjectPngs[url] = await download(url, raw);
+  console.log(`subject[${i}]:`, subjectPngs[url]);
+}
+
+const rows = await d1(
+  `SELECT id, title, model, input_json FROM templates WHERE id IN (${IDS.map((i) => `'${i}'`).join(",")})`
+);
+const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+console.log(`loaded ${rows.length}/${IDS.length} templates`);
+
+const results = {};
+let ok = 0;
+let fail = 0;
+
+for (let i = 0; i < IDS.length; i++) {
+  const id = IDS[i];
+  const subjectUrl = SUBJECTS[i % SUBJECTS.length];
+  const beforePng = subjectPngs[subjectUrl];
   const t = byId[id];
   if (!t) {
     console.log(`skip ${id} (missing)`);
     fail++;
     continue;
   }
-  process.stdout.write(`\n${t.title} (${id})\n  generate … `);
+  process.stdout.write(`\n${t.title} (${id})\n  subject: ${subjectUrl.split("/").pop()}\n  generate … `);
   try {
-    const afterUrl = await generateAfter(t);
+    const afterUrl = await generateAfter(t, subjectUrl);
     console.log(`✓ ${afterUrl}`);
 
     const afterRaw = join(WORK, `${id}-after.bin`);
     const afterPng = await download(afterUrl, afterRaw);
     process.stdout.write("  slider … ");
     const outBase = join(WORK, id);
-    const { mp4, gif, poster } = buildSlider(beforePng, afterPng, outBase);
+    const { mp4, poster } = buildSlider(beforePng, afterPng, outBase);
     console.log("✓");
 
     process.stdout.write("  upload … ");
     const stamp = Date.now();
-    const videoUrl = await uploadBunny(mp4, `media/templates/ba-sliders/${id}-${stamp}.mp4`, "video/mp4");
-    const posterUrl = await uploadBunny(poster, `media/templates/ba-sliders/${id}-${stamp}-after.jpg`, "image/jpeg");
+    const videoUrl = await uploadBunny(
+      mp4,
+      `media/templates/ba-sliders/${id}-${stamp}.mp4`,
+      "video/mp4"
+    );
+    const posterUrl = await uploadBunny(
+      poster,
+      `media/templates/ba-sliders/${id}-${stamp}-after.jpg`,
+      "image/jpeg"
+    );
     console.log("✓");
 
-    // preview_video = one-way wipe MP4 (play once → freeze on after; replay on hover)
-    // preview_image = after still (poster)
     await d1(
       `UPDATE templates SET
         preview_video = '${videoUrl.replace(/'/g, "''")}',
@@ -303,12 +350,12 @@ for (const id of IDS) {
       WHERE id = '${id}'`
     );
 
-    results[id] = { afterUrl, videoUrl, posterUrl };
+    results[id] = { afterUrl, videoUrl, posterUrl, subjectUrl };
     console.log(`  video:  ${videoUrl}`);
     console.log(`  poster: ${posterUrl}`);
     ok++;
   } catch (e) {
-    console.log(`✗ ${e.message.slice(0, 220)}`);
+    console.log(`✗ ${String(e.message).slice(0, 220)}`);
     fail++;
   }
 }
