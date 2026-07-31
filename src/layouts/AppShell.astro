@@ -151,6 +151,9 @@ if (!user) {
     // Preview videos play automatically while on-screen and pause when scrolled
     // away (keeps many rail/grid videos from all decoding at once). Re-scans on
     // navigation so dynamically rendered cards are covered too.
+    //
+    // `.pd-play-once` (before/after slider thumbs): play through once, freeze on
+    // the last frame (after), and replay from the start on hover.
     (function () {
       function bind() {
         var vids = document.querySelectorAll("video.pd-autoplay:not([data-pd-bound])");
@@ -162,6 +165,11 @@ if (!user) {
                   entries.forEach(function (en) {
                     var v = en.target;
                     if (en.isIntersecting) {
+                      if (v.classList.contains("pd-play-once")) {
+                        // First time into view: play from start. If already finished, stay on after.
+                        if (v.dataset.pdOnceDone === "1") return;
+                        try { v.currentTime = 0; } catch (e) {}
+                      }
                       var p = v.play();
                       if (p && p.catch) p.catch(function () {});
                     } else {
@@ -175,10 +183,33 @@ if (!user) {
         vids.forEach(function (v) {
           v.setAttribute("data-pd-bound", "1");
           v.muted = true; // required for autoplay in most browsers
+          var playOnce = v.classList.contains("pd-play-once");
+          if (playOnce) {
+            v.loop = false;
+            v.removeAttribute("loop");
+            v.addEventListener("ended", function () {
+              v.pause();
+              v.dataset.pdOnceDone = "1";
+              // Snap to last frame in case the browser blanks on ended.
+              try {
+                if (v.duration && isFinite(v.duration)) v.currentTime = Math.max(0, v.duration - 0.05);
+              } catch (e) {}
+            });
+            var host = v.closest("a, .pd-cat-card, .pd-card") || v.parentElement;
+            if (host && !host.dataset.pdOnceHover) {
+              host.dataset.pdOnceHover = "1";
+              host.addEventListener("mouseenter", function () {
+                v.dataset.pdOnceDone = "0";
+                try { v.currentTime = 0; } catch (e) {}
+                var p = v.play();
+                if (p && p.catch) p.catch(function () {});
+              });
+            }
+          }
           // Show a frame a few seconds in (not the often-blank first frame) as
-          // the thumbnail/starting point.
+          // the thumbnail/starting point — skip for play-once / hero (data-no-seek).
           var seek = function () {
-            if ("noSeek" in v.dataset) return; // hero plays from frame 0 (faster first paint)
+            if ("noSeek" in v.dataset || playOnce) return;
             if (v.dataset.pdSeeked) return;
             var off = Math.min(3, (v.duration || 0) * 0.25);
             if (off > 0) {

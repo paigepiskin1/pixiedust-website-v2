@@ -56,6 +56,8 @@ export interface RailCard {
   previewImage?: string;
   previewVideo?: string;
   previewImages?: string[];
+  /** Play preview video once, freeze on last frame; replay on hover. */
+  previewPlayOnce?: boolean;
 }
 
 export const TRENDING: RailCard[] = [

@@ -18,6 +18,8 @@ export interface CatalogItem {
   previewVideo?: string;
   /** Optional multi-image catalog thumbnail carousel. */
   previewImages?: string[];
+  /** Play preview video once, freeze on last frame; replay on hover. */
+  previewPlayOnce?: boolean;
 }
 
 const AMBER = "var(--pd-amber)";

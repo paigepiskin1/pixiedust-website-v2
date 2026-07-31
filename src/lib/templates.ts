@@ -589,6 +589,8 @@ interface CardShape {
   previewImage?: string;
   previewVideo?: string;
   previewImages?: string[];
+  /** Play preview video once, freeze on last frame; replay on hover. */
+  previewPlayOnce?: boolean;
 }
 
 /** Parse structured template.meta JSON when present. */
@@ -624,6 +626,9 @@ export function templateToCard(t: Template): CardShape {
     previewImage: previewImages?.[0] ?? t.previewImage ?? undefined,
     previewVideo: t.previewVideo ?? undefined,
     previewImages,
+    previewPlayOnce:
+      metaObj?.previewPlayOnce === true ||
+      (!!t.previewVideo && /\/ba-sliders\//.test(t.previewVideo)),
   };
 }
 

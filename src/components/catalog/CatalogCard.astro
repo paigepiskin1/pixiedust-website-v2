@@ -22,7 +22,20 @@ const hasCarousel = carousel.length > 1;
 >
   {
     item.previewVideo ? (
-      <video src={item.previewVideo} muted loop playsinline autoplay preload="metadata" class="pd-autoplay absolute inset-0 h-full w-full object-cover" />
+      <video
+        src={item.previewVideo}
+        poster={item.previewImage || undefined}
+        muted
+        playsinline
+        autoplay
+        preload="metadata"
+        data-no-seek={item.previewPlayOnce ? "" : undefined}
+        class:list={[
+          "pd-autoplay absolute inset-0 h-full w-full object-cover",
+          item.previewPlayOnce ? "pd-play-once" : null,
+        ]}
+        loop={!item.previewPlayOnce}
+      />
     ) : hasCarousel ? (
       <div class="pd-card-carousel absolute inset-0" data-pd-carousel>
         {carousel.map((src, i) => (

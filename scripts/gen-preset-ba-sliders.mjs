@@ -129,7 +129,7 @@ function prepareInput(raw) {
   return input;
 }
 
-/** Build a looping before→after→before wipe slider MP4 + GIF + poster. */
+/** Build a one-way before→after wipe MP4 + after still poster (for play-once + hover replay). */
 function buildSlider(beforePng, afterPng, outBase) {
   const mp4 = `${outBase}.mp4`;
   const gif = `${outBase}.gif`;
@@ -137,15 +137,15 @@ function buildSlider(beforePng, afterPng, outBase) {
   const framesDir = `${outBase}-frames`;
   mkdirSync(framesDir, { recursive: true });
 
-  // Render classic slider frames in Python (white divider + ping-pong).
+  // One-way wipe: hold before → slide to after → hold after (ends on after).
   const py = `
 from PIL import Image, ImageDraw
-import math, os
+import os
 SIZE = 720
 FPS = 16
-# one way duration in seconds
-WAY = 1.35
-HOLD = 0.35
+WAY = 1.4
+HOLD_BEFORE = 0.35
+HOLD_AFTER = 0.55
 before = Image.open(${JSON.stringify(beforePng)}).convert("RGB")
 after = Image.open(${JSON.stringify(afterPng)}).convert("RGB")
 def fit(im):
@@ -155,26 +155,24 @@ def fit(im):
     canvas.paste(im, ((SIZE-im.width)//2, (SIZE-im.height)//2))
     return canvas
 b, a = fit(before), fit(after)
-frames = []
-# progress 0→1→0
-steps = int(WAY * FPS)
-hold = int(HOLD * FPS)
+steps = max(2, int(WAY * FPS))
+hb = int(HOLD_BEFORE * FPS)
+ha = int(HOLD_AFTER * FPS)
 def ease(t):
-    # smoothstep
     return t*t*(3-2*t)
-seq = [0.0]*hold + [ease(i/(steps-1)) for i in range(steps)] + [1.0]*hold + [ease(1-i/(steps-1)) for i in range(steps)] + [0.0]*hold
+seq = [0.0]*hb + [ease(i/(steps-1)) for i in range(steps)] + [1.0]*ha
 for i, p in enumerate(seq):
     x = max(0, min(SIZE, int(round(p * SIZE))))
     frame = b.copy()
     if x > 0:
         frame.paste(a.crop((0,0,x,SIZE)), (0,0))
     d = ImageDraw.Draw(frame)
-    # divider + small handle
     d.line([(x,0),(x,SIZE)], fill=(255,255,255), width=3)
     cy = SIZE//2
     d.ellipse([x-10, cy-18, x+10, cy+18], fill=(255,255,255), outline=(20,20,24))
     path = os.path.join(${JSON.stringify(framesDir)}, f"f{i:04d}.png")
     frame.save(path, "PNG")
+a.save(${JSON.stringify(poster)}, quality=90)
 print(len(seq))
 `;
   const pyFile = `${outBase}-mkframes.py`;
@@ -198,6 +196,7 @@ print(len(seq))
   );
   if (r1.status !== 0) throw new Error(`mp4 failed: ${r1.stderr?.slice(-400)}`);
 
+  // Optional short GIF of the one-way wipe (not used as catalog thumb anymore).
   const r2 = spawnSync(
     "ffmpeg",
     [
@@ -209,15 +208,6 @@ print(len(seq))
     { encoding: "utf8" }
   );
   if (r2.status !== 0) throw new Error(`gif failed: ${r2.stderr?.slice(-400)}`);
-
-  // Mid wipe frame as poster
-  const mid = join(framesDir, "f0020.png");
-  const r3 = spawnSync(
-    "ffmpeg",
-    ["-y", "-i", existsSync(mid) ? mid : mp4, "-frames:v", "1", "-q:v", "3", poster],
-    { encoding: "utf8" }
-  );
-  if (r3.status !== 0) throw new Error(`poster failed: ${r3.stderr?.slice(-200)}`);
 
   return { mp4, gif, poster };
 }
@@ -300,24 +290,22 @@ for (const id of IDS) {
     process.stdout.write("  upload … ");
     const stamp = Date.now();
     const videoUrl = await uploadBunny(mp4, `media/templates/ba-sliders/${id}-${stamp}.mp4`, "video/mp4");
-    const gifUrl = await uploadBunny(gif, `media/templates/ba-sliders/${id}-${stamp}.gif`, "image/gif");
-    const posterUrl = await uploadBunny(poster, `media/templates/ba-sliders/${id}-${stamp}-poster.jpg`, "image/jpeg");
-    const afterStill = await uploadBunny(afterPng, `media/templates/ba-sliders/${id}-${stamp}-after.png`, "image/png");
+    const posterUrl = await uploadBunny(poster, `media/templates/ba-sliders/${id}-${stamp}-after.jpg`, "image/jpeg");
     console.log("✓");
 
-    // preview_video = looping wipe MP4 (catalog autoplays)
-    // preview_image = GIF so <img> surfaces also animate
+    // preview_video = one-way wipe MP4 (play once → freeze on after; replay on hover)
+    // preview_image = after still (poster)
     await d1(
       `UPDATE templates SET
         preview_video = '${videoUrl.replace(/'/g, "''")}',
-        preview_image = '${gifUrl.replace(/'/g, "''")}',
+        preview_image = '${posterUrl.replace(/'/g, "''")}',
         updated_at = datetime('now')
       WHERE id = '${id}'`
     );
 
-    results[id] = { afterUrl, videoUrl, gifUrl, posterUrl, afterStill };
-    console.log(`  video: ${videoUrl}`);
-    console.log(`  gif:   ${gifUrl}`);
+    results[id] = { afterUrl, videoUrl, posterUrl };
+    console.log(`  video:  ${videoUrl}`);
+    console.log(`  poster: ${posterUrl}`);
     ok++;
   } catch (e) {
     console.log(`✗ ${e.message.slice(0, 220)}`);
