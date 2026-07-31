@@ -265,6 +265,11 @@ function adaptForModel(input, model, subjectUrl) {
   return payload;
 }
 
+const SAFE_PROMPTS = {
+  "preset-disposable-flash":
+    "Apply a classic disposable camera flash look to this photo. Keep the same person and pose. Hard on-camera flash, slight overexposure on the face, cool shadows, mild film grain, vintage point-and-shoot night snapshot aesthetic. Do not change identity, clothing, or background layout.",
+};
+
 async function generateAfter(t, subjectUrl) {
   const input = prepareInput(t.input_json, subjectUrl);
   // Prefer template model; fall back through safer nano-banana variants on flags/timeouts.
@@ -282,6 +287,28 @@ async function generateAfter(t, subjectUrl) {
       lastErr = e;
       console.log(`\n    retry failed (${model}): ${String(e.message).slice(0, 140)}`);
       process.stdout.write("  ");
+    }
+  }
+  // Last resort: short safe prompt (helps when the stored prompt trips provider validation).
+  if (SAFE_PROMPTS[t.id] || typeof input.prompt === "string") {
+    const safePrompt =
+      SAFE_PROMPTS[t.id] ||
+      `Apply the ${t.title} look to this photo. Keep the same person, pose, clothing, and framing. Photorealistic.`;
+    for (const model of ["google/nano-banana", "google/nano-banana-pro"]) {
+      try {
+        process.stdout.write(`[safe:${model}] `);
+        const jobId = await submit(model, {
+          prompt: safePrompt,
+          image_input: [subjectUrl],
+          aspect_ratio: "1:1",
+          output_format: "jpg",
+        });
+        return await poll(jobId);
+      } catch (e) {
+        lastErr = e;
+        console.log(`\n    safe retry failed (${model}): ${String(e.message).slice(0, 140)}`);
+        process.stdout.write("  ");
+      }
     }
   }
   throw lastErr || new Error("generate failed");
