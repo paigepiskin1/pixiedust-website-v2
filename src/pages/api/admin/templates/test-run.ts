@@ -7,6 +7,7 @@ export const prerender = false;
 import type { APIContext } from "astro";
 import { adminActor } from "../../../../lib/admin";
 import { submitGeneration } from "../../../../lib/syncnode";
+import { prepareByteplusAssets } from "../../../../lib/byteplus-assets";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -66,8 +67,13 @@ export async function POST({ request, locals }: APIContext) {
   }
 
   try {
+    // Mirror the real generate path: optionally register images in the BytePlus
+    // asset library and swap them for asset://<id> refs before submitting.
+    if (provider === "byteplus" && body.assetLibrary) {
+      await prepareByteplusAssets(env.SYNCNODE_API_KEY, env.DB, input);
+    }
     const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider, model, input });
-    return json({ ok: true, jobId, provider });
+    return json({ ok: true, jobId, provider, input });
   } catch (err) {
     return json({ error: String((err as Error).message || err) }, 502);
   }
