@@ -35,7 +35,7 @@ const config = {
   credits,
   signedIn,
   baseRule: HAIR_BASE_RULE,
-  cuts: Object.fromEntries(HAIR_CUTS.map((c) => [c.id, { prompt: c.prompt, label: c.label }])),
+  cuts: Object.fromEntries(HAIR_CUTS.map((c) => [c.id, { prompt: c.prompt, label: c.label, ref: c.ref || null }])),
   colors: HAIR_COLORS.map((c) => ({ id: c.id, label: c.label, prompt: c.prompt })),
 };
 ---
@@ -306,10 +306,13 @@ const config = {
 
     function buildPrompt(): string {
       const parts: string[] = [];
-      if (mode === "reference" && refUrl()) {
-        parts.push("Restyle their hair to closely match the hairstyle shown in the second reference image — copy its cut, length, shape and texture, but keep the person's own identity and face.");
-      } else if (selectedCut && cfg.cuts[selectedCut]) {
-        parts.push(`Give them ${cfg.cuts[selectedCut].prompt}.`);
+      const cut = selectedCut ? cfg.cuts[selectedCut] : null;
+      const usingRef = (mode === "reference" && refUrl()) || !!(cut && cut.ref);
+      if (usingRef) {
+        parts.push("Restyle their hair to closely match the hairstyle shown in the second reference image — copy its cut, length, shape, layers and texture, but keep the person's own identity and face.");
+        if (cut?.prompt) parts.push(`Aim for ${cut.prompt}.`);
+      } else if (cut) {
+        parts.push(`Give them ${cut.prompt}.`);
       }
       const col = (cfg.colors || []).find((c: any) => c.id === selectedColor);
       if (col && col.prompt) parts.push(`Colour their hair ${col.prompt}.`);
@@ -424,7 +427,9 @@ const config = {
       const prompt = buildPrompt();
       if (!prompt) { showError("Pick a style or color."); return; }
       const images: string[] = [person];
+      const cut = selectedCut ? cfg.cuts[selectedCut] : null;
       if (mode === "reference" && refUrl()) images.push(refUrl()!);
+      else if (cut?.ref) images.push(cut.ref);
       const total = cost();
       if (credits < total) { window.location.href = "/credits"; return; }
       errEl.classList.add("hidden");

@@ -1,5 +1,7 @@
 // Hair Studio data — colors, cuts (by gender), and the prompt builder. Mirrors
 // the tattoo studio: each cut carries a `prompt` fragment + on-model `preview`.
+// Optional `ref` is a style-reference photo sent as the second image input so
+// GPT Image / nano-banana can match cut shape more faithfully.
 // Reference-photo mode lets users try on a hairstyle from an uploaded image.
 
 export type HairGender = "female" | "male";
@@ -11,7 +13,10 @@ export interface HairCut {
   blurb: string;
   /** Design phrasing, slots into "Give them <fragment>". */
   prompt: string;
+  /** On-model cover shown in the cut gallery. */
   preview: string;
+  /** Optional hairstyle reference image (second model input). */
+  ref?: string;
 }
 
 export interface HairColor {
@@ -47,12 +52,135 @@ export const HAIR_COLORS: HairColor[] = [
 
 export const HAIR_CUTS: HairCut[] = [
   // ── Women's ──
-  { id: "f-long-layers", gender: "female", label: "Long Layers", blurb: "Soft face-framing layers", prompt: "a long, layered haircut with soft face-framing layers", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg" },
-  { id: "f-blunt-bob", gender: "female", label: "Blunt Bob", blurb: "Sleek jaw-length bob", prompt: "a sleek blunt bob cut at jaw length", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860725.jpg" },
-  { id: "f-curtain-bangs", gender: "female", label: "Curtain Bangs", blurb: "Face-framing fringe", prompt: "long hair with curtain bangs framing the face", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860575.jpg" },
-  { id: "f-beach-waves", gender: "female", label: "Beach Waves", blurb: "Tousled natural waves", prompt: "long tousled beachy waves with natural volume", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086861270.jpg" },
-  { id: "f-pixie", gender: "female", label: "Pixie Cut", blurb: "Short & chic", prompt: "a short cropped pixie cut", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859182.jpg" },
-  { id: "f-sleek-straight", gender: "female", label: "Sleek Straight", blurb: "Glossy center part", prompt: "long sleek straight glossy hair with a center part", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086871329.jpg" },
+  {
+    id: "f-long-layers",
+    gender: "female",
+    label: "Long Layers",
+    blurb: "Soft face-framing layers",
+    prompt:
+      "a long layered haircut with soft face-framing layers, feathered ends, and natural movement like a salon layered blowout",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
+    ref: "https://i.pinimg.com/1200x/de/6f/62/de6f62df7939d7bc860fd33b3aa7121e.jpg",
+  },
+  {
+    id: "f-long-wolf",
+    gender: "female",
+    label: "Long Wolf Cut",
+    blurb: "Shaggy layers + curtain fringe",
+    prompt:
+      "a long wolf cut with shaggy disconnected layers, volume at the crown, face-framing pieces, and a soft curtain fringe",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
+    ref: "https://i.pinimg.com/736x/f6/e6/d7/f6e6d72aa7dc2302847ec7422c202e50.jpg",
+  },
+  {
+    id: "f-short-wolf",
+    gender: "female",
+    label: "Short Wolf Cut",
+    blurb: "Cropped shaggy wolf",
+    prompt:
+      "a short wolf cut with choppy layered fringe, textured shaggy crown, and shorter layered ends around the shoulders",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
+    ref: "https://i.pinimg.com/736x/0e/e1/57/0ee1574d2c64c0d3af588c58073562ab.jpg",
+  },
+  {
+    id: "f-long-angles",
+    gender: "female",
+    label: "Long Angles",
+    blurb: "Sharp A-line layers",
+    prompt:
+      "long angled layers with a sharp A-line silhouette, longer in front, sleek face-framing pieces, and polished ends",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
+    ref: "https://i.pinimg.com/1200x/d3/18/21/d31821d081f4eff8632429cdb83a93d6.jpg",
+  },
+  {
+    id: "f-curtain-bangs",
+    gender: "female",
+    label: "Curtain Bangs",
+    blurb: "Sabrina-style fringe",
+    prompt:
+      "long hair with soft Sabrina Carpenter-style curtain bangs sweeping apart at the center, face-framing fringe, and glossy length",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860575.jpg",
+    ref: "https://i.pinimg.com/736x/c6/e7/1d/c6e71d2236586a569a8275bf5b30797a.jpg",
+  },
+  {
+    id: "f-long-straight",
+    gender: "female",
+    label: "Long Straight",
+    blurb: "Sleek glossy length",
+    prompt:
+      "long sleek straight hair with a clean center or soft side part, glassy shine, and blunt polished ends",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086871329.jpg",
+    ref: "https://i.pinimg.com/1200x/c6/eb/14/c6eb14598c62184f3b8cd1f05d8b1643.jpg",
+  },
+  {
+    id: "f-long-curly",
+    gender: "female",
+    label: "Long Curly",
+    blurb: "Defined bouncy curls",
+    prompt:
+      "long curly hair with defined springy curls, natural volume, and soft face-framing curl pieces",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086861270.jpg",
+    ref: "https://i.pinimg.com/1200x/0e/9b/66/0e9b66f1153e857766696d787632e870.jpg",
+  },
+  {
+    id: "f-traditional-bob",
+    gender: "female",
+    label: "Traditional Bob",
+    blurb: "Classic chin-length bob",
+    prompt:
+      "a classic traditional bob cut at chin length, soft rounded shape, light internal layering, and a clean polished finish",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860725.jpg",
+    ref: "https://m.media-amazon.com/images/I/617+Ze3merL._SX679_.jpg",
+  },
+  {
+    id: "f-flipped-bob",
+    gender: "female",
+    label: "Flipped Out Bob",
+    blurb: "Ends flicked out",
+    prompt:
+      "a chin-to-shoulder bob with flipped-out ends, soft bounce, and a retro blowout flip at the tips",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860725.jpg",
+    ref: "https://i.pinimg.com/736x/81/ce/83/81ce83c97886edf6474b3bb5b3c9e264.jpg",
+  },
+  {
+    id: "f-y2k-bob",
+    gender: "female",
+    label: "Y2K Bob",
+    blurb: "Chunky early-2000s bob",
+    prompt:
+      "an early-2000s Y2K bob with chunky layers, slight flip, face-framing pieces, and glossy blowout volume",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860725.jpg",
+    ref: "https://i.pinimg.com/736x/00/c7/01/00c701b8fa209c9ad8b501471a7812bf.jpg",
+  },
+  {
+    id: "f-mullet",
+    gender: "female",
+    label: "Mullet",
+    blurb: "Short front, long back",
+    prompt:
+      "a modern women's mullet with shorter layered front and sides, longer textured length in the back, and soft face-framing pieces",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859182.jpg",
+  },
+  {
+    id: "f-pixie",
+    gender: "female",
+    label: "Pixie Cut",
+    blurb: "Short & chic",
+    prompt:
+      "a chic short pixie cut with textured crown, softly tapered sides, and a light feathered fringe",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859182.jpg",
+  },
+  {
+    id: "f-scene-queen",
+    gender: "female",
+    label: "Scene Queen",
+    blurb: "Choppy emo scene cut",
+    prompt:
+      "a scene queen haircut with choppy asymmetrical layers, heavy side-swept fringe, teased volume at the crown, and razor-cut ends",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
+    ref: "https://i.pinimg.com/1200x/fb/22/aa/fb22aacaac2c75bb52ae6d486c080d95.jpg",
+  },
+
   // ── Men's ──
   { id: "m-textured-crop", gender: "male", label: "Textured Crop", blurb: "Short crop + fringe", prompt: "a short textured crop haircut with a small fringe", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086866479.jpg" },
   { id: "m-fade-quiff", gender: "male", label: "Fade + Quiff", blurb: "Skin fade, quiff on top", prompt: "a skin fade on the sides with a voluminous quiff on top", preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086869917.jpg" },
@@ -79,10 +207,11 @@ export function buildHairPrompt(sel: HairSelection): string {
   const cut = sel.cutId ? HAIR_CUTS.find((c) => c.id === sel.cutId) : null;
   const color = sel.colorId ? HAIR_COLORS.find((c) => c.id === sel.colorId) : null;
   const parts: string[] = [];
-  if (sel.hasReference) {
+  if (sel.hasReference || cut?.ref) {
     parts.push(
-      "Restyle their hair to closely match the hairstyle shown in the second reference image — copy its cut, length, shape and texture, but keep the person's own identity and face."
+      "Restyle their hair to closely match the hairstyle shown in the second reference image — copy its cut, length, shape, layers and texture, but keep the person's own identity and face."
     );
+    if (cut?.prompt) parts.push(`Aim for ${cut.prompt}.`);
   } else if (cut) {
     parts.push(`Give them ${cut.prompt}.`);
   }
