@@ -22,10 +22,14 @@ export interface HairCut {
 export interface HairColor {
   id: string;
   label: string;
-  /** Swatch color (CSS). */
+  /** Solid swatch color (CSS hex). Ignored when `swatch` is set. */
   hex: string;
+  /** Optional CSS background for multi-tone swatches (gradient). */
+  swatch?: string;
   /** Colour phrasing, slots into "Colour their hair <fragment>". */
   prompt: string;
+  /** Optional color-reference photo (extra model input). */
+  ref?: string;
 }
 
 export const HAIR_GENDERS: { id: HairGender; label: string }[] = [
@@ -35,6 +39,8 @@ export const HAIR_GENDERS: { id: HairGender; label: string }[] = [
 
 export const HAIR_COLORS: HairColor[] = [
   { id: "keep", label: "Keep my color", hex: "", prompt: "" },
+
+  // ── Solids ──
   { id: "jet-black", label: "Jet Black", hex: "#1b1b1f", prompt: "a deep jet-black" },
   { id: "dark-brown", label: "Dark Brown", hex: "#3b2417", prompt: "a rich dark brown" },
   { id: "chestnut", label: "Chestnut", hex: "#6b4429", prompt: "a warm chestnut brown" },
@@ -46,7 +52,67 @@ export const HAIR_COLORS: HairColor[] = [
   { id: "burgundy", label: "Burgundy", hex: "#5a1f2a", prompt: "a burgundy wine" },
   { id: "silver", label: "Silver", hex: "#c8c8cf", prompt: "a silver grey" },
   { id: "rose-gold", label: "Rose Gold", hex: "#d9a7a0", prompt: "a soft rose-gold" },
-  { id: "pastel-pink", label: "Pastel Pink", hex: "#e7b6c8", prompt: "a pastel pink" },
+
+  // ── Multi-tone / chunky ──
+  {
+    id: "two-tone",
+    label: "Two Tone",
+    hex: "#ece6d6",
+    swatch: "linear-gradient(180deg,#f2e6c8 0 48%,#1b1b1f 52% 100%)",
+    prompt:
+      "a bold two-tone color — bright blonde on the top/crown layers and deep black underneath (skunk / peekaboo contrast)",
+  },
+  {
+    id: "y2k-chunky",
+    label: "Y2K Chunky",
+    hex: "#c99b5b",
+    swatch: "linear-gradient(135deg,#f0e2b8 0 28%,#5a3a22 28% 55%,#f0e2b8 55% 78%,#5a3a22 78% 100%)",
+    prompt:
+      "Y2K chunky highlights and lowlights — thick alternating blonde and medium-brown strips throughout the hair",
+  },
+  {
+    id: "black-blonde-chunky",
+    label: "Black Blonde Chunky",
+    hex: "#1b1b1f",
+    swatch: "linear-gradient(135deg,#1b1b1f 0 35%,#f2e6c8 35% 55%,#1b1b1f 55% 75%,#f2e6c8 75% 100%)",
+    prompt:
+      "chunky black-and-blonde highlights — bold thick strips of platinum blonde woven through jet-black hair",
+    ref: "https://pixiecdn.b-cdn.net/hair-refs/colors/black-blonde-chunky.jpg",
+  },
+  {
+    id: "blonde-chunky",
+    label: "Blonde Chunky",
+    hex: "#e8d5a8",
+    swatch: "linear-gradient(135deg,#6b4429 0 40%,#e8d5a8 40% 55%,#6b4429 55% 70%,#e8d5a8 70% 85%,#6b4429 85% 100%)",
+    prompt:
+      "subtle chunky blonde highlights — thicker-than-foil blonde pieces through a medium brown base, soft and dimensional rather than stark",
+  },
+  {
+    id: "money-piece",
+    label: "Money Piece",
+    hex: "#f0e2b8",
+    swatch: "linear-gradient(90deg,#f0e2b8 0 22%,#5a3a22 22% 78%,#f0e2b8 78% 100%)",
+    prompt:
+      "a money-piece color — bright blonde face-framing front pieces with the rest of the hair left a natural medium brown",
+  },
+  {
+    id: "pink-black-chunky",
+    label: "Pink Black Chunky",
+    hex: "#e7b6c8",
+    swatch: "linear-gradient(135deg,#1b1b1f 0 40%,#f4a7c2 40% 60%,#1b1b1f 60% 80%,#f4a7c2 80% 100%)",
+    prompt:
+      "chunky pink-and-black hair — bold thick strips of hot pastel pink woven through jet-black hair",
+    ref: "https://pixiecdn.b-cdn.net/hair-refs/colors/pink-black-chunky.jpg",
+  },
+
+  // ── Solid pastels ──
+  { id: "pastel-pink", label: "Pastel Pink", hex: "#e7b6c8", prompt: "a soft solid pastel pink" },
+  { id: "pastel-lavender", label: "Pastel Lavender", hex: "#c9b6e7", prompt: "a soft solid pastel lavender purple" },
+  { id: "pastel-lilac", label: "Pastel Lilac", hex: "#d8c4ef", prompt: "a soft solid pastel lilac" },
+  { id: "pastel-mint", label: "Pastel Mint", hex: "#b6e7d4", prompt: "a soft solid pastel mint green" },
+  { id: "pastel-blue", label: "Pastel Blue", hex: "#b6d4e7", prompt: "a soft solid pastel baby blue" },
+  { id: "pastel-peach", label: "Pastel Peach", hex: "#f0c9b0", prompt: "a soft solid pastel peach" },
+  { id: "pastel-yellow", label: "Pastel Yellow", hex: "#f0e6b0", prompt: "a soft solid pastel butter yellow" },
   { id: "icy-blue", label: "Icy Blue", hex: "#a9c7db", prompt: "an icy blue" },
 ];
 
@@ -244,13 +310,19 @@ export function buildHairPrompt(sel: HairSelection): string {
   const parts: string[] = [];
   if (sel.hasReference || cut?.ref) {
     parts.push(
-      "Restyle their hair to closely match the hairstyle shown in the second reference image — copy its cut, length, shape, layers and texture, but keep the person's own identity and face."
+      "Restyle their hair to closely match the hairstyle shown in the cut/style reference image — copy its cut, length, shape, layers and texture, but keep the person's own identity and face."
     );
     if (cut?.prompt) parts.push(`Aim for ${cut.prompt}.`);
   } else if (cut) {
     parts.push(`Give them ${cut.prompt}.`);
   }
-  if (color && color.prompt) parts.push(`Colour their hair ${color.prompt}.`);
+  if (color?.ref) {
+    parts.push(
+      `Colour their hair to match the color pattern in the color reference image — aim for ${color.prompt}.`
+    );
+  } else if (color && color.prompt) {
+    parts.push(`Colour their hair ${color.prompt}.`);
+  }
   if (!parts.length) return "";
   return `${HAIR_BASE_RULE} ${parts.join(" ")}`;
 }

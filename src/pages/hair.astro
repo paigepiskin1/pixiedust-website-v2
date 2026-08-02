@@ -36,7 +36,13 @@ const config = {
   signedIn,
   baseRule: HAIR_BASE_RULE,
   cuts: Object.fromEntries(HAIR_CUTS.map((c) => [c.id, { prompt: c.prompt, label: c.label, ref: c.ref || null }])),
-  colors: HAIR_COLORS.map((c) => ({ id: c.id, label: c.label, prompt: c.prompt })),
+  colors: HAIR_COLORS.map((c) => ({
+    id: c.id,
+    label: c.label,
+    prompt: c.prompt,
+    ref: c.ref || null,
+    swatch: c.swatch || null,
+  })),
 };
 ---
 
@@ -119,14 +125,21 @@ const config = {
           <div class="mt-4">
             <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Hair color</span>
             <div id="pd-color-row" class="flex flex-wrap gap-1.5">
-              {HAIR_COLORS.map((col, i) => (
+              {HAIR_COLORS.map((col, i) => {
+                const bg = col.swatch
+                  ? `background:${col.swatch};`
+                  : col.hex
+                    ? `background:${col.hex};`
+                    : "background:conic-gradient(from 0deg,#c99b5b,#3b2417,#b5502a,#ece6d6,#c99b5b);";
+                return (
                 <button type="button" class="pd-color-btn flex items-center gap-1.5 rounded-full" data-color-id={col.id} data-active={i === 0 ? "true" : "false"} style="padding:4px 11px 4px 4px;background:var(--pd-bg);border:1.5px solid var(--pd-hairline2);cursor:pointer;">
-                  <span class="pd-color-swatch" style={`position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:0.5px solid var(--pd-hairline3);${col.hex ? `background:${col.hex};` : "background:conic-gradient(from 0deg,#c99b5b,#3b2417,#b5502a,#ece6d6,#c99b5b);"}`}>
+                  <span class="pd-color-swatch" style={`position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:0.5px solid var(--pd-hairline3);${bg}`}>
                     <svg class="pd-color-check" width="11" height="11" viewBox="0 0 12 12" fill="none" style="display:none;"><path d="M2.5 6.2 4.8 8.5 9.5 3.5" stroke="#0A0A0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </span>
                   <span class="pd-color-name text-ink" style="font-size:11px;">{col.label}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -307,15 +320,19 @@ const config = {
     function buildPrompt(): string {
       const parts: string[] = [];
       const cut = selectedCut ? cfg.cuts[selectedCut] : null;
-      const usingRef = (mode === "reference" && refUrl()) || !!(cut && cut.ref);
-      if (usingRef) {
-        parts.push("Restyle their hair to closely match the hairstyle shown in the second reference image — copy its cut, length, shape, layers and texture, but keep the person's own identity and face.");
+      const col = (cfg.colors || []).find((c: any) => c.id === selectedColor);
+      const usingCutRef = (mode === "reference" && refUrl()) || !!(cut && cut.ref);
+      if (usingCutRef) {
+        parts.push("Restyle their hair to closely match the hairstyle shown in the cut/style reference image — copy its cut, length, shape, layers and texture, but keep the person's own identity and face.");
         if (cut?.prompt) parts.push(`Aim for ${cut.prompt}.`);
       } else if (cut) {
         parts.push(`Give them ${cut.prompt}.`);
       }
-      const col = (cfg.colors || []).find((c: any) => c.id === selectedColor);
-      if (col && col.prompt) parts.push(`Colour their hair ${col.prompt}.`);
+      if (col?.ref && col.prompt) {
+        parts.push(`Colour their hair to match the color pattern in the color reference image — aim for ${col.prompt}.`);
+      } else if (col && col.prompt) {
+        parts.push(`Colour their hair ${col.prompt}.`);
+      }
       if (!parts.length) return "";
       return `${cfg.baseRule} ${parts.join(" ")}`;
     }
@@ -428,8 +445,10 @@ const config = {
       if (!prompt) { showError("Pick a style or color."); return; }
       const images: string[] = [person];
       const cut = selectedCut ? cfg.cuts[selectedCut] : null;
+      const col = (cfg.colors || []).find((c: any) => c.id === selectedColor);
       if (mode === "reference" && refUrl()) images.push(refUrl()!);
       else if (cut?.ref) images.push(cut.ref);
+      if (col?.ref) images.push(col.ref);
       const total = cost();
       if (credits < total) { window.location.href = "/credits"; return; }
       errEl.classList.add("hidden");
