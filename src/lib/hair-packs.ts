@@ -290,7 +290,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Medium length, swept back",
     prompt:
       "a men's flow haircut — medium-length hair swept back and slightly to the side, soft natural movement, longer on top with tapered sides, clean and athletic",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785685345589.jpg",
   },
   {
     id: "m-short-mullet",
@@ -299,7 +299,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Short front, longer back",
     prompt:
       "a short men's mullet — cropped textured top and fringe, shorter sides, with distinctly longer length at the nape, modern and tight rather than extreme",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785685469280.jpg",
   },
   {
     id: "m-modern-mullet",
@@ -308,7 +308,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Shaggy top, longer tail",
     prompt:
       "a modern men's mullet — textured shaggy layers on top, faded or tapered sides, and longer layered length down the back, stylish and contemporary",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785685585809.jpg",
   },
   {
     id: "m-fade",
@@ -317,7 +317,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Clean skin fade, short top",
     prompt:
       "a clean men's skin fade haircut — sides faded tightly into the skin, short textured crop on top, sharp line-up and polished barber finish",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785685691056.jpg",
   },
   {
     id: "m-mohawk",
@@ -326,7 +326,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Strip on top, shaved sides",
     prompt:
       "a men's mohawk — a raised strip of longer hair running down the center of the head with the sides closely shaved or faded, bold and sharp",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785685806011.jpg",
   },
   {
     id: "m-quiff",
@@ -335,7 +335,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Volume swept up & forward",
     prompt:
       "a classic men's quiff — longer hair on top swept up and slightly forward with volume at the front, tapered sides, polished barber style",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785685923941.jpg",
   },
   {
     id: "m-braids",
@@ -344,7 +344,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Cornrows / men's braids",
     prompt:
       "neat men's cornrow braids — clean straight or slightly curved braids from the hairline back across the scalp, precise parts, natural hair color, barbershop finish",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686037379.jpg",
   },
   {
     id: "m-taper",
@@ -353,7 +353,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Soft taper, natural top",
     prompt:
       "a classic men's taper haircut — sides and back gradually tapered shorter toward the ears and neckline, natural medium-short length on top, clean and timeless",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686146041.jpg",
   },
   {
     id: "m-faux-hawk",
@@ -362,7 +362,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Hawk shape, faded sides",
     prompt:
       "a men's faux hawk — longer textured hair styled into a hawk ridge down the center with faded sides, spiked slightly upward but softer than a full mohawk",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686256623.jpg",
   },
   {
     id: "m-90s-spiky",
@@ -371,7 +371,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Twisted gel spikes",
     prompt:
       "1990s men's spiky hair — short twisted gel spikes standing up across the top, textured and crunchy with product, tapered sides, classic late-90s look",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686370235.jpg",
   },
   {
     id: "m-00s-spiky",
@@ -380,7 +380,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Jersey Shore club spikes",
     prompt:
       "early-2000s club-era men's spiked hair in Jersey Shore style — heavily gelled forward-and-up spikes on top, shiny with product, short sides, bold nightlife look",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686484659.jpg",
   },
   {
     id: "m-burst-fade",
@@ -389,7 +389,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Fade radiating from ear",
     prompt:
       "a men's burst fade — a fade that radiates in a semi-circle around the ear into longer hair on top and back, textured crown, sharp modern barber cut",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686623367.jpg",
   },
   {
     id: "m-messy-fringe",
@@ -398,7 +398,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Tousled fringe forward",
     prompt:
       "a men's messy fringe haircut — medium-length tousled hair falling forward into a textured fringe over the forehead, casual and undone with natural movement",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686738817.jpg",
   },
   {
     id: "m-spiky-fringe",
@@ -407,7 +407,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Spiked fringe forward",
     prompt:
       "a men's spiky fringe — short-to-medium hair styled into pointed spikes angled forward over the forehead, textured with product, tapered sides",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686854664.jpg",
   },
   {
     id: "m-long-undercut",
@@ -416,7 +416,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Man bun + undercut",
     prompt:
       "a men's long undercut with a man bun — sides and back closely cropped undercut, longer top hair gathered into a neat bun on the crown, clean contrast",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785686966351.jpg",
   },
   {
     id: "m-textured-fringe",
@@ -425,7 +425,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Cropped textured fringe",
     prompt:
       "a men's textured fringe crop — short choppy layers on top with a soft textured fringe sitting on the forehead, faded or tapered sides, modern barber finish",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785687082964.jpg",
   },
   {
     id: "m-choppy-fringe",
@@ -434,7 +434,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Razored choppy fringe",
     prompt:
       "a men's choppy fringe haircut — medium length with razor-cut uneven layers and a heavy choppy fringe across the forehead, edgy textured finish",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785687212660.jpg",
   },
   {
     id: "m-modern-quiff",
@@ -443,7 +443,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Textured high-volume quiff",
     prompt:
       "a modern men's quiff — high textured volume swept up and back from the forehead, disconnected or skin-faded sides, matte product finish, sharp and contemporary",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785687328051.jpg",
   },
   {
     id: "m-wavy-undercut",
@@ -452,7 +452,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Waves on top, undercut sides",
     prompt:
       "a men's wavy undercut — longer wavy hair on top with natural wave pattern, closely cropped undercut sides, soft parting or swept style",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785687439279.jpg",
   },
   {
     id: "m-shaggy-long",
@@ -461,7 +461,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Long layered shag",
     prompt:
       "long shaggy men's hair — shoulder-grazing layered length with textured ends, soft curtain pieces around the face, casual undone volume",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785687550267.jpg",
   },
   {
     id: "m-surfer",
@@ -470,7 +470,7 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Sun-tousled beach waves",
     prompt:
       "men's surfer hair — medium-long sun-tousled beachy waves with natural texture and movement, slightly messy fringe, casual coastal look",
-    preview: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/ef44d116-5cdc-4751-ac9e-6e6875702003.png",
+    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1785687663974.jpg",
   },
 ];
 
