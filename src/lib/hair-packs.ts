@@ -50,6 +50,9 @@ export const HAIR_COLORS: HairColor[] = [
   { id: "icy-blue", label: "Icy Blue", hex: "#a9c7db", prompt: "an icy blue" },
 ];
 
+/** Placeholder preview until on-model covers are regenerated. */
+const PLACEHOLDER = "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/c385e363-674d-47f2-ba24-89ae54eb8f55.webp";
+
 export const HAIR_CUTS: HairCut[] = [
   // ── Women's ──
   {
@@ -59,8 +62,8 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Soft face-framing layers",
     prompt:
       "a long layered haircut with soft face-framing layers, feathered ends, and natural movement like a salon layered blowout",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
-    ref: "https://i.pinimg.com/1200x/de/6f/62/de6f62df7939d7bc860fd33b3aa7121e.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/3f3d3515-7c51-4605-b7ea-3f0c519d2927.jpg",
   },
   {
     id: "f-long-wolf",
@@ -69,8 +72,8 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Shaggy layers + curtain fringe",
     prompt:
       "a long wolf cut with shaggy disconnected layers, volume at the crown, face-framing pieces, and a soft curtain fringe",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
-    ref: "https://i.pinimg.com/736x/f6/e6/d7/f6e6d72aa7dc2302847ec7422c202e50.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/8090eeca-8ca9-408d-b662-c5d706c25a8c.jpg",
   },
   {
     id: "f-short-wolf",
@@ -79,28 +82,28 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Cropped shaggy wolf",
     prompt:
       "a short wolf cut with choppy layered fringe, textured shaggy crown, and shorter layered ends around the shoulders",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
-    ref: "https://i.pinimg.com/736x/0e/e1/57/0ee1574d2c64c0d3af588c58073562ab.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/545be481-4153-4823-be74-19e3881286d7.jpg",
   },
   {
     id: "f-long-angles",
     gender: "female",
-    label: "Long Angles",
+    label: "Long Angled Layers",
     blurb: "Sharp A-line layers",
     prompt:
       "long angled layers with a sharp A-line silhouette, longer in front, sleek face-framing pieces, and polished ends",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
+    preview: PLACEHOLDER,
     ref: "https://i.pinimg.com/1200x/d3/18/21/d31821d081f4eff8632429cdb83a93d6.jpg",
   },
   {
     id: "f-curtain-bangs",
     gender: "female",
     label: "Curtain Bangs",
-    blurb: "Sabrina-style fringe",
+    blurb: "Sabrina Carpenter style",
     prompt:
       "long hair with soft Sabrina Carpenter-style curtain bangs sweeping apart at the center, face-framing fringe, and glossy length",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860575.jpg",
-    ref: "https://i.pinimg.com/736x/c6/e7/1d/c6e71d2236586a569a8275bf5b30797a.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/35e97a44-13f8-4b86-95ed-d26bccf485b2.jpg",
   },
   {
     id: "f-long-straight",
@@ -109,8 +112,8 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Sleek glossy length",
     prompt:
       "long sleek straight hair with a clean center or soft side part, glassy shine, and blunt polished ends",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086871329.jpg",
-    ref: "https://i.pinimg.com/1200x/c6/eb/14/c6eb14598c62184f3b8cd1f05d8b1643.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/a22bc279-10a0-41ae-b29e-99df3b80df6c.jpg",
   },
   {
     id: "f-long-curly",
@@ -119,8 +122,8 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Defined bouncy curls",
     prompt:
       "long curly hair with defined springy curls, natural volume, and soft face-framing curl pieces",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086861270.jpg",
-    ref: "https://i.pinimg.com/1200x/0e/9b/66/0e9b66f1153e857766696d787632e870.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/eae83b93-beb7-4314-9359-4c225817ba77.jpg",
   },
   {
     id: "f-traditional-bob",
@@ -129,18 +132,18 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Classic chin-length bob",
     prompt:
       "a classic traditional bob cut at chin length, soft rounded shape, light internal layering, and a clean polished finish",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860725.jpg",
-    ref: "https://m.media-amazon.com/images/I/617+Ze3merL._SX679_.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/b4ed556a-ee5f-4b70-ad94-0521b521262f.jpg",
   },
   {
     id: "f-flipped-bob",
     gender: "female",
-    label: "Flipped Out Bob",
+    label: "Flipped-Out Bob",
     blurb: "Ends flicked out",
     prompt:
       "a chin-to-shoulder bob with flipped-out ends, soft bounce, and a retro blowout flip at the tips",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860725.jpg",
-    ref: "https://i.pinimg.com/736x/81/ce/83/81ce83c97886edf6474b3bb5b3c9e264.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/c78a01e7-6245-4b18-a4b0-714374bb1d07.jpg",
   },
   {
     id: "f-y2k-bob",
@@ -149,17 +152,17 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Chunky early-2000s bob",
     prompt:
       "an early-2000s Y2K bob with chunky layers, slight flip, face-framing pieces, and glossy blowout volume",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086860725.jpg",
-    ref: "https://i.pinimg.com/736x/00/c7/01/00c701b8fa209c9ad8b501471a7812bf.jpg",
+    preview: PLACEHOLDER,
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/d68d75b7-be46-4e80-bca6-94d3161b5ea0.jpg",
   },
   {
-    id: "f-mullet",
+    id: "f-angled-bob",
     gender: "female",
-    label: "Mullet",
-    blurb: "Short front, long back",
+    label: "Angled Bob",
+    blurb: "90s Posh Spice bob",
     prompt:
-      "a modern women's mullet with shorter layered front and sides, longer textured length in the back, and soft face-framing pieces",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859182.jpg",
+      "a 1990s Victoria Beckham / Posh Spice angled bob — shorter in back, longer sharp points in front, sleek blowout, blunt polished ends",
+    preview: PLACEHOLDER,
   },
   {
     id: "f-pixie",
@@ -168,17 +171,52 @@ export const HAIR_CUTS: HairCut[] = [
     blurb: "Short & chic",
     prompt:
       "a chic short pixie cut with textured crown, softly tapered sides, and a light feathered fringe",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859182.jpg",
+    preview: PLACEHOLDER,
+  },
+  {
+    id: "f-mullet",
+    gender: "female",
+    label: "Mullet",
+    blurb: "Short front, long back",
+    prompt:
+      "a modern women's mullet with shorter layered front and sides, longer textured length in the back, and soft face-framing pieces",
+    preview: PLACEHOLDER,
+  },
+  {
+    id: "f-long-mullet",
+    gender: "female",
+    label: "Long Mullet",
+    blurb: "Grown-out shaggy mullet",
+    prompt:
+      "a long women's mullet with shaggy layered top and fringe, disconnected shorter sides, and much longer textured length down the back",
+    preview: PLACEHOLDER,
+  },
+  {
+    id: "f-emo",
+    gender: "female",
+    label: "Emo Hair",
+    blurb: "Side-swept emo layers",
+    prompt:
+      "an emo haircut with a heavy side-swept fringe covering one eye, choppy layered length, and razor-cut face-framing pieces",
+    preview: PLACEHOLDER,
   },
   {
     id: "f-scene-queen",
     gender: "female",
     label: "Scene Queen",
-    blurb: "Choppy emo scene cut",
+    blurb: "Choppy scene cut",
     prompt:
       "a scene queen haircut with choppy asymmetrical layers, heavy side-swept fringe, teased volume at the crown, and razor-cut ends",
-    preview: "https://pixiecdn.b-cdn.net/gen_d80b0323-9f76-44ee-bb08-a6aed948e196_1784086859701.jpg",
-    ref: "https://i.pinimg.com/1200x/fb/22/aa/fb22aacaac2c75bb52ae6d486c080d95.jpg",
+    preview: PLACEHOLDER,
+  },
+  {
+    id: "f-afro",
+    gender: "female",
+    label: "Afro",
+    blurb: "Full natural afro",
+    prompt:
+      "a full rounded natural afro with dense coily texture, even spherical shape, and soft volume framing the face",
+    preview: PLACEHOLDER,
   },
 
   // ── Men's ──

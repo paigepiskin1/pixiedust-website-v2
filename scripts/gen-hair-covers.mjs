@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 /**
  * Generate on-model hair cut covers with GPT Image 2.
- * Uses the provided model photo + each cut's style reference when available.
  *
  * Usage: node scripts/dev.mjs node scripts/gen-hair-covers.mjs
  */
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const SYNCNODE_KEY = process.env.SYNCNODE_API_KEY;
@@ -25,17 +24,17 @@ const CUTS = [
   {
     id: "f-long-layers",
     prompt: "a long layered haircut with soft face-framing layers, feathered ends, and natural movement like a salon layered blowout",
-    ref: "https://i.pinimg.com/1200x/de/6f/62/de6f62df7939d7bc860fd33b3aa7121e.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/3f3d3515-7c51-4605-b7ea-3f0c519d2927.jpg",
   },
   {
     id: "f-long-wolf",
     prompt: "a long wolf cut with shaggy disconnected layers, volume at the crown, face-framing pieces, and a soft curtain fringe",
-    ref: "https://i.pinimg.com/736x/f6/e6/d7/f6e6d72aa7dc2302847ec7422c202e50.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/8090eeca-8ca9-408d-b662-c5d706c25a8c.jpg",
   },
   {
     id: "f-short-wolf",
     prompt: "a short wolf cut with choppy layered fringe, textured shaggy crown, and shorter layered ends around the shoulders",
-    ref: "https://i.pinimg.com/736x/0e/e1/57/0ee1574d2c64c0d3af588c58073562ab.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/545be481-4153-4823-be74-19e3881286d7.jpg",
   },
   {
     id: "f-long-angles",
@@ -45,45 +44,60 @@ const CUTS = [
   {
     id: "f-curtain-bangs",
     prompt: "long hair with soft Sabrina Carpenter-style curtain bangs sweeping apart at the center, face-framing fringe, and glossy length",
-    ref: "https://i.pinimg.com/736x/c6/e7/1d/c6e71d2236586a569a8275bf5b30797a.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/35e97a44-13f8-4b86-95ed-d26bccf485b2.jpg",
   },
   {
     id: "f-long-straight",
     prompt: "long sleek straight hair with a clean center or soft side part, glassy shine, and blunt polished ends",
-    ref: "https://i.pinimg.com/1200x/c6/eb/14/c6eb14598c62184f3b8cd1f05d8b1643.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/a22bc279-10a0-41ae-b29e-99df3b80df6c.jpg",
   },
   {
     id: "f-long-curly",
     prompt: "long curly hair with defined springy curls, natural volume, and soft face-framing curl pieces",
-    ref: "https://i.pinimg.com/1200x/0e/9b/66/0e9b66f1153e857766696d787632e870.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/eae83b93-beb7-4314-9359-4c225817ba77.jpg",
   },
   {
     id: "f-traditional-bob",
     prompt: "a classic traditional bob cut at chin length, soft rounded shape, light internal layering, and a clean polished finish",
-    ref: "https://m.media-amazon.com/images/I/617+Ze3merL._SX679_.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/b4ed556a-ee5f-4b70-ad94-0521b521262f.jpg",
   },
   {
     id: "f-flipped-bob",
     prompt: "a chin-to-shoulder bob with flipped-out ends, soft bounce, and a retro blowout flip at the tips",
-    ref: "https://i.pinimg.com/736x/81/ce/83/81ce83c97886edf6474b3bb5b3c9e264.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/c78a01e7-6245-4b18-a4b0-714374bb1d07.jpg",
   },
   {
     id: "f-y2k-bob",
     prompt: "an early-2000s Y2K bob with chunky layers, slight flip, face-framing pieces, and glossy blowout volume",
-    ref: "https://i.pinimg.com/736x/00/c7/01/00c701b8fa209c9ad8b501471a7812bf.jpg",
+    ref: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/d68d75b7-be46-4e80-bca6-94d3161b5ea0.jpg",
   },
   {
-    id: "f-mullet",
-    prompt: "a modern women's mullet with shorter layered front and sides, longer textured length in the back, and soft face-framing pieces",
+    id: "f-angled-bob",
+    prompt: "a 1990s Victoria Beckham / Posh Spice angled bob — shorter in back, longer sharp points in front, sleek blowout, blunt polished ends",
   },
   {
     id: "f-pixie",
     prompt: "a chic short pixie cut with textured crown, softly tapered sides, and a light feathered fringe",
   },
   {
+    id: "f-mullet",
+    prompt: "a modern women's mullet with shorter layered front and sides, longer textured length in the back, and soft face-framing pieces",
+  },
+  {
+    id: "f-long-mullet",
+    prompt: "a long women's mullet with shaggy layered top and fringe, disconnected shorter sides, and much longer textured length down the back",
+  },
+  {
+    id: "f-emo",
+    prompt: "an emo haircut with a heavy side-swept fringe covering one eye, choppy layered length, and razor-cut face-framing pieces",
+  },
+  {
     id: "f-scene-queen",
     prompt: "a scene queen haircut with choppy asymmetrical layers, heavy side-swept fringe, teased volume at the crown, and razor-cut ends",
-    ref: "https://i.pinimg.com/1200x/fb/22/aa/fb22aacaac2c75bb52ae6d486c080d95.jpg",
+  },
+  {
+    id: "f-afro",
+    prompt: "a full rounded natural afro with dense coily texture, even spherical shape, and soft volume framing the face",
   },
 ];
 
@@ -103,12 +117,23 @@ async function uploadBunny(buf, remotePath, contentType) {
 }
 
 async function rehost(url, name) {
-  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 PixieDustCoverBot" } });
+  if (url.includes("pixiecdn.b-cdn.net")) return url;
+  const r = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      Referer: "https://www.pinterest.com/",
+    },
+  });
   if (!r.ok) throw new Error(`Download ${url} → ${r.status}`);
   const ct = r.headers.get("content-type") || "image/jpeg";
   const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
   const buf = Buffer.from(await r.arrayBuffer());
-  return uploadBunny(buf, `media/hair/refs/${name}.${ext}`, ct.includes("png") ? "image/png" : ct.includes("webp") ? "image/webp" : "image/jpeg");
+  return uploadBunny(
+    buf,
+    `media/hair/refs/${name}.${ext}`,
+    ct.includes("png") ? "image/png" : ct.includes("webp") ? "image/webp" : "image/jpeg"
+  );
 }
 
 async function submit(model, input) {
@@ -122,7 +147,7 @@ async function submit(model, input) {
   return d.job_id;
 }
 
-async function poll(jobId, maxMs = 360000) {
+async function poll(jobId, maxMs = 420000) {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 4000));
@@ -161,34 +186,34 @@ function buildPrompt(cut) {
 async function generateCover(cut, refUrl) {
   const images = [MODEL];
   if (refUrl) images.push(refUrl);
-  const prompt = buildPrompt(cut);
-  const models = ["openai/gpt-image-2", "google/nano-banana"];
+  const prompt = buildPrompt({ ...cut, ref: refUrl });
+  // Prefer nano-banana when GPT flags sensitive; still try GPT first for fidelity.
+  const models = ["openai/gpt-image-2", "google/nano-banana", "google/nano-banana-pro"];
   let lastErr;
   for (const model of models) {
     try {
       process.stdout.write(`[${model.split("/").pop()}] `);
-      const input =
-        model.includes("gpt-image")
-          ? {
-              prompt,
-              input_images: images,
-              aspect_ratio: "2:3",
-              quality: "high",
-              moderation: "low",
-              output_format: "jpeg",
-              number_of_images: 1,
-            }
-          : {
-              prompt,
-              image_input: images,
-              aspect_ratio: "2:3",
-              output_format: "jpg",
-            };
+      const input = model.includes("gpt-image")
+        ? {
+            prompt,
+            input_images: images,
+            aspect_ratio: "2:3",
+            quality: "high",
+            moderation: "low",
+            output_format: "jpeg",
+            number_of_images: 1,
+          }
+        : {
+            prompt,
+            image_input: images,
+            aspect_ratio: "2:3",
+            output_format: "jpg",
+          };
       const jobId = await submit(model, input);
       return await poll(jobId);
     } catch (e) {
       lastErr = e;
-      console.log(`\n    fail: ${String(e.message).slice(0, 160)}`);
+      console.log(`\n    fail: ${String(e.message).slice(0, 180)}`);
       process.stdout.write("  ");
     }
   }
@@ -196,28 +221,29 @@ async function generateCover(cut, refUrl) {
 }
 
 const results = {};
-console.log("Rehosting style refs…");
+console.log("Rehosting external style refs…");
 for (const cut of CUTS) {
   if (!cut.ref) continue;
   try {
-    const hosted = await rehost(cut.ref, cut.id);
-    cut.hostedRef = hosted;
-    console.log(`  ${cut.id} → ${hosted}`);
+    cut.hostedRef = await rehost(cut.ref, cut.id);
+    console.log(`  ${cut.id} → ${cut.hostedRef}`);
   } catch (e) {
-    console.log(`  ${cut.id} rehost failed, using original: ${e.message.slice(0, 100)}`);
-    cut.hostedRef = cut.ref;
+    console.log(`  ${cut.id} rehost failed: ${String(e.message).slice(0, 120)}`);
+    // Skip broken external refs — generate from text prompt only.
+    cut.hostedRef = null;
+    cut.ref = null;
   }
 }
 
-console.log("\nGenerating covers…");
+console.log(`\nGenerating ${CUTS.length} covers…`);
 for (const cut of CUTS) {
   process.stdout.write(`\n${cut.id} … `);
   try {
-    const url = await generateCover(cut, cut.hostedRef);
+    const url = await generateCover(cut, cut.hostedRef || null);
     console.log(`\n✓ ${url}`);
-    results[cut.id] = { preview: url, ref: cut.hostedRef || null };
+    results[cut.id] = { preview: url, ref: cut.hostedRef || cut.ref || null };
   } catch (e) {
-    console.log(`\n✗ ${String(e.message).slice(0, 200)}`);
+    console.log(`\n✗ ${String(e.message).slice(0, 220)}`);
     results[cut.id] = { error: String(e.message) };
   }
 }
@@ -226,23 +252,21 @@ const outPath = join(process.cwd(), "scripts/.hair-cover-results.json");
 writeFileSync(outPath, JSON.stringify(results, null, 2));
 console.log("\nWrote", outPath);
 
-// Patch hair-packs.ts preview (+ hosted ref) URLs
 const packsPath = join(process.cwd(), "src/lib/hair-packs.ts");
 let src = readFileSync(packsPath, "utf8");
 for (const [id, data] of Object.entries(results)) {
   if (!data.preview) continue;
-  // Replace preview URL inside the object that has this id
   const idRe = new RegExp(`(id:\\s*"${id}"[\\s\\S]*?preview:\\s*")[^"]+(")`);
-  if (idRe.test(src)) {
-    src = src.replace(idRe, `$1${data.preview}$2`);
-  }
+  if (idRe.test(src)) src = src.replace(idRe, `$1${data.preview}$2`);
   if (data.ref) {
     const refRe = new RegExp(`(id:\\s*"${id}"[\\s\\S]*?ref:\\s*")[^"]+(")`);
-    if (refRe.test(src)) {
-      src = src.replace(refRe, `$1${data.ref}$2`);
-    }
+    if (refRe.test(src)) src = src.replace(refRe, `$1${data.ref}$2`);
   }
 }
 writeFileSync(packsPath, src);
 console.log("Patched src/lib/hair-packs.ts");
+
+const ok = Object.values(results).filter((r) => r.preview).length;
+const fail = Object.values(results).filter((r) => r.error).length;
+console.log(`\nDone: ${ok} ok, ${fail} failed`);
 console.log(JSON.stringify(results, null, 2));
