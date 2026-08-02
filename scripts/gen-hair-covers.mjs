@@ -13,7 +13,7 @@ const BKEY = process.env.BUNNY_API_KEY;
 const PULL = (process.env.BUNNY_PULL_ZONE_URL || "https://pixiecdn.b-cdn.net").replace(/\/$/, "");
 
 const MODEL =
-  "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/c385e363-674d-47f2-ba24-89ae54eb8f55.webp";
+  "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/9adf7a8f-5a8b-4d7e-a883-ce6e57596018.png";
 
 const BASE =
   "Generate an edited version of the first photo in which ONLY the person's hair is restyled. " +
@@ -39,7 +39,7 @@ const CUTS = [
   {
     id: "f-long-angles",
     prompt: "long angled layers with a sharp A-line silhouette, longer in front, sleek face-framing pieces, and polished ends",
-    ref: "https://i.pinimg.com/1200x/d3/18/21/d31821d081f4eff8632429cdb83a93d6.jpg",
+    ref: "https://pixiecdn.b-cdn.net/media/hair/refs/f-long-angles.jpg",
   },
   {
     id: "f-curtain-bangs",
