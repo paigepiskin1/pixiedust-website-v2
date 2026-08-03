@@ -19,7 +19,20 @@ const { item, height = 260, width = 200 } = Astro.props;
 >
   {
     item.previewVideo ? (
-      <video src={item.previewVideo} muted loop playsinline autoplay preload="metadata" class="pd-autoplay absolute inset-0 h-full w-full object-cover" />
+      <video
+        src={item.previewVideo}
+        poster={item.previewImage || undefined}
+        muted
+        playsinline
+        autoplay
+        preload="metadata"
+        data-no-seek={item.previewPlayOnce ? "" : undefined}
+        class:list={[
+          "pd-autoplay absolute inset-0 h-full w-full object-cover",
+          item.previewPlayOnce ? "pd-play-once" : null,
+        ]}
+        loop={!item.previewPlayOnce}
+      />
     ) : item.previewImage ? (
       <img src={item.previewImage} loading="lazy" alt={item.name} class="absolute inset-0 h-full w-full object-cover" />
     ) : (

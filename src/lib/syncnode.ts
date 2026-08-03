@@ -9,9 +9,15 @@ export interface SubmitResult {
 
 export async function submitGeneration(
   apiKey: string,
-  opts: { provider: string; model: string; input: Record<string, unknown> }
+  opts: {
+    provider: string;
+    model: string;
+    input: Record<string, unknown>;
+    /** HTTPS callback SyncNode should POST when the job finishes. */
+    webhookUrl?: string;
+  }
 ): Promise<SubmitResult> {
-  const { provider, model, input } = opts;
+  const { provider, model, input, webhookUrl } = opts;
   // BytePlus (Ark / Dreamina·Seedance) takes its params at the top level
   // (content, resolution, ratio, duration, …) rather than nested under `input`.
   const isByteplus = provider === "byteplus";
@@ -24,7 +30,17 @@ export async function submitGeneration(
           ? `${BASE}/byteplus/generate`
           : `${BASE}/generate`;
 
-  const payload = isByteplus ? { apiKey, model, ...input } : { apiKey, model, input };
+  const payload: Record<string, unknown> = isByteplus
+    ? { apiKey, model, ...input }
+    : { apiKey, model, input };
+
+  // SyncNode markets async webhooks; send common field names so whichever the
+  // gateway accepts gets registered. Unknown fields are ignored.
+  if (webhookUrl) {
+    payload.webhook_url = webhookUrl;
+    payload.webhookUrl = webhookUrl;
+    payload.callback_url = webhookUrl;
+  }
 
   const res = await fetch(url, {
     method: "POST",
