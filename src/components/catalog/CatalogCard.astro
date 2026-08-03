@@ -9,30 +9,57 @@ interface Props {
   aspect?: string;
 }
 const { item, aspect = "1 / 1.3" } = Astro.props;
+const carousel = (item.previewImages ?? []).filter(Boolean);
+const hasCarousel = carousel.length > 1;
 ---
 
 <a
   href={item.href}
   class="pd-cat-card pd-card pd-lift group relative block overflow-hidden rounded-[18px]"
   data-cat={item.c ?? "All"}
+  data-carousel={hasCarousel ? "true" : undefined}
   style={`aspect-ratio:${aspect};background:var(--pd-bg2);`}
 >
   {
     item.previewVideo ? (
       <video src={item.previewVideo} muted loop playsinline autoplay preload="metadata" class="pd-autoplay absolute inset-0 h-full w-full object-cover" />
+    ) : hasCarousel ? (
+      <div class="pd-card-carousel absolute inset-0" data-pd-carousel>
+        {carousel.map((src, i) => (
+          <img
+            src={src}
+            loading={i === 0 ? "eager" : "lazy"}
+            alt={`${item.name} ${i + 1}`}
+            class="pd-card-carousel-slide absolute inset-0 h-full w-full object-cover"
+            data-active={i === 0 ? "true" : "false"}
+            style={i === 0 ? undefined : "opacity:0;"}
+          />
+        ))}
+        <div class="pd-card-carousel-dots absolute inset-x-0 z-[2] flex justify-center gap-1.5" style="bottom:62px;">
+          {carousel.map((_, i) => (
+            <button
+              type="button"
+              class="pd-card-carousel-dot"
+              data-idx={String(i)}
+              data-active={i === 0 ? "true" : "false"}
+              aria-label={`Show preview ${i + 1}`}
+            />
+          ))}
+        </div>
+      </div>
     ) : item.previewImage ? (
       <img src={item.previewImage} loading="lazy" alt={item.name} class="absolute inset-0 h-full w-full object-cover" />
     ) : (
       <Media tone={item.tone} />
     )
   }
-  <div class="absolute inset-0" style="background:linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.85) 100%);"></div>
+  <div class="absolute inset-0 z-[1]" style="background:linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.85) 100%);pointer-events:none;"></div>
 
-  {item.tag && <div class="absolute left-3 top-3"><Pill color={item.accent} label={item.tag} /></div>}
+  {item.tag && <div class="absolute left-3 top-3 z-[2]"><Pill color={item.accent} label={item.tag} /></div>}
   {
     item.meta && (
       <div
-        class="absolute right-3 top-3 font-mono"
+        class="absolute right-3 top-3 z-[2] font-mono"
         style="padding:3px 9px;border-radius:999px;background:rgba(10,10,11,0.6);backdrop-filter:blur(10px);font-size:10px;color:#fff;letter-spacing:0.5px;"
       >
         {item.meta}
@@ -41,13 +68,13 @@ const { item, aspect = "1 / 1.3" } = Astro.props;
   }
 
   <div
-    class="absolute left-1/2 top-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
-    style="background:rgba(255,255,255,0.94);"
+    class="absolute left-1/2 top-1/2 z-[2] flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
+    style="background:rgba(255,255,255,0.94);pointer-events:none;"
   >
     <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 1 L12 7 L3 13 Z" fill="#0A0A0B"></path></svg>
   </div>
 
-  <div class="absolute inset-x-3.5 bottom-3">
+  <div class="absolute inset-x-3.5 bottom-3 z-[2]">
     <div class="font-semibold text-white" style="font-size:14.5px;letter-spacing:-0.2px;">{item.name}</div>
     <div class="mt-1 flex items-center justify-between gap-2">
       {
@@ -61,3 +88,84 @@ const { item, aspect = "1 / 1.3" } = Astro.props;
     </div>
   </div>
 </a>
+
+<style>
+  .pd-card-carousel-slide {
+    transition: opacity 420ms ease;
+  }
+  .pd-card-carousel-slide[data-active="true"] {
+    opacity: 1 !important;
+  }
+  .pd-card-carousel-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.35);
+  }
+  .pd-card-carousel-dot[data-active="true"] {
+    background: #fff;
+    width: 14px;
+  }
+</style>
+
+<script>
+  function initCardCarousels(root: ParentNode = document) {
+    root.querySelectorAll<HTMLElement>("[data-pd-carousel]").forEach((host) => {
+      if ((host as any)._pdCarouselInit) return;
+      (host as any)._pdCarouselInit = true;
+      const slides = Array.from(host.querySelectorAll<HTMLElement>(".pd-card-carousel-slide"));
+      const dots = Array.from(host.querySelectorAll<HTMLButtonElement>(".pd-card-carousel-dot"));
+      if (slides.length < 2) return;
+      let idx = 0;
+      let timer: number | null = null;
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+      const show = (n: number) => {
+        idx = ((n % slides.length) + slides.length) % slides.length;
+        slides.forEach((s, i) => {
+          s.dataset.active = String(i === idx);
+          s.style.opacity = i === idx ? "1" : "0";
+        });
+        dots.forEach((d, i) => {
+          d.dataset.active = String(i === idx);
+        });
+      };
+
+      const stop = () => {
+        if (timer != null) {
+          window.clearInterval(timer);
+          timer = null;
+        }
+      };
+      const start = () => {
+        if (reduce) return;
+        stop();
+        timer = window.setInterval(() => show(idx + 1), 2600);
+      };
+
+      dots.forEach((dot) => {
+        dot.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          show(Number(dot.dataset.idx) || 0);
+          start();
+        });
+      });
+
+      const card = host.closest(".pd-cat-card");
+      card?.addEventListener("mouseenter", stop);
+      card?.addEventListener("mouseleave", start);
+      card?.addEventListener("focusin", stop);
+      card?.addEventListener("focusout", start);
+
+      show(0);
+      start();
+    });
+  }
+
+  initCardCarousels();
+  document.addEventListener("astro:page-load", () => initCardCarousels());
+</script>
