@@ -30,7 +30,15 @@ function formatAccept(accept: string) {
 <div class="pd-field-panel flex flex-col gap-4" id={id}>
   {fields.map((f) => (
     f.type === "file" ? (
-      <div class="block">
+      <div
+        class="block"
+        data-show-when-field={f.showWhen?.field}
+        data-show-when-includes={f.showWhen?.includes}
+        data-show-when-equals={f.showWhen?.equals}
+        data-hide-when-field={f.hideWhen?.field}
+        data-hide-when-truthy={f.hideWhen ? String(f.hideWhen.truthy !== false) : undefined}
+        style={f.showWhen || f.hideWhen ? "display:none;" : undefined}
+      >
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
           <div class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
@@ -53,22 +61,57 @@ function formatAccept(accept: string) {
           <div class="pd-upload-error" style="display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--pd-pink) 12%,transparent);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);font-size:12px;line-height:1.35;"></div>
         </div>
         {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
+        {f.key === "outfit" && <slot name="after-outfit" />}
       </div>
+    ) : f.type === "toggle" ? (
+      <label
+        class="flex cursor-pointer items-start gap-3 rounded-xl"
+        data-show-when-field={f.showWhen?.field}
+        data-show-when-includes={f.showWhen?.includes}
+        data-show-when-equals={f.showWhen?.equals}
+        data-hide-when-field={f.hideWhen?.field}
+        data-hide-when-truthy={f.hideWhen ? String(f.hideWhen.truthy !== false) : undefined}
+        style={`padding:12px 14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);${f.showWhen || f.hideWhen ? "display:none;" : ""}`}
+      >
+        <input
+          data-field={f.key}
+          type="checkbox"
+          checked={f.default === true || f.default === "true"}
+          class="mt-0.5"
+          style="width:16px;height:16px;accent-color:var(--pd-ink);flex:none;"
+        />
+        <span class="min-w-0">
+          <span class="block font-medium text-ink" style="font-size:12.5px;">{f.label}</span>
+          {f.help && <span class="mt-0.5 block text-ink-4" style="font-size:11px;">{f.help}</span>}
+        </span>
+      </label>
     ) : (
-      <label class="block">
+      <label
+        class="block"
+        data-show-when-field={f.showWhen?.field}
+        data-show-when-includes={f.showWhen?.includes}
+        data-show-when-equals={f.showWhen?.equals}
+        data-hide-when-field={f.hideWhen?.field}
+        data-hide-when-truthy={f.hideWhen ? String(f.hideWhen.truthy !== false) : undefined}
+        style={f.showWhen || f.hideWhen ? "display:none;" : undefined}
+      >
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         {f.type === "textarea" ? (
           <textarea data-field={f.key} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
         ) : f.type === "select" && (f.options ?? []).some((o) => (o as any).image) ? (
           <>
             <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
-            <div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fill,140px);gap:8px;justify-content:start;">
+            <div class="pd-opt-cards" style="display:flex;flex-direction:column;gap:6px;">
               {(f.options ?? []).map((o) => {
                 const active = String(f.default ?? f.options?.[0]?.value ?? "") === o.value;
                 return (
-                  <button type="button" class="pd-opt-card" data-val={o.value} data-active={active ? "true" : "false"} style={`display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${active ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)"};border:1px solid ${active ? "var(--pd-lilac)" : "var(--pd-hairline2)"};`}>
-                    {(o as any).image && <img src={(o as any).image} alt={o.label} loading="lazy" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);" />}
-                    <span style="font-size:12px;font-weight:500;color:var(--pd-ink);padding:0 2px 2px;line-height:1.25;">{o.label}</span>
+                  <button type="button" class="pd-opt-card" data-val={o.value} data-active={active ? "true" : "false"} style={`display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${active ? "color-mix(in srgb,var(--pd-lilac) 10%,var(--pd-bg))" : "var(--pd-bg)"};border:0.5px solid ${active ? "var(--pd-lilac)" : "var(--pd-hairline2)"};`}>
+                    {(o as any).image ? (
+                      <img src={(o as any).image} alt="" loading="lazy" style="width:36px;height:36px;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);flex:none;border:0.5px solid var(--pd-hairline);" />
+                    ) : (
+                      <span style="width:36px;height:36px;border-radius:8px;display:block;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex:none;"></span>
+                    )}
+                    <span style="font-size:12.5px;font-weight:500;color:var(--pd-ink);line-height:1.3;">{o.label}</span>
                   </button>
                 );
               })}
@@ -142,7 +185,8 @@ function formatAccept(accept: string) {
       const maxFiles = Number(f.max ?? 4);
       const accept = String(f.accept ?? "");
       const acceptLabel = accept ? accept.replace(/image\//g,"").replace(/video\//g,"").replace(/,\s*/g,", ").toUpperCase() : "";
-      return `<div>
+      const sw = showWhenAttrs(f);
+      return `<div${sw}>
         <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
         <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
           <div class="pd-upload-zone" style="position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);border-radius:12px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;">
@@ -167,6 +211,18 @@ function formatAccept(accept: string) {
       </div>`;
     }
 
+    if (type === "toggle") {
+      const on = f.default === true || f.default === "true";
+      const sw = showWhenAttrs(f);
+      return `<label${sw} style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);border-radius:12px;cursor:pointer;">
+        <input data-field="${key}" type="checkbox"${on ? " checked" : ""} style="width:16px;height:16px;margin-top:2px;accent-color:var(--pd-ink);flex:none;" />
+        <span style="min-width:0;">
+          <span style="display:block;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}</span>
+          ${help}
+        </span>
+      </label>`;
+    }
+
     let input = "";
     if (type === "textarea") {
       input = `<textarea data-field="${key}" rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
@@ -175,12 +231,12 @@ function formatAccept(accept: string) {
       const cards = f.options.map((o: any) => {
         const val = String(o.value ?? o);
         const on = val === current;
-        return `<button type="button" class="pd-opt-card" data-val="${escAttr(val)}" data-active="${on?"true":"false"}" style="display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${on?"color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))":"var(--pd-bg)"};border:1px solid ${on?"var(--pd-lilac)":"var(--pd-hairline2)"};">
-          ${o.image?`<img src="${escAttr(String(o.image))}" alt="${escAttr(String(o.label??val))}" loading="lazy" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);" />`:""}
-          <span style="font-size:12px;font-weight:500;color:var(--pd-ink);padding:0 2px 2px;line-height:1.25;">${escHtml(String(o.label??val))}</span>
+        return `<button type="button" class="pd-opt-card" data-val="${escAttr(val)}" data-active="${on?"true":"false"}" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border-radius:12px;cursor:pointer;text-align:left;transition:border-color 120ms,background 120ms;background:${on?"color-mix(in srgb,var(--pd-lilac) 10%,var(--pd-bg))":"var(--pd-bg)"};border:0.5px solid ${on?"var(--pd-lilac)":"var(--pd-hairline2)"};">
+          ${o.image?`<img src="${escAttr(String(o.image))}" alt="" loading="lazy" style="width:36px;height:36px;object-fit:cover;border-radius:8px;display:block;background:var(--pd-bg2);flex:none;border:0.5px solid var(--pd-hairline);" />`:`<span style="width:36px;height:36px;border-radius:8px;display:block;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex:none;"></span>`}
+          <span style="font-size:12.5px;font-weight:500;color:var(--pd-ink);line-height:1.3;">${escHtml(String(o.label??val))}</span>
         </button>`;
       }).join("");
-      input = `<input type="hidden" data-field="${key}" value="${escAttr(current)}" /><div class="pd-opt-cards" style="display:grid;grid-template-columns:repeat(auto-fill,140px);gap:8px;justify-content:start;">${cards}</div>`;
+      input = `<input type="hidden" data-field="${key}" value="${escAttr(current)}" /><div class="pd-opt-cards" style="display:flex;flex-direction:column;gap:6px;">${cards}</div>`;
     } else if (type === "select" && Array.isArray(f.options) && f.ui === "dropdown") {
       const current = def || String(f.options[0]?.value ?? f.options[0] ?? "");
       const opts = f.options.map((o: any) => `<option value="${escAttr(String(o.value??o))}"${String(o.value??o)===current?" selected":""}>${escHtml(String(o.label??o.value??o))}</option>`).join("");
@@ -199,12 +255,28 @@ function formatAccept(accept: string) {
       const t = type === "url" ? "url" : type === "email" ? "email" : "text";
       input = `<input data-field="${key}" type="${t}" placeholder="${escAttr(ph)}" value="${escAttr(def)}" style="${S}" />`;
     }
-    return `<label style="display:block;">
+    const sw = showWhenAttrs(f);
+    return `<label${sw} style="display:block;">
       <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
       ${input}${help}
     </label>`;
   }).join("");
 };
+
+function showWhenAttrs(f: any): string {
+  const bits: string[] = [];
+  if (f?.showWhen?.field) {
+    bits.push(`data-show-when-field="${escAttr(String(f.showWhen.field))}"`);
+    if (f.showWhen.includes) bits.push(`data-show-when-includes="${escAttr(String(f.showWhen.includes))}"`);
+    if (f.showWhen.equals != null) bits.push(`data-show-when-equals="${escAttr(String(f.showWhen.equals))}"`);
+  }
+  if (f?.hideWhen?.field) {
+    bits.push(`data-hide-when-field="${escAttr(String(f.hideWhen.field))}"`);
+    bits.push(`data-hide-when-truthy="${f.hideWhen.truthy === false ? "false" : "true"}"`);
+  }
+  if (!bits.length) return "";
+  return ` ${bits.join(" ")} style="display:none;"`;
+}
 
 function escHtml(s: string) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
@@ -374,9 +446,10 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       el.addEventListener("drop", async e => { e.preventDefault(); dc=0; uhl(); for(const f of Array.from((e as DragEvent).dataTransfer?.files??[]).slice(0,maxFiles-urls.length)) await addFile(f); });
       el.addEventListener("change", async () => { const files=Array.from(el.files??[]).slice(0,maxFiles-urls.length); el.value=""; for(const f of files) await addFile(f); });
 
-      // Render a thumb for an already-hosted URL (preloaded reference images).
-      function addExisting(url: string) {
-        if (!url || urls.length >= maxFiles) return;
+      // Render a thumb for an already-hosted URL (preloaded reference images,
+      // or product-link picks from the studio).
+      function addExisting(url: string): boolean {
+        if (!url || urls.includes(url) || urls.length >= maxFiles) return false;
         const thumb = document.createElement("div");
         thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
         const img = document.createElement("img");
@@ -389,6 +462,14 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         thumb.appendChild(img); thumb.appendChild(x);
         thumbsEl?.appendChild(thumb);
         urls.push(url);
+        syncZone();
+        return true;
+      }
+      // Expose so studio product-link UI can push selected images into this field.
+      if (wrap) {
+        (wrap as any)._pdAddUrl = addExisting;
+        (wrap as any)._pdMultiCount = () => urls.length;
+        (wrap as any)._pdMultiMax = maxFiles;
       }
       // Preload reference images from the field's default.
       try {
@@ -439,6 +520,40 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     } catch { /* ignore bad default */ }
   });
 
+  const fieldValue = (field: string): string => {
+    const src = root.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+      `[data-field="${field}"]`
+    );
+    if (!src) return "";
+    if ((src as HTMLInputElement).type === "checkbox") {
+      return (src as HTMLInputElement).checked ? "true" : "false";
+    }
+    return String((src as HTMLInputElement).value ?? "");
+  };
+
+  const applyShowWhen = () => {
+    root.querySelectorAll<HTMLElement>("[data-show-when-field], [data-hide-when-field]").forEach((el) => {
+      let show = true;
+      const field = el.dataset.showWhenField || "";
+      if (field) {
+        const val = fieldValue(field);
+        const includes = el.dataset.showWhenIncludes || "";
+        const equals = el.dataset.showWhenEquals;
+        if (equals != null && equals !== "") show = val === equals;
+        else if (includes) show = val.toLowerCase().includes(includes.toLowerCase());
+      }
+      const hideField = el.dataset.hideWhenField || "";
+      if (hideField) {
+        const hv = fieldValue(hideField);
+        const truthy = el.dataset.hideWhenTruthy !== "false";
+        const isOn = hv === "true" || hv === "1" || hv === "on";
+        if (truthy && isOn) show = false;
+        if (!truthy && !isOn) show = false;
+      }
+      el.style.display = show ? "" : "none";
+    });
+  };
+
   // Thumbnail-card option groups (a <select> whose options carry images). Clicks
   // update the sibling hidden input so pdCollectFieldValues picks up the value.
   root.querySelectorAll<HTMLElement>(".pd-opt-cards").forEach((group) => {
@@ -453,6 +568,7 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           c.style.borderColor = on ? "var(--pd-lilac)" : "var(--pd-hairline2)";
           c.style.background = on ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)";
         });
+        applyShowWhen();
       });
     });
   });
@@ -471,9 +587,18 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           s.style.color = on ? "var(--pd-bg)" : "var(--pd-ink)";
           s.style.borderColor = on ? "transparent" : "var(--pd-hairline2)";
         });
+        applyShowWhen();
       });
     });
   });
+
+  root.querySelectorAll<HTMLSelectElement>("select[data-field]").forEach((sel) => {
+    sel.addEventListener("change", applyShowWhen);
+  });
+  root.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-field]').forEach((box) => {
+    box.addEventListener("change", applyShowWhen);
+  });
+  applyShowWhen();
 };
 
 // ── Collect all field values ──────────────────────────────────────────────────
@@ -483,6 +608,10 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     const key = (el as HTMLInputElement).dataset.field!;
     if ((el as HTMLInputElement).type === "file") {
       if (fileUrls[key] != null) out[key] = fileUrls[key];
+      return;
+    }
+    if ((el as HTMLInputElement).type === "checkbox") {
+      out[key] = (el as HTMLInputElement).checked;
       return;
     }
     out[key] = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
