@@ -1,11 +1,26 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults } from "../../../lib/templates";
+import {
+  getTemplate,
+  resolveInput,
+  computeCost,
+  isChain,
+  allFields,
+  resolveChainStep,
+  applyFieldDefaults,
+  appendSelectedOptionRefs,
+  isUploadLook,
+} from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
 import { prepareByteplusAssets } from "../../../lib/byteplus-assets";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
+import {
+  buildSyncnodeWebhookUrl,
+  finishGenerationInBackground,
+  syncnodeWebhookKey,
+} from "../../../lib/generations";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -17,6 +32,24 @@ export async function POST({ request, locals }: APIContext) {
 
   const env = locals.runtime.env;
   const db = env.DB;
+  const webhookKey = await syncnodeWebhookKey(env.SYNCNODE_API_KEY);
+  const origin = new URL(request.url).origin;
+  const webhookUrl = buildSyncnodeWebhookUrl(origin, webhookKey);
+  const scheduleFinish = (genId: string) => {
+    // Poll SyncNode after the response, then self-chain /api/generate/continue
+    // so long jobs (GPT Image) still finalize after the user leaves the page.
+    const ctx = (locals.runtime as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } }).ctx;
+    const p = finishGenerationInBackground(env, genId, {
+      webhookUrl,
+      origin,
+      continueKey: webhookKey,
+      hop: 0,
+    }).catch((err) => {
+      console.error("[generate] background finish error:", err);
+    });
+    if (ctx?.waitUntil) ctx.waitUntil(p);
+    else p.catch(() => {});
+  };
   const dbUser = await getUserByUid(db, user.uid);
   if (!dbUser) return json({ error: "Account not found." }, 401);
   const userId = dbUser.id;
@@ -96,13 +129,19 @@ export async function POST({ request, locals }: APIContext) {
       .run();
 
     try {
-      const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: steps[0].provider, model: steps[0].model, input: step0Input });
+      const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, {
+        provider: steps[0].provider,
+        model: steps[0].model,
+        input: step0Input,
+        webhookUrl,
+      });
       steps[0].jobId = jobId;
       steps[0].status = "processing";
       await db
         .prepare("UPDATE generations SET status='processing', provider_job_id=?, chain_json=?, updated_at=datetime('now') WHERE id=?")
         .bind(jobId, JSON.stringify(chain), genId)
         .run();
+      scheduleFinish(genId);
       return json({ id: genId, status: "processing", balance: deb.balance, cost, steps: steps.length });
     } catch (err) {
       return fail(err);
@@ -110,7 +149,14 @@ export async function POST({ request, locals }: APIContext) {
   }
 
   // ─── Single step ───
-  const { input } = resolveInput(template, inputs);
+  if (isUploadLook(template, inputs)) {
+    const outfit = inputs.outfit;
+    if (typeof outfit !== "string" || !/^https?:\/\//i.test(outfit)) {
+      return json({ error: "Upload an outfit photo, or pick Keep / Female / Male instead." }, 400);
+    }
+  }
+  const resolved = resolveInput(template, inputs);
+  const input = appendSelectedOptionRefs(template, inputs, resolved.input as Record<string, unknown>);
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;
@@ -178,11 +224,17 @@ export async function POST({ request, locals }: APIContext) {
     .run();
 
   try {
-    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
+    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, {
+      provider: template.provider,
+      model: template.model,
+      input,
+      webhookUrl,
+    });
     await db
       .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
       .bind(jobId, genId)
       .run();
+    scheduleFinish(genId);
     return json({ id: genId, status: "processing", balance: deb.balance, cost });
   } catch (err) {
     return fail(err);

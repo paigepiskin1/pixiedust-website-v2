@@ -126,6 +126,27 @@ if (!user) {
       .catch(() => {});
   </script>
 
+  {user && (
+    <script is:inline>
+      // Finalize any SyncNode jobs that finished after the user left a studio
+      // page — keeps My creations up to date without requiring an open poll tab.
+      (function () {
+        var run = function () {
+          // JSON Content-Type avoids CF/Astro treating this as a cross-site form POST.
+          fetch("/api/generate/reconcile", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          }).catch(function () {});
+        };
+        if (document.readyState === "complete") run();
+        else window.addEventListener("load", run, { once: true });
+        document.addEventListener("astro:page-load", run);
+      })();
+    </script>
+  )}
+
   <script is:inline>
     // Preview videos play automatically while on-screen and pause when scrolled
     // away (keeps many rail/grid videos from all decoding at once). Re-scans on

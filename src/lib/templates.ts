@@ -22,7 +22,14 @@ export interface TemplateField {
   help?: string;
   required?: boolean;
   default?: string | number | boolean;
-  options?: { value: string; label: string }[];
+  options?: {
+    value: string;
+    label: string;
+    /** Optional preview card image in the studio UI. */
+    image?: string;
+    /** Optional backend reference image appended to model image inputs when selected. */
+    ref?: string;
+  }[];
   min?: number;
   max?: number;
   step?: number;
@@ -31,6 +38,8 @@ export interface TemplateField {
   multiple?: boolean;
   /** For select fields: "buttons" (default) or "dropdown". */
   ui?: "buttons" | "dropdown";
+  /** Optionally show this field only when another field's value matches. */
+  showWhen?: { field: string; includes?: string; equals?: string };
 }
 
 export interface TemplateStep {
@@ -238,7 +247,14 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
         return val != null ? String(val) : String(byKey.get(key)?.default ?? "");
       });
     }
-    if (Array.isArray(v)) return v.map(subst);
+    // Flatten one level so ["{{files*}}", "https://…"] becomes a flat URL list
+    // (image models expect string[] — not nested arrays from multi-file fields).
+    if (Array.isArray(v)) {
+      return v.flatMap((item) => {
+        const r = subst(item);
+        return Array.isArray(r) ? r : [r];
+      });
+    }
     if (v && typeof v === "object") {
       const out: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = subst(val);
@@ -248,6 +264,65 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
   };
 
   return { input: subst(t.input) as Record<string, unknown>, errors };
+}
+
+function imageInputKey(input: Record<string, unknown>): "input_images" | "image_input" | null {
+  if ("input_images" in input) return "input_images";
+  if ("image_input" in input) return "image_input";
+  return null;
+}
+
+function cleanImageUrls(cur: unknown): string[] {
+  return (Array.isArray(cur) ? cur : cur ? [cur] : [])
+    .flatMap((x) => (Array.isArray(x) ? x : [x]))
+    .filter((x): x is string => typeof x === "string" && /^https?:\/\//i.test(x));
+}
+
+/** True when the selected look asks the user to upload their own outfit photo. */
+export function isUploadLook(t: Template, inputs: Record<string, unknown>): boolean {
+  const lookField = allFields(t).find((f) => f.key === "look" && f.type === "select");
+  if (!lookField?.options?.length) return false;
+  const selected = String(inputs.look ?? lookField.default ?? "");
+  if (/uploaded outfit/i.test(selected)) return true;
+  const opt = lookField.options.find((o) => o.value === selected);
+  return /upload/i.test(opt?.label ?? "");
+}
+
+/**
+ * Attach look/outfit reference images for the model:
+ * - preset male/female options → backend `ref`/`image`
+ * - "Upload my own outfit" → user `outfit` file URL
+ * Also strips empty placeholders from image arrays.
+ */
+export function appendSelectedOptionRefs(
+  t: Template,
+  inputs: Record<string, unknown>,
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const imageKey = imageInputKey(input);
+  if (!imageKey) return input;
+
+  const list = cleanImageUrls(input[imageKey]);
+  // Drop a stray user outfit URL if the template inlined {{outfit}} while the
+  // user picked keep/original or a preset look — we re-add it only for upload.
+  const outfitUrl =
+    typeof inputs.outfit === "string" && /^https?:\/\//i.test(inputs.outfit) ? inputs.outfit : null;
+  const withoutOutfit = outfitUrl ? list.filter((u) => u !== outfitUrl) : list;
+
+  const lookField = allFields(t).find((f) => f.key === "look" && f.type === "select");
+  const selected = String(inputs.look ?? lookField?.default ?? "");
+  const opt = lookField?.options?.find((o) => o.value === selected);
+  const upload = isUploadLook(t, inputs);
+
+  const out = [...withoutOutfit];
+  if (upload) {
+    if (outfitUrl && !out.includes(outfitUrl)) out.push(outfitUrl);
+  } else if (selected.trim()) {
+    const ref = opt?.ref || opt?.image;
+    if (typeof ref === "string" && /^https?:\/\//i.test(ref) && !out.includes(ref)) out.push(ref);
+  }
+
+  return { ...input, [imageKey]: out };
 }
 
 /**
