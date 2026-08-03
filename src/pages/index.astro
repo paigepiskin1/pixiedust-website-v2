@@ -23,13 +23,28 @@ const TRENDING_PIN = [
   "byteplus-seedance-fast-i2v",
 ] as const;
 
-const [trending, presets, beauty, videoPool, toolMedia, pinnedRaw] = await Promise.all([
+// Pinned "Trendy Selfie" homepage rail (photoshoot templates).
+const TRENDY_SELFIE_PIN = [
+  "ocean-underwater-selfie",
+  "nyc-dot5-stairwell",
+  "tropical-wet-hair-selfie",
+  "facial-bed-selfie",
+  "bali-moto-selfie",
+  "hawaii-surf-gopro",
+  "santorini-caldera-selfie",
+  "subway-platform-copy-2",
+  "nyc-dot5-cafe",
+  "grwm-face-cream-selfie",
+] as const;
+
+const [trending, presets, beauty, videoPool, toolMedia, pinnedRaw, trendySelfieRaw] = await Promise.all([
   listTemplates(db, { featured: true, limit: 16 }),
   listTemplates(db, { kind: "preset", limit: 8 }),
   listTemplates(db, { kind: "beauty", limit: 8 }),
   listTemplates(db, { kinds: ["i2v", "video", "motion", "cinema"], limit: 40 }),
   getToolCards(db),
   Promise.all(TRENDING_PIN.map((id) => getTemplate(db, id))),
+  Promise.all(TRENDY_SELFIE_PIN.map((id) => getTemplate(db, id))),
 ]);
 
 // Surface templates that actually have a generated preview video first for the
@@ -46,6 +61,9 @@ const trendingMerged = [...pinnedTrending, ...trending].filter(
 const trendingCards = trendingMerged.map(templateToRail);
 const presetCards = presets.map(templateToRail);
 const beautyCards = beauty.map(templateToRail);
+const trendySelfieCards = trendySelfieRaw
+  .filter((t): t is NonNullable<typeof t> => !!t && !t.isHidden && !t.isAdminOnly)
+  .map(templateToRail);
 
 // Hero slides: admin-curated picks (from /admin/tools) take over when present;
 // otherwise auto-fill from the video-preview templates so the hero plays actual
@@ -101,6 +119,11 @@ const heroSlides: HeroSlide[] = curatedHero.length
           height={260}
         />
       </Reveal>
+    </section>
+
+    <section class="mb-9">
+      <RailHead title="Trendy Selfie" sub="Photoshoots · Selfie" accent="var(--pd-lilac)" seeAllHref="/shoots" />
+      <CardRail items={trendySelfieCards} height={280} width={200} />
     </section>
 
     <section class="mb-9">
