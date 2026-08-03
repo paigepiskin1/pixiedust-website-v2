@@ -172,6 +172,11 @@ const SPECIFIC_PROMPTS = {
   "shoot-soft-siren":    "Woman with long hair in a flowy dress, romantic soft lighting",
   "shoot-vogue-editorial":"Fashion model in avant-garde outfit, magazine editorial pose",
   "shoot-y2k-mall-girl": "Teen in Y2K fashion at a colorful shopping mall, playful pose",
+  "nyc-dot5-stairwell":  "Cool .5 iPhone selfie of a young woman in a NYC apartment stairwell, daytime digital flash, ultra-wide front camera",
+  "nyc-dot5-subway":     "Cool .5 iPhone selfie of a young woman on a crowded NYC subway seat, digital flash, ultra-wide",
+  "nyc-dot5-cafe":       "Cool .5 iPhone selfie of a young woman in a NYC cafe holding a coffee, daytime digital flash",
+  "nyc-dot5-bodega":     "Cool .5 iPhone fashion street photo of a young woman outside a NYC bodega, daytime digital flash",
+  "nyc-dot5-walk":       "Cool .5 iPhone fashion street photo of a young woman walking in NYC daytime, digital flash",
 
   // Ads
   "ad-beauty-before-after":"Split view of woman's face transformation, beauty advertisement",
