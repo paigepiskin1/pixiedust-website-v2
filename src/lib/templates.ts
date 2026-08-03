@@ -22,15 +22,26 @@ export interface TemplateField {
   help?: string;
   required?: boolean;
   default?: string | number | boolean;
-  options?: { value: string; label: string }[];
+  options?: {
+    value: string;
+    label: string;
+    /** Optional preview card image in the studio UI. */
+    image?: string;
+    /** Optional backend reference image appended to model image inputs when selected. */
+    ref?: string;
+  }[];
   min?: number;
   max?: number;
   step?: number;
   accept?: string;
   placeholder?: string;
   multiple?: boolean;
-  /** For select fields: "buttons" (default) or "dropdown". */
-  ui?: "buttons" | "dropdown";
+  /** For select fields: "buttons" (default) or "dropdown". For file fields: "square" = compact square upload tile (used in side-by-side You/Friend pairs). */
+  ui?: "buttons" | "dropdown" | "square";
+  /** Optionally show this field only when another field's value matches. */
+  showWhen?: { field: string; includes?: string; equals?: string };
+  /** Optionally hide this field when another field is truthy (e.g. keep_outfit). */
+  hideWhen?: { field: string; truthy?: boolean };
 }
 
 export interface TemplateStep {
@@ -238,7 +249,14 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
         return val != null ? String(val) : String(byKey.get(key)?.default ?? "");
       });
     }
-    if (Array.isArray(v)) return v.map(subst);
+    // Flatten one level so ["{{files*}}", "https://…"] becomes a flat URL list
+    // (image models expect string[] — not nested arrays from multi-file fields).
+    if (Array.isArray(v)) {
+      return v.flatMap((item) => {
+        const r = subst(item);
+        return Array.isArray(r) ? r : [r];
+      });
+    }
     if (v && typeof v === "object") {
       const out: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = subst(val);
@@ -248,6 +266,243 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
   };
 
   return { input: subst(t.input) as Record<string, unknown>, errors };
+}
+
+function imageInputKey(input: Record<string, unknown>): "input_images" | "image_input" | null {
+  if ("input_images" in input) return "input_images";
+  if ("image_input" in input) return "image_input";
+  return null;
+}
+
+function cleanImageUrls(cur: unknown): string[] {
+  return (Array.isArray(cur) ? cur : cur ? [cur] : [])
+    .flatMap((x) => (Array.isArray(x) ? x : [x]))
+    .filter((x): x is string => typeof x === "string" && /^https?:\/\//i.test(x));
+}
+
+export const UPLOAD_OUTFIT_LOOK_VALUE =
+  ", wearing the exact outfit shown in the uploaded outfit reference image. Match that outfit closely";
+
+const OPTIONAL_OUTFIT_FIELD: TemplateField = {
+  key: "outfit",
+  type: "file",
+  label: "Change outfit (optional)",
+  required: false,
+  multiple: true,
+  max: 4,
+  accept: "image/*",
+  help: "Optional — upload flat lays or outfit photos to wear instead of what's in your photos.",
+};
+
+const KEEP_OUTFIT_FIELD: TemplateField = {
+  key: "keep_outfit",
+  type: "toggle",
+  label: "Keep my original outfit",
+  required: false,
+  default: false,
+  help: "Use the clothes in your photos — skip the template outfit and any uploads.",
+};
+
+/** Collect uploaded outfit CDN URLs (single string or multi-file array). */
+export function collectOutfitUrls(inputs: Record<string, unknown>): string[] {
+  const v = inputs.outfit;
+  if (Array.isArray(v)) return cleanImageUrls(v);
+  if (typeof v === "string" && /^https?:\/\//i.test(v)) return [v];
+  return [];
+}
+
+/** True when the user checked "Keep my original outfit". */
+export function isKeepOriginalOutfit(inputs: Record<string, unknown>): boolean {
+  const v = inputs.keep_outfit;
+  return v === true || v === "true" || v === 1 || v === "1" || v === "on";
+}
+
+/** True when the selected look asks the user to upload their own outfit photo,
+ *  or when an always-optional outfit field has files (no gated look select). */
+export function isUploadLook(t: Template, inputs: Record<string, unknown>): boolean {
+  if (isKeepOriginalOutfit(inputs)) return false;
+  const urls = collectOutfitUrls(inputs);
+  const lookField = allFields(t).find((f) => f.key === "look" && f.type === "select");
+  if (!lookField?.options?.length) return urls.length > 0;
+
+  const selected = String(inputs.look ?? lookField.default ?? "");
+  if (/uploaded outfit/i.test(selected)) return true;
+  const opt = lookField.options.find((o) => o.value === selected);
+  if (/upload/i.test(opt?.label ?? "")) return true;
+  // Look select without an Upload option: treat optional outfit files as upload.
+  const hasUploadOpt = lookField.options.some(
+    (o) => /upload/i.test(o.label ?? "") || /uploaded outfit/i.test(o.value ?? "")
+  );
+  return !hasUploadOpt && urls.length > 0;
+}
+
+/**
+ * Ensure every photoshoot template exposes:
+ * - "Keep my original outfit" checkbox
+ * - optional outfit upload (or Upload option on existing look selects)
+ */
+export function ensureOptionalOutfitUpload(t: Template): Template {
+  if (t.kind !== "shoot") return t;
+  const fields: TemplateField[] = (t.fields ?? []).map((f) => ({
+    ...f,
+    options: f.options ? f.options.map((o) => ({ ...o })) : undefined,
+  }));
+  const lookIdx = fields.findIndex((f) => f.key === "look" && f.type === "select");
+  const outfitIdx = fields.findIndex((f) => f.key === "outfit" && f.type === "file");
+  const keepIdx = fields.findIndex((f) => f.key === "keep_outfit");
+
+  if (lookIdx >= 0) {
+    const look = fields[lookIdx];
+    const opts = [...(look.options ?? [])];
+    const hasUpload = opts.some((o) => /upload/i.test(o.label ?? "") || /uploaded outfit/i.test(o.value ?? ""));
+    if (!hasUpload) {
+      opts.push({ value: UPLOAD_OUTFIT_LOOK_VALUE, label: "Upload my own outfit" });
+      fields[lookIdx] = {
+        ...look,
+        options: opts,
+        help: look.help || "Keep your clothes, pick a styled look, or upload your own outfit photo.",
+      };
+    }
+    fields[lookIdx] = {
+      ...fields[lookIdx],
+      hideWhen: { field: "keep_outfit", truthy: true },
+    };
+    const gated: TemplateField = {
+      ...OPTIONAL_OUTFIT_FIELD,
+      label: "Outfit photo(s)",
+      help: "Flat lays or outfit photos — required when you pick Upload my own outfit.",
+      showWhen: { field: "look", includes: "uploaded outfit" },
+      hideWhen: { field: "keep_outfit", truthy: true },
+    };
+    if (outfitIdx >= 0) {
+      const cur = fields[outfitIdx];
+      fields[outfitIdx] = {
+        ...cur,
+        ...gated,
+        label: cur.label || gated.label,
+        help: cur.help || gated.help,
+        required: false,
+        multiple: true,
+        max: Math.max(4, Number(cur.max) || 4),
+        accept: cur.accept || "image/*",
+        showWhen: gated.showWhen,
+        hideWhen: gated.hideWhen,
+      };
+    } else {
+      fields.push(gated);
+    }
+  } else if (outfitIdx >= 0) {
+    const cur = fields[outfitIdx];
+    fields[outfitIdx] = {
+      ...cur,
+      required: false,
+      multiple: true,
+      max: Math.max(4, Number(cur.max) || 4),
+      accept: cur.accept || "image/*",
+      label: cur.label || OPTIONAL_OUTFIT_FIELD.label,
+      help: cur.help || OPTIONAL_OUTFIT_FIELD.help,
+      showWhen: undefined,
+      hideWhen: { field: "keep_outfit", truthy: true },
+    };
+  } else {
+    fields.push({ ...OPTIONAL_OUTFIT_FIELD, hideWhen: { field: "keep_outfit", truthy: true } });
+  }
+
+  if (keepIdx < 0) {
+    // Insert keep checkbox after the primary photo upload(s) — prefer after
+    // "friend" so With Friends You/Friend squares stay adjacent.
+    const friendIdx = fields.findIndex((f) => f.key === "friend" && f.type === "file");
+    const personIdx = fields.findIndex((f) => f.key === "person" && f.type === "file");
+    const filesIdx = fields.findIndex((f) => f.key === "files" || f.type === "file");
+    const anchor = friendIdx >= 0 ? friendIdx : personIdx >= 0 ? personIdx : filesIdx;
+    const insertAt = anchor >= 0 ? anchor + 1 : 0;
+    fields.splice(insertAt, 0, { ...KEEP_OUTFIT_FIELD });
+  } else {
+    fields[keepIdx] = {
+      ...KEEP_OUTFIT_FIELD,
+      ...fields[keepIdx],
+      type: "toggle",
+      label: fields[keepIdx].label || KEEP_OUTFIT_FIELD.label,
+      help: fields[keepIdx].help || KEEP_OUTFIT_FIELD.help,
+      default: fields[keepIdx].default ?? false,
+    };
+  }
+
+  return { ...t, fields };
+}
+
+/** Force prompt/look inputs to preserve the subject's original clothes. */
+export function applyKeepOriginalOutfitPrompt(prompt: string): string {
+  const note =
+    " Keep my exact original outfit from the reference photos — do not change my clothes or styling.";
+  if (/exact original outfit from the reference/i.test(prompt)) return prompt;
+  // Neutralize common "wearing …" clauses so baked-in template outfits don't win.
+  let out = prompt.replace(
+    /,?\s*wearing (the exact outfit shown in the uploaded outfit reference image\. Match that outfit closely|[^.]{8,220})/gi,
+    ", wearing the same outfit as in my reference photos"
+  );
+  out = out.replace(/\.\s*$/, "") + "." + note;
+  return out;
+}
+
+/** Inject outfit-match wording into the prompt when upload refs are in play and
+ *  the look token did not already supply it. */
+export function injectOutfitPromptHint(prompt: string, inputs: Record<string, unknown>): string {
+  if (isKeepOriginalOutfit(inputs)) return applyKeepOriginalOutfitPrompt(prompt);
+  if (!collectOutfitUrls(inputs).length) return prompt;
+  if (/uploaded outfit reference/i.test(prompt)) return prompt;
+  const hint = UPLOAD_OUTFIT_LOOK_VALUE;
+  if (/\bof me\b/i.test(prompt)) return prompt.replace(/\bof me\b/i, `of me${hint}`);
+  return `${prompt}${hint}`;
+}
+
+/**
+ * Attach look/outfit reference images for the model:
+ * - preset male/female options → backend `ref`/`image`
+ * - "Upload my own outfit" / optional outfit files → user outfit URL(s)
+ * - keep_outfit checkbox → strip outfit refs and force original clothes
+ * Also strips empty placeholders from image arrays and hints the prompt.
+ */
+export function appendSelectedOptionRefs(
+  t: Template,
+  inputs: Record<string, unknown>,
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const imageKey = imageInputKey(input);
+  if (!imageKey) return input;
+
+  const list = cleanImageUrls(input[imageKey]);
+  const outfitUrls = collectOutfitUrls(inputs);
+  // Drop stray user outfit URLs if the template inlined {{outfit}} while the
+  // user picked keep/original or a preset look — we re-add only for upload.
+  const withoutOutfit = outfitUrls.length ? list.filter((u) => !outfitUrls.includes(u)) : list;
+
+  if (isKeepOriginalOutfit(inputs)) {
+    let next: Record<string, unknown> = { ...input, [imageKey]: withoutOutfit };
+    if (typeof next.prompt === "string") {
+      next = { ...next, prompt: applyKeepOriginalOutfitPrompt(next.prompt) };
+    }
+    return next;
+  }
+
+  const lookField = allFields(t).find((f) => f.key === "look" && f.type === "select");
+  const selected = String(inputs.look ?? lookField?.default ?? "");
+  const opt = lookField?.options?.find((o) => o.value === selected);
+  const upload = isUploadLook(t, inputs);
+
+  const out = [...withoutOutfit];
+  if (upload) {
+    for (const u of outfitUrls) if (!out.includes(u)) out.push(u);
+  } else if (selected.trim()) {
+    const ref = opt?.ref || opt?.image;
+    if (typeof ref === "string" && /^https?:\/\//i.test(ref) && !out.includes(ref)) out.push(ref);
+  }
+
+  let next: Record<string, unknown> = { ...input, [imageKey]: out };
+  if (upload && typeof next.prompt === "string") {
+    next = { ...next, prompt: injectOutfitPromptHint(next.prompt, inputs) };
+  }
+  return next;
 }
 
 /**
@@ -333,10 +588,27 @@ interface CardShape {
   href: string;
   previewImage?: string;
   previewVideo?: string;
+  previewImages?: string[];
+}
+
+/** Parse structured template.meta JSON when present. */
+export function parseTemplateMeta(meta: string | null | undefined): Record<string, unknown> | null {
+  if (!meta || !/^\s*[[{]/.test(meta)) return null;
+  try {
+    const p = JSON.parse(meta);
+    return p && typeof p === "object" ? (p as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Map a template to the catalog-card shape (uses `tag` for the pill). */
 export function templateToCard(t: Template): CardShape {
+  const metaObj = parseTemplateMeta(t.meta);
+  const fromMeta = Array.isArray(metaObj?.previewImages)
+    ? (metaObj!.previewImages as unknown[]).filter((u): u is string => typeof u === "string" && /^https?:\/\//i.test(u))
+    : [];
+  const previewImages = fromMeta.length ? fromMeta : undefined;
   return {
     name: t.title,
     sub: t.subtitle ?? undefined,
@@ -349,8 +621,9 @@ export function templateToCard(t: Template): CardShape {
     cr: t.creditCost,
     c: t.category ?? undefined,
     href: templateHref(t.id),
-    previewImage: t.previewImage ?? undefined,
+    previewImage: previewImages?.[0] ?? t.previewImage ?? undefined,
     previewVideo: t.previewVideo ?? undefined,
+    previewImages,
   };
 }
 
