@@ -16,6 +16,8 @@ export interface CatalogItem {
   href: string;
   previewImage?: string;
   previewVideo?: string;
+  /** Optional multi-image catalog thumbnail carousel. */
+  previewImages?: string[];
 }
 
 const AMBER = "var(--pd-amber)";
@@ -81,7 +83,18 @@ const presetRaw: Omit<CatalogItem, "accent" | "cr" | "href">[] = [
 export const PRESETS: CatalogItem[] = presetRaw.map((p) => ({ ...p, accent: AMBER, cr: 2, href: workspaceHref("preset", p.name) }));
 
 // ─── Photoshoots ───────────────────────────────────────────
-export const SHOOT_CATS = ["All", "Editorial", "Professional", "Glamour", "Lifestyle", "Fantasy"];
+export const SHOOT_CATS = [
+  "All",
+  "Selfie",
+  "Street",
+  "Movies",
+  "Broadcast Trends",
+  "Editorial",
+  "Professional",
+  "Glamour",
+  "Lifestyle",
+  "Fantasy",
+];
 const shootRaw: Omit<CatalogItem, "accent" | "href">[] = [
   { name: "Editorial Noir", sub: "24 shots · $4.99", tag: "Popular", tone: "noir", c: "Editorial", cr: 30 },
   { name: "Soft Siren", sub: "18 shots · $3.99", tone: "pink", c: "Glamour", cr: 22 },
