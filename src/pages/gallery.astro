@@ -3,12 +3,28 @@ export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import PageHeader from "../components/ui/PageHeader.astro";
 import { getUserByUid } from "../lib/users";
+import {
+  buildSyncnodeWebhookUrl,
+  reconcileUserGenerations,
+  syncnodeWebhookKey,
+} from "../lib/generations";
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect("/auth/sign-in?redirect=/gallery");
 
-const db = Astro.locals.runtime.env.DB;
+const env = Astro.locals.runtime.env;
+const db = env.DB;
 const dbUser = await getUserByUid(db, user.uid);
+
+// Pull finished SyncNode jobs into D1 before listing so leaving a studio mid-run
+// still surfaces the result here.
+try {
+  const key = await syncnodeWebhookKey(env.SYNCNODE_API_KEY);
+  const webhookUrl = buildSyncnodeWebhookUrl(Astro.url.origin, key);
+  await reconcileUserGenerations(env, dbUser!.id, { webhookUrl });
+} catch (err) {
+  console.error("[gallery] reconcile error:", err);
+}
 
 interface Row {
   id: string; type: string; kind: string; output_url: string;
