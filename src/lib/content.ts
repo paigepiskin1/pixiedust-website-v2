@@ -55,6 +55,7 @@ export interface RailCard {
   href?: string;
   previewImage?: string;
   previewVideo?: string;
+  previewImages?: string[];
 }
 
 export const TRENDING: RailCard[] = [
