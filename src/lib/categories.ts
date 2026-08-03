@@ -19,7 +19,13 @@ export async function getCategories(db: D1Database): Promise<string[]> {
   if (!raw) return [...DEFAULT_CATEGORIES];
   try {
     const p = JSON.parse(raw);
-    return Array.isArray(p) && p.length ? (p as string[]) : [...DEFAULT_CATEGORIES];
+    if (!Array.isArray(p) || !p.length) return [...DEFAULT_CATEGORIES];
+    const stored = p as string[];
+    // Keep the admin-managed order; append any new defaults (e.g. Selfie)
+    // that aren't in the saved palette yet.
+    const seen = new Set(stored.map((c) => c.toLowerCase()));
+    const extras = DEFAULT_CATEGORIES.filter((c) => !seen.has(c.toLowerCase()));
+    return extras.length ? [...stored, ...extras] : stored;
   } catch {
     return [...DEFAULT_CATEGORIES];
   }
