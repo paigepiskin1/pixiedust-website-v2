@@ -604,9 +604,11 @@ const config = {
     }
 
     function tileFail(tile: HTMLElement, msg: string) {
+      const genId = tile.dataset.genId;
       tile.innerHTML =
         '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;text-align:center;color:var(--pd-pink);font-size:11.5px;line-height:1.4;"></div>';
       (tile.firstElementChild as HTMLElement).textContent = msg;
+      if (genId) (window as any).pdAttachReportBtn?.(tile, genId, "stuck_processing");
     }
 
     function tileResult(tile: HTMLElement, outputs: string[], genId?: string) {
@@ -652,6 +654,7 @@ const config = {
         dl.style.cssText = "position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center;z-index:1;";
         tile.appendChild(dl);
       }
+      if (genId) (window as any).pdAttachReportBtn?.(tile, genId, "bad_result");
     }
 
     async function poll(id: string, tile: HTMLElement): Promise<void> {
@@ -721,6 +724,8 @@ const config = {
           tileFail(tile, friendlyError(data.error || "Could not start generation."));
           return;
         }
+        tile.dataset.genId = data.id;
+        (window as any).pdAttachReportBtn?.(tile, data.id, "stuck_processing");
         await poll(data.id, tile);
       } catch (err) {
         credits += per;

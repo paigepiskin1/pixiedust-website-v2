@@ -8,6 +8,7 @@ export const ADMIN_NAV = [
   { k: "tools",         name: "Homepage",      href: "/admin/tools" },
   { k: "users",         name: "Users",         href: "/admin/users" },
   { k: "content",       name: "Content",       href: "/admin/content" },
+  { k: "reports",       name: "Reports",       href: "/admin/reports" },
   { k: "email",         name: "Email log",     href: "/admin/email" },
   { k: "welcome-email", name: "Welcome Email", href: "/admin/email/welcome" },
 ];

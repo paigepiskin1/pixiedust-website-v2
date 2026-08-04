@@ -4,6 +4,7 @@ import Sidebar from "../components/shell/Sidebar.astro";
 import Topbar from "../components/shell/Topbar.astro";
 import MobileDrawer from "../components/shell/MobileDrawer.astro";
 import Toast from "../components/ui/Toast.astro";
+import ReportGeneration from "../components/ui/ReportGeneration.astro";
 import FirstVisitSignup from "../components/FirstVisitSignup.astro";
 import type { WelcomeSlide } from "../components/FirstVisitSignup.astro";
 import { getToolCards } from "../lib/tool-cards";
@@ -93,6 +94,7 @@ if (!user) {
   </div>
   <MobileDrawer credits={credits} user={user} />
   <Toast />
+  {user && <ReportGeneration />}
   {!user && <FirstVisitSignup slides={welcomeSlides} />}
 
   <script is:inline>

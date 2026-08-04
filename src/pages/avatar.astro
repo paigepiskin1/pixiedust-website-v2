@@ -318,8 +318,10 @@ const config = {
       if (s) s.textContent = text;
     }
     function tileFail(tile: HTMLElement, msg: string) {
+      const genId = tile.dataset.genId;
       tile.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;text-align:center;color:var(--pd-pink);font-size:11.5px;line-height:1.4;"></div>';
       (tile.firstElementChild as HTMLElement).textContent = msg;
+      if (genId) (window as any).pdAttachReportBtn?.(tile, genId, "stuck_processing");
     }
     function tileResult(tile: HTMLElement, outputs: string[], genId?: string) {
       tile.innerHTML = "";
@@ -336,6 +338,7 @@ const config = {
       dl.textContent = "↓"; dl.title = "Download";
       dl.style.cssText = "position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center;";
       tile.appendChild(dl);
+      if (genId) (window as any).pdAttachReportBtn?.(tile, genId, "bad_result");
     }
 
     // Minimal lightbox
@@ -383,6 +386,10 @@ const config = {
           if (data.needCredits) { tile.remove(); window.location.href = "/credits"; }
           else tileFail(tile, friendlyError(data.error || "Could not start generation."));
           return;
+        }
+        if (data.id) {
+          tile.dataset.genId = data.id;
+          (window as any).pdAttachReportBtn?.(tile, data.id, "stuck_processing");
         }
         await poll(data.id, tile, per);
       } catch {

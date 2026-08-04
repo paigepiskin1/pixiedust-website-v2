@@ -1,0 +1,194 @@
+---
+// Global report-generation modal. Call from anywhere:
+//   window.pdReportGeneration(genId, { preferredReason?: 'stuck_processing' })
+import { REPORT_REASONS } from "../../lib/generation-reports";
+---
+
+<div
+  id="pd-report-modal"
+  class="fixed inset-0 z-[9997] items-center justify-center p-4"
+  style="display:none;background:rgba(5,5,8,0.65);backdrop-filter:blur(8px);"
+  hidden
+>
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="pd-report-title"
+    class="w-full rounded-2xl"
+    style="max-width:360px;padding:22px 22px 18px;background:var(--pd-raised);border:0.5px solid var(--pd-hairline2);box-shadow:0 24px 60px rgba(0,0,0,.45);"
+  >
+    <div id="pd-report-title" class="font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.4px;">Report issue</div>
+    <p class="mt-1.5 text-ink-3" style="font-size:12.5px;line-height:1.45;">Tell us what’s wrong with this generation. We’ll review it in admin.</p>
+
+    <label class="mt-4 mb-1.5 block font-medium text-ink" style="font-size:12px;" for="pd-report-reason">Reason</label>
+    <select
+      id="pd-report-reason"
+      class="w-full rounded-xl text-ink"
+      style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);font-size:13px;"
+    >
+      {REPORT_REASONS.map((r) => <option value={r.id}>{r.label}</option>)}
+    </select>
+
+    <label class="mt-3 mb-1.5 block font-medium text-ink" style="font-size:12px;" for="pd-report-note">Details <span class="text-ink-3 font-normal">(optional)</span></label>
+    <textarea
+      id="pd-report-note"
+      rows="3"
+      maxlength="1000"
+      placeholder="Anything else we should know…"
+      class="w-full rounded-xl text-ink"
+      style="padding:10px 12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);font-size:13px;resize:vertical;min-height:72px;"
+    ></textarea>
+
+    <p id="pd-report-err" class="mt-2 hidden" style="font-size:12px;color:var(--pd-pink);"></p>
+
+    <div class="mt-4 grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        id="pd-report-cancel"
+        class="rounded-xl font-semibold"
+        style="padding:10px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);font-size:13px;cursor:pointer;"
+      >Cancel</button>
+      <button
+        type="button"
+        id="pd-report-submit"
+        class="rounded-xl font-semibold"
+        style="padding:10px;background:var(--pd-lilac);border:none;color:#0A0A0B;font-size:13px;cursor:pointer;"
+      >Submit report</button>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    const modal = document.getElementById("pd-report-modal");
+    if (!modal) return;
+    const reasonEl = document.getElementById("pd-report-reason");
+    const noteEl = document.getElementById("pd-report-note");
+    const errEl = document.getElementById("pd-report-err");
+    const submitBtn = document.getElementById("pd-report-submit");
+    const cancelBtn = document.getElementById("pd-report-cancel");
+    let currentId = null;
+    let submitting = false;
+
+    function close() {
+      modal.style.display = "none";
+      modal.hidden = true;
+      currentId = null;
+      submitting = false;
+      if (errEl) {
+        errEl.textContent = "";
+        errEl.classList.add("hidden");
+      }
+      if (noteEl) noteEl.value = "";
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Submit report";
+      }
+    }
+
+    function open(genId, opts) {
+      if (!genId) return;
+      currentId = genId;
+      if (reasonEl) {
+        const pref = (opts && opts.preferredReason) || "stuck_processing";
+        if ([].some.call(reasonEl.options, function (o) { return o.value === pref; })) {
+          reasonEl.value = pref;
+        } else {
+          reasonEl.selectedIndex = 0;
+        }
+      }
+      if (noteEl) noteEl.value = "";
+      if (errEl) {
+        errEl.textContent = "";
+        errEl.classList.add("hidden");
+      }
+      modal.hidden = false;
+      modal.style.display = "flex";
+      reasonEl && reasonEl.focus();
+    }
+
+    window.pdReportGeneration = function (genId, opts) {
+      open(genId, opts || {});
+    };
+
+    /** Attach a small Report control to a generation result tile. */
+    window.pdAttachReportBtn = function (tile, genId, preferredReason) {
+      if (!tile || !genId) return;
+      tile.dataset.genId = genId;
+      if (tile.querySelector(".pd-report-btn")) return;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "pd-report-btn";
+      btn.title = "Report issue";
+      btn.textContent = "!";
+      btn.style.cssText =
+        "position:absolute;left:7px;bottom:7px;width:24px;height:24px;border-radius:6px;" +
+        "background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:12px;font-weight:700;" +
+        "border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;" +
+        "letter-spacing:0;";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.pdReportGeneration(genId, { preferredReason: preferredReason || "stuck_processing" });
+      });
+      tile.appendChild(btn);
+    };
+
+    cancelBtn && cancelBtn.addEventListener("click", close);
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) close();
+    });
+    window.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && modal.style.display === "flex") close();
+    });
+
+    submitBtn &&
+      submitBtn.addEventListener("click", async function () {
+        if (!currentId || submitting) return;
+        submitting = true;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Sending…";
+        if (errEl) {
+          errEl.textContent = "";
+          errEl.classList.add("hidden");
+        }
+        try {
+          const res = await fetch("/api/generations/report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: currentId,
+              reason: reasonEl ? reasonEl.value : "other",
+              note: noteEl ? noteEl.value : "",
+            }),
+          });
+          const data = await res.json().catch(function () { return {}; });
+          if (!res.ok) {
+            if (errEl) {
+              errEl.textContent = data.error || "Could not submit report.";
+              errEl.classList.remove("hidden");
+            }
+            submitting = false;
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Submit report";
+            return;
+          }
+          close();
+          if (window.pdToast) {
+            window.pdToast(
+              data.alreadyReported ? "Already reported — thanks" : "Report submitted — thanks",
+              { accent: "var(--pd-mint)" }
+            );
+          }
+        } catch {
+          if (errEl) {
+            errEl.textContent = "Network error — try again.";
+            errEl.classList.remove("hidden");
+          }
+          submitting = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Submit report";
+        }
+      });
+  })();
+</script>

@@ -1,0 +1,167 @@
+---
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+import {
+  listGenerationReports,
+  countOpenReports,
+  reasonLabel,
+} from "../../../lib/generation-reports";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const filter = (Astro.url.searchParams.get("status") || "open") as "open" | "resolved" | "all";
+const status = ["open", "resolved", "all"].includes(filter) ? filter : "open";
+const [rows, openCount] = await Promise.all([
+  listGenerationReports(db, { status, limit: 120 }),
+  countOpenReports(db),
+]);
+
+const badge = (s: string) => {
+  if (s === "open") return { c: "var(--pd-amber)", t: "Open" };
+  if (s === "resolved") return { c: "var(--pd-mint)", t: "Resolved" };
+  return { c: "var(--pd-ink3)", t: s };
+};
+const genBadge = (s: string | null) => {
+  if (s === "completed") return { c: "var(--pd-mint)", t: "Completed" };
+  if (s === "processing" || s === "pending") return { c: "var(--pd-amber)", t: s || "…" };
+  if (s === "failed") return { c: "var(--pd-pink)", t: "Failed" };
+  return { c: "var(--pd-ink3)", t: s || "deleted" };
+};
+const fmt = (s: string | null) => (s ? s.replace("T", " ").slice(0, 16) : "");
+---
+
+<AdminShell title="Admin · Reports" tab="reports">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Reports</h1>
+      <p class="mt-1 text-ink-3" style="font-size:13.5px;">
+        User-filed generation issues (stuck processing, bad results, billing). {openCount} open.
+      </p>
+    </div>
+    <div class="flex gap-1.5 font-mono flex-wrap" style="font-size:11px;">
+      {(["open", "resolved", "all"] as const).map((s) => (
+        <a
+          href={`/admin/reports?status=${s}`}
+          class="rounded-full"
+          style={`padding:6px 12px;text-decoration:none;border:0.5px solid var(--pd-hairline);${
+            status === s
+              ? "background:var(--pd-ink);color:var(--pd-bg);"
+              : "background:var(--pd-bg2);color:var(--pd-ink2);"
+          }`}
+        >
+          {s === "open" ? `Open (${openCount})` : s[0].toUpperCase() + s.slice(1)}
+        </a>
+      ))}
+    </div>
+  </div>
+
+  {
+    rows.length === 0 ? (
+      <div class="mt-6 rounded-2xl text-center text-ink-3" style="padding:48px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:13px;">
+        No {status === "all" ? "" : status + " "}reports yet.
+      </div>
+    ) : (
+      <div class="mt-6 overflow-hidden rounded-2xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+        <table class="w-full" style="border-collapse:collapse;font-size:12.5px;">
+          <thead>
+            <tr class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.6px;text-align:left;">
+              <th style="padding:11px 14px;">When</th>
+              <th style="padding:11px 14px;">Preview</th>
+              <th style="padding:11px 14px;">User</th>
+              <th style="padding:11px 14px;">Reason</th>
+              <th style="padding:11px 14px;">Gen status</th>
+              <th style="padding:11px 14px;">Template</th>
+              <th style="padding:11px 14px;">Ticket</th>
+              <th style="padding:11px 14px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const tb = badge(r.status);
+              const gb = genBadge(r.gen_status);
+              return (
+                <tr class="pd-report-row" data-id={r.id} style="border-top:0.5px solid var(--pd-hairline);vertical-align:top;">
+                  <td class="font-mono text-ink-3" style="padding:10px 14px;white-space:nowrap;font-size:11px;">{fmt(r.created_at)}</td>
+                  <td style="padding:10px 14px;">
+                    {r.output_url && r.gen_status === "completed" ? (
+                      r.gen_type === "video" ? (
+                        <video src={r.output_url} muted playsinline preload="metadata" style="width:44px;height:44px;object-fit:cover;border-radius:8px;background:var(--pd-bg3);" />
+                      ) : (
+                        <img src={r.output_url} alt="" loading="lazy" style="width:44px;height:44px;object-fit:cover;border-radius:8px;background:var(--pd-bg3);" />
+                      )
+                    ) : (
+                      <div class="font-mono uppercase flex items-center justify-center" style="width:44px;height:44px;border-radius:8px;background:var(--pd-bg3);font-size:8px;color:var(--pd-ink3);">
+                        {r.gen_status === "processing" || r.gen_status === "pending" ? "…" : "—"}
+                      </div>
+                    )}
+                  </td>
+                  <td class="text-ink-2" style="padding:10px 14px;max-width:160px;">
+                    <div class="truncate">{r.email}</div>
+                    <div class="font-mono text-ink-3 truncate" style="font-size:10px;" title={r.generation_id}>{r.generation_id.slice(0, 8)}…</div>
+                  </td>
+                  <td class="text-ink" style="padding:10px 14px;">
+                    <div>{reasonLabel(r.reason)}</div>
+                    {r.note && <div class="text-ink-3 mt-0.5" style="font-size:11px;max-width:200px;">{r.note}</div>}
+                  </td>
+                  <td style="padding:10px 14px;">
+                    <span class="font-mono uppercase" style={`font-size:9.5px;letter-spacing:0.5px;padding:3px 9px;border-radius:999px;color:${gb.c};background:color-mix(in srgb,${gb.c} 13%,transparent);`}>{gb.t}</span>
+                  </td>
+                  <td class="text-ink-2" style="padding:10px 14px;max-width:140px;">
+                    {r.template_id ? (
+                      <a href={`/studio/${r.template_id}`} class="truncate block" style="color:inherit;text-decoration:underline;text-underline-offset:2px;">{r.template_title || r.template_id}</a>
+                    ) : (
+                      <span class="text-ink-3">—</span>
+                    )}
+                  </td>
+                  <td style="padding:10px 14px;">
+                    <span class="font-mono uppercase" style={`font-size:9.5px;letter-spacing:0.5px;padding:3px 9px;border-radius:999px;color:${tb.c};background:color-mix(in srgb,${tb.c} 13%,transparent);`}>{tb.t}</span>
+                    {r.admin_note && <div class="text-ink-3 mt-1" style="font-size:10.5px;max-width:140px;">{r.admin_note}</div>}
+                  </td>
+                  <td style="padding:10px 14px;white-space:nowrap;">
+                    {r.status === "open" && (
+                      <button
+                        type="button"
+                        class="pd-resolve-btn font-mono uppercase"
+                        data-id={r.id}
+                        style="font-size:10px;letter-spacing:0.4px;padding:5px 10px;border-radius:8px;background:transparent;border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);cursor:pointer;"
+                      >
+                        Resolve
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  <script>
+    document.querySelectorAll<HTMLElement>(".pd-resolve-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id!;
+        const adminNote = window.prompt("Optional admin note (visible on this ticket):") ?? undefined;
+        if (adminNote === undefined) return; // cancelled
+        btn.setAttribute("disabled", "true");
+        btn.textContent = "…";
+        const res = await fetch("/api/admin/reports/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, adminNote }),
+        });
+        if (res.ok) {
+          document.querySelector(`.pd-report-row[data-id="${id}"]`)?.remove();
+          (window as any).pdToast?.("Report resolved", { accent: "var(--pd-mint)" });
+        } else {
+          btn.removeAttribute("disabled");
+          btn.textContent = "Resolve";
+          (window as any).pdToast?.("Could not resolve", { accent: "var(--pd-pink)" });
+        }
+      });
+    });
+  </script>
+</AdminShell>
