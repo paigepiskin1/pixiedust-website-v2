@@ -5,15 +5,38 @@ import { isAdmin } from "../../../lib/admin";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
 
-const db = Astro.locals.runtime.env.DB;
+const env = Astro.locals.runtime.env;
+const db = env.DB;
+
+// Admin content is a D1 mirror — without this, gens that finished on SyncNode
+// after the user closed studio stay stuck on "processing" forever.
+let reconcileNote = "";
+if (env.SYNCNODE_API_KEY) {
+  try {
+    const { reconcileStuckGenerations } = await import("../../../lib/reconcile-generations");
+    const r = await reconcileStuckGenerations(db, env.SYNCNODE_API_KEY, {
+      limit: 40,
+      olderThanMinutes: 1,
+    });
+    if (r.completed || r.failed) {
+      reconcileNote = `Reconciled ${r.completed} completed, ${r.failed} failed.`;
+    }
+  } catch (err) {
+    console.error("[admin/content] reconcile failed:", err);
+  }
+}
+
 interface Row {
   id: string; output_url: string | null; type: string; status: string; kind: string;
-  created: string; email: string | null;
+  created: string; email: string | null; template_title: string | null;
 }
 const { results } = await db
   .prepare(
-    `SELECT g.id, g.output_url, g.type, g.status, g.kind, datetime(g.created_at) AS created, u.email
-     FROM generations g JOIN users u ON u.id = g.user_id
+    `SELECT g.id, g.output_url, g.type, g.status, g.kind, datetime(g.created_at) AS created, u.email,
+            t.title AS template_title
+     FROM generations g
+     JOIN users u ON u.id = g.user_id
+     LEFT JOIN templates t ON t.id = g.template_id
      ORDER BY g.created_at DESC LIMIT 60`
   )
   .all<Row>();
@@ -22,7 +45,10 @@ const rows = results ?? [];
 
 <AdminShell title="Admin · Content" tab="content">
   <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Content</h1>
-  <p class="mt-1 text-ink-3" style="font-size:13.5px;">Latest {rows.length} generations across all users. Remove anything that violates the AUP.</p>
+  <p class="mt-1 text-ink-3" style="font-size:13.5px;">
+    Latest {rows.length} generations across all users. Remove anything that violates the AUP.
+    {reconcileNote && <span style="color:var(--pd-teal);"> {reconcileNote}</span>}
+  </p>
 
   {
     rows.length === 0 ? (
@@ -40,9 +66,12 @@ const rows = results ?? [];
             ) : (
               <div class="flex h-full w-full items-center justify-center font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">{r.status}</div>
             )}
-            <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 p-2" style="background:linear-gradient(180deg,transparent,rgba(0,0,0,0.8));">
-              <span class="truncate font-mono" style="font-size:9px;color:rgba(255,255,255,0.85);">{r.email}</span>
-              <button type="button" class="pd-cdel shrink-0 font-mono uppercase" data-id={r.id} style="font-size:9px;color:var(--pd-pink);background:none;border:none;cursor:pointer;letter-spacing:0.5px;">Del</button>
+            <div class="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 p-2" style="background:linear-gradient(180deg,transparent,rgba(0,0,0,0.8));">
+              {r.template_title && <span class="truncate font-mono" style="font-size:8.5px;color:rgba(255,255,255,0.65);">{r.template_title}</span>}
+              <div class="flex items-center justify-between gap-2">
+                <span class="truncate font-mono" style="font-size:9px;color:rgba(255,255,255,0.85);">{r.email}</span>
+                <button type="button" class="pd-cdel shrink-0 font-mono uppercase" data-id={r.id} style="font-size:9px;color:var(--pd-pink);background:none;border:none;cursor:pointer;letter-spacing:0.5px;">Del</button>
+              </div>
             </div>
           </div>
         ))}

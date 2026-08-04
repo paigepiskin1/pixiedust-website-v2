@@ -7,8 +7,23 @@ import { getUserByUid } from "../lib/users";
 const user = Astro.locals.user;
 if (!user) return Astro.redirect("/auth/sign-in?redirect=/gallery");
 
-const db = Astro.locals.runtime.env.DB;
+const env = Astro.locals.runtime.env;
+const db = env.DB;
 const dbUser = await getUserByUid(db, user.uid);
+
+// Pull finished (or failed) SyncNode jobs into D1 when the studio tab closed
+// before polling could mark them complete — otherwise they never appear here.
+if (dbUser && env.SYNCNODE_API_KEY) {
+  try {
+    const { reconcileUserGenerations } = await import("../lib/reconcile-generations");
+    await reconcileUserGenerations(db, env.SYNCNODE_API_KEY, dbUser.id, {
+      limit: 20,
+      olderThanMinutes: 1,
+    });
+  } catch (err) {
+    console.error("[gallery] reconcile failed:", err);
+  }
+}
 
 interface Row {
   id: string; type: string; kind: string; output_url: string;
