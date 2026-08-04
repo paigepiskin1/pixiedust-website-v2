@@ -5,10 +5,23 @@ import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
 import { prepareByteplusAssets } from "../../../lib/byteplus-assets";
+import { finalizeGenerationInBackground } from "../../../lib/advance-generation";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
+}
+
+/** Keep finalizing after the response so D1 updates even if the studio tab closes. */
+function scheduleFinalize(locals: APIContext["locals"], genId: string) {
+  const env = locals.runtime.env;
+  const apiKey = env.SYNCNODE_API_KEY;
+  if (!apiKey) return;
+  const ctx = (locals.runtime as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } }).ctx;
+  const p = finalizeGenerationInBackground(env.DB, apiKey, genId).catch((err) => {
+    console.error("[generate] background finalize failed:", genId, err);
+  });
+  if (ctx?.waitUntil) ctx.waitUntil(p);
 }
 
 export async function POST({ request, locals }: APIContext) {
@@ -103,6 +116,7 @@ export async function POST({ request, locals }: APIContext) {
         .prepare("UPDATE generations SET status='processing', provider_job_id=?, chain_json=?, updated_at=datetime('now') WHERE id=?")
         .bind(jobId, JSON.stringify(chain), genId)
         .run();
+      scheduleFinalize(locals, genId);
       return json({ id: genId, status: "processing", balance: deb.balance, cost, steps: steps.length });
     } catch (err) {
       return fail(err);
@@ -183,6 +197,7 @@ export async function POST({ request, locals }: APIContext) {
       .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
       .bind(jobId, genId)
       .run();
+    scheduleFinalize(locals, genId);
     return json({ id: genId, status: "processing", balance: deb.balance, cost });
   } catch (err) {
     return fail(err);
