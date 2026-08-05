@@ -63,3 +63,21 @@ export async function prepareByteplusAssets(apiKey: string, db: D1Database, inpu
   }
   return input;
 }
+
+/**
+ * Delete the library assets referenced in a finished generation's input, so the
+ * shared group doesn't accumulate. Best-effort — never throws (the video is
+ * already made; a leftover asset is harmless).
+ */
+export async function cleanupByteplusAssets(apiKey: string, input: Record<string, unknown>): Promise<void> {
+  const content = (input as any)?.content;
+  if (!Array.isArray(content)) return;
+  for (const part of content) {
+    const url = part?.type === "image_url" ? part?.image_url?.url : undefined;
+    if (typeof url === "string" && url.startsWith("asset://")) {
+      try {
+        await assetCall(apiKey, "DeleteAsset", { Id: url.slice("asset://".length) });
+      } catch { /* best-effort */ }
+    }
+  }
+}
