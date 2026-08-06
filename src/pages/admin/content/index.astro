@@ -9,11 +9,15 @@ const db = Astro.locals.runtime.env.DB;
 interface Row {
   id: string; output_url: string | null; type: string; status: string; kind: string;
   created: string; email: string | null;
+  template_id: string | null; template_title: string | null;
 }
 const { results } = await db
   .prepare(
-    `SELECT g.id, g.output_url, g.type, g.status, g.kind, datetime(g.created_at) AS created, u.email
-     FROM generations g JOIN users u ON u.id = g.user_id
+    `SELECT g.id, g.output_url, g.type, g.status, g.kind, g.template_id,
+            datetime(g.created_at) AS created, u.email, t.title AS template_title
+     FROM generations g
+     JOIN users u ON u.id = g.user_id
+     LEFT JOIN templates t ON t.id = g.template_id
      ORDER BY g.created_at DESC LIMIT 60`
   )
   .all<Row>();
@@ -35,11 +39,19 @@ const rows = results ?? [];
               r.type === "video" ? (
                 <video src={r.output_url} muted playsinline preload="metadata" class="h-full w-full object-cover" />
               ) : (
-                <img src={r.output_url} loading="lazy" alt="" class="h-full w-full object-cover" />
+                <img src={r.output_url} loading="lazy" alt={r.template_title || r.kind || "generation"} class="h-full w-full object-cover" />
               )
             ) : (
               <div class="flex h-full w-full items-center justify-center font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">{r.status}</div>
             )}
+            <div class="pointer-events-none absolute inset-x-0 top-0 p-2" style="background:linear-gradient(180deg,rgba(0,0,0,0.75),transparent);">
+              <div class="truncate font-semibold text-white" style="font-size:11.5px;letter-spacing:-0.1px;" title={r.template_title || r.template_id || "No template"}>
+                {r.template_title || r.template_id || "No template"}
+              </div>
+              {r.kind ? (
+                <div class="mt-0.5 truncate font-mono uppercase" style="font-size:9px;color:rgba(255,255,255,0.65);letter-spacing:0.4px;">{r.kind}</div>
+              ) : null}
+            </div>
             <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 p-2" style="background:linear-gradient(180deg,transparent,rgba(0,0,0,0.8));">
               <span class="truncate font-mono" style="font-size:9px;color:rgba(255,255,255,0.85);">{r.email}</span>
               <button type="button" class="pd-cdel shrink-0 font-mono uppercase" data-id={r.id} style="font-size:9px;color:var(--pd-pink);background:none;border:none;cursor:pointer;letter-spacing:0.5px;">Del</button>
