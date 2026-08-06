@@ -23,7 +23,15 @@ interface Props {
 const { fields = [], id } = Astro.props;
 
 function formatAccept(accept: string) {
-  return accept.replace(/image\//g, "").replace(/video\//g, "").replace(/,\s*/g, ", ").toUpperCase();
+  return accept
+    .replace(/image\/\*/g, "images")
+    .replace(/video\/\*/g, "video")
+    .replace(/audio\/\*/g, "audio")
+    .replace(/image\//g, "")
+    .replace(/video\//g, "")
+    .replace(/audio\//g, "")
+    .replace(/,\s*/g, " · ")
+    .toUpperCase();
 }
 ---
 
@@ -154,7 +162,9 @@ function formatAccept(accept: string) {
       const labeled = !!f.labeled;
       const maxFiles = Number(f.max ?? 4);
       const accept = String(f.accept ?? "");
-      const acceptLabel = accept ? accept.replace(/image\//g,"").replace(/video\//g,"").replace(/,\s*/g,", ").toUpperCase() : "";
+      const acceptLabel = accept
+        ? accept.replace(/image\/\*/g,"images").replace(/video\/\*/g,"video").replace(/audio\/\*/g,"audio").replace(/image\//g,"").replace(/video\//g,"").replace(/audio\//g,"").replace(/,\s*/g," · ").toUpperCase()
+        : "";
       return `<div>
         <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
         <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${labeled?` data-labeled="true"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
@@ -333,11 +343,27 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
   type RefMeta = { index: number; tag: string; alias: string; phrase: string; url: string };
   const refMeta: Record<string, RefMeta[]> = ((root as any)._pdRefMeta = (root as any)._pdRefMeta || {});
 
-  function defaultAlias(i: number) { return `Image${i}`; }
-  function defaultPhrase(i: number) { return `image ${i}`; }
+  type MediaKind = "image" | "video" | "audio";
+  function kindFromMime(mime: string): MediaKind {
+    if (/^video\//i.test(mime)) return "video";
+    if (/^audio\//i.test(mime)) return "audio";
+    return "image";
+  }
+  function kindFromUrl(url: string): MediaKind {
+    if (/\.(mp4|mov|webm)(\?|$)/i.test(url)) return "video";
+    if (/\.(mp3|wav|m4a|aac|ogg|mpeg)(\?|$)/i.test(url)) return "audio";
+    return "image";
+  }
+  function defaultAlias(kind: MediaKind, n: number) {
+    return `${kind === "video" ? "Video" : kind === "audio" ? "Audio" : "Image"}${n}`;
+  }
+  function defaultPhrase(kind: MediaKind, n: number) { return `${kind} ${n}`; }
   function sanitizeAlias(raw: string, fallback: string) {
     const s = String(raw || "").trim().replace(/\s+/g, "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24);
     return s || fallback;
+  }
+  function displayAlias(alias: string) {
+    return alias.replace(/^(Image|Video|Audio)(\d+)$/i, (_, t: string, n: string) => `${t[0].toUpperCase()}${t.slice(1).toLowerCase()} ${n}`);
   }
 
   function getRefs(key: string): RefMeta[] {
@@ -415,25 +441,31 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
 
     if (isMulti) {
       const thumbsEl = wrap?.querySelector<HTMLElement>(".pd-multi-previews");
+      const errorEl = wrap?.querySelector<HTMLElement>(".pd-upload-error");
       let urls: string[] = [];
-      // Parallel alias map keyed by url (survives renumbering)
+      // Parallel alias/kind maps keyed by url (survive renumbering)
       const aliases: Record<string, string> = {};
+      const kinds: Record<string, MediaKind> = {};
 
       function rebuildMeta() {
         const used = new Set<string>();
-        refMeta[key] = urls.map((url, i) => {
-          const index = i + 1;
-          const fallback = defaultAlias(index);
+        const counts = { image: 0, video: 0, audio: 0 };
+        refMeta[key] = urls.map((url) => {
+          const kind = kinds[url] || kindFromUrl(url);
+          kinds[url] = kind;
+          counts[kind] += 1;
+          const index = counts[kind];
+          const fallback = defaultAlias(kind, index);
           let alias = aliases[url] || fallback;
-          // Auto-renumber default ImageN labels when order changes.
-          if (/^Image\d+$/i.test(alias)) alias = fallback;
+          // Auto-renumber default typed labels when order changes.
+          if (/^(Image|Video|Audio)\d+$/i.test(alias)) alias = fallback;
           alias = sanitizeAlias(alias, fallback);
           let base = alias;
           let n = 2;
           while (used.has(alias.toLowerCase())) alias = `${base}${n++}`;
           used.add(alias.toLowerCase());
           aliases[url] = alias;
-          return { index, tag: `@${alias}`, alias, phrase: defaultPhrase(index), url };
+          return { index, tag: `@${alias}`, alias, phrase: defaultPhrase(kind, index), url };
         });
         // Update badge text on thumbs
         if (thumbsEl && labeled) {
@@ -441,7 +473,7 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
             const meta = refMeta[key][i];
             const badge = thumb.querySelector<HTMLElement>(".pd-ref-label");
             if (badge && meta) {
-              badge.textContent = meta.alias.replace(/^Image(\d+)$/i, "Image $1");
+              badge.textContent = displayAlias(meta.alias);
               badge.dataset.alias = meta.alias;
             }
           });
@@ -466,6 +498,7 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           e.preventDefault(); e.stopPropagation();
           urls = urls.filter((u) => u !== url);
           delete aliases[url];
+          delete kinds[url];
           thumb.remove();
           syncZone();
         });
@@ -481,11 +514,11 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         badge.style.cssText = "position:absolute;left:3px;right:3px;bottom:3px;padding:2px 4px;border-radius:6px;border:none;cursor:pointer;font-size:9.5px;font-weight:700;letter-spacing:0.2px;color:#fff;background:rgba(0,0,0,0.62);backdrop-filter:blur(4px);text-align:center;z-index:2;line-height:1.2;";
         badge.addEventListener("click", (e) => {
           e.preventDefault(); e.stopPropagation();
-          const idx = urls.indexOf(url) + 1;
-          const current = aliases[url] || defaultAlias(idx);
-          const next = window.prompt("Label for this image (used as @tag)", current.replace(/^Image(\d+)$/, "Image$1"));
+          const kind = kinds[url] || kindFromUrl(url);
+          const current = aliases[url] || defaultAlias(kind, 1);
+          const next = window.prompt("Label for this file (used as @tag)", current);
           if (next == null) return;
-          aliases[url] = sanitizeAlias(next, defaultAlias(idx));
+          aliases[url] = sanitizeAlias(next, defaultAlias(kind, 1));
           rebuildMeta();
         });
         thumb.appendChild(badge);
@@ -500,36 +533,75 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         return thumb;
       }
 
+      function makePreviewEl(kind: MediaKind, src: string): { el: HTMLElement; revoke?: string } {
+        if (kind === "video") {
+          const v = document.createElement("video");
+          v.muted = true; v.playsInline = true; v.preload = "metadata";
+          v.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+          v.src = src;
+          return { el: v, revoke: src.startsWith("blob:") ? src : undefined };
+        }
+        if (kind === "audio") {
+          const box = document.createElement("div");
+          box.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--pd-bg3);color:var(--pd-ink2);font-size:22px;";
+          box.textContent = "♪";
+          box.title = "Audio reference";
+          return { el: box };
+        }
+        const img = document.createElement("img");
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+        img.src = src;
+        return { el: img, revoke: src.startsWith("blob:") ? src : undefined };
+      }
+
       async function addFile(file: File) {
         if (urls.length >= maxFiles) return;
+        const kind = kindFromMime(file.type || "");
         const thumb = makeThumbShell();
-        const img = document.createElement("img");
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
-        img.src = URL.createObjectURL(file);
+        const localUrl = URL.createObjectURL(file);
+        const preview = makePreviewEl(kind, localUrl);
         const spinner = document.createElement("div");
-        spinner.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);font-size:9px;color:#fff;";
+        spinner.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);font-size:9px;color:#fff;z-index:1;";
         spinner.textContent = "↑";
-        thumb.appendChild(img); thumb.appendChild(spinner);
+        thumb.appendChild(preview.el); thumb.appendChild(spinner);
         thumbsEl?.appendChild(thumb);
         if (thumbsEl) thumbsEl.style.display = "flex";
+        if (errorEl) { errorEl.style.display = "none"; errorEl.textContent = ""; }
 
         const fd = new FormData(); fd.append("file", file);
         bump(1);
         try {
           const r = await fetch("/api/upload", { method: "POST", body: fd });
-          const d = await r.json();
-          if (r.ok) {
-            const blobSrc = img.src;
+          const d = await r.json().catch(() => ({}));
+          if (r.ok && d.url) {
             const url = String(d.url);
+            const mediaKind = (d.kind as MediaKind) || kind;
             urls.push(url);
-            aliases[url] = defaultAlias(urls.length);
-            img.src = url;
-            URL.revokeObjectURL(blobSrc);
+            kinds[url] = mediaKind;
+            aliases[url] = defaultAlias(mediaKind, urls.filter((u) => (kinds[u] || kindFromUrl(u)) === mediaKind).length);
+            if (preview.el instanceof HTMLImageElement || preview.el instanceof HTMLVideoElement) {
+              preview.el.src = url;
+            }
+            if (preview.revoke) URL.revokeObjectURL(preview.revoke);
             spinner.remove();
             attachRemove(thumb, url);
             attachLabelBadge(thumb, url);
-          } else { thumb.remove(); }
-        } catch { thumb.remove(); }
+          } else {
+            thumb.remove();
+            if (preview.revoke) URL.revokeObjectURL(preview.revoke);
+            if (errorEl) {
+              errorEl.textContent = d.error || "Upload failed — try another file.";
+              errorEl.style.display = "block";
+            }
+          }
+        } catch {
+          thumb.remove();
+          if (preview.revoke) URL.revokeObjectURL(preview.revoke);
+          if (errorEl) {
+            errorEl.textContent = "Upload failed — try again.";
+            errorEl.style.display = "block";
+          }
+        }
         finally { bump(-1); }
         syncZone();
       }
@@ -543,17 +615,17 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       el.addEventListener("drop", async e => { e.preventDefault(); dc=0; uhl(); for(const f of Array.from((e as DragEvent).dataTransfer?.files??[]).slice(0,maxFiles-urls.length)) await addFile(f); });
       el.addEventListener("change", async () => { const files=Array.from(el.files??[]).slice(0,maxFiles-urls.length); el.value=""; for(const f of files) await addFile(f); });
 
-      // Render a thumb for an already-hosted URL (preloaded reference images).
+      // Render a thumb for an already-hosted URL (preloaded reference media).
       function addExisting(url: string) {
         if (!url || urls.length >= maxFiles) return;
+        const kind = kindFromUrl(url);
         const thumb = makeThumbShell();
-        const img = document.createElement("img");
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
-        img.src = url;
-        thumb.appendChild(img);
+        const preview = makePreviewEl(kind, url);
+        thumb.appendChild(preview.el);
         attachRemove(thumb, url);
         urls.push(url);
-        aliases[url] = defaultAlias(urls.length);
+        kinds[url] = kind;
+        aliases[url] = defaultAlias(kind, urls.filter((u) => (kinds[u] || kindFromUrl(u)) === kind).length);
         attachLabelBadge(thumb, url);
         thumbsEl?.appendChild(thumb);
       }

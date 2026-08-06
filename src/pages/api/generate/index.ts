@@ -111,6 +111,30 @@ export async function POST({ request, locals }: APIContext) {
 
   // ─── Single step ───
   const { input } = resolveInput(template, inputs);
+
+  // BytePlus Seedream accepts mixed media refs — keep images in `image`, and
+  // surface video/audio on their own keys so non-image URLs aren't stuffed into
+  // the image array (which BytePlus rejects).
+  if (
+    template.provider === "byteplus" &&
+    /seedream/i.test(template.model) &&
+    Array.isArray(input.image)
+  ) {
+    const images: string[] = [];
+    const videos: string[] = [];
+    const audios: string[] = [];
+    for (const u of input.image as unknown[]) {
+      if (typeof u !== "string" || !u) continue;
+      if (/\.(mp4|mov|webm)(\?|$)/i.test(u)) videos.push(u);
+      else if (/\.(mp3|wav|m4a|aac|ogg|mpeg)(\?|$)/i.test(u)) audios.push(u);
+      else images.push(u);
+    }
+    if (images.length) input.image = images;
+    else delete input.image;
+    if (videos.length) input.video = videos.length === 1 ? videos[0] : videos;
+    if (audios.length) input.audio = audios.length === 1 ? audios[0] : audios;
+  }
+
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;

@@ -1,5 +1,5 @@
 -- Seedream 5.0 Pro photoshoot template (BytePlus ModelArk via SyncNode /byteplus/image).
--- Image edit + multi-reference (up to 10), 1K/2K size, optional ratios, no watermark, 5 credits.
+-- Image edit + multi-reference (up to 9 image/video/audio), 1K/2K size, optional ratios, no watermark, 5 credits.
 -- Idempotent upsert — live D1 may already have this row from a prior insert.
 
 INSERT OR REPLACE INTO templates (
@@ -18,7 +18,7 @@ INSERT OR REPLACE INTO templates (
   'byteplus',
   'dola-seedream-5-0-pro-260628',
   '{"prompt":"{{prompt}}","image":"{{files*}}","size":"2K","aspect_ratio":"{{aspect}}","response_format":"url","watermark":false,"output_format":"jpeg"}',
-  '[{"key":"files","type":"file","label":"Reference images","required":true,"multiple":true,"max":10,"accept":"image/*","labeled":true,"help":"1–10 references — each gets an Image label. Click a label to rename, then @tag it in the prompt."},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"mentionFrom":"files","placeholder":"e.g. Use @Image1 as the person. Use @Image2 as the pajama outfit. Keep face and pose from @Image1.","help":"Type @ to mention a reference, or tap the chips under your uploads."}]',
+  '[{"key":"files","type":"file","label":"Reference files","required":true,"multiple":true,"max":9,"accept":"image/*,video/*,audio/*","labeled":true,"help":"Up to 9 references (images, video, or audio). Each gets a label — click to rename, then @tag it in the prompt."},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"mentionFrom":"files","placeholder":"e.g. Use @Image1 as the person. Use @Image2 as the pajama outfit. Keep face and pose from @Image1.","help":"Type @ to mention a reference, or tap the chips under your uploads."}]',
   NULL,
   5,
   '{"2K":1,"1K":1}',
@@ -29,9 +29,9 @@ INSERT OR REPLACE INTO templates (
   '["seedream","photoshoot","edit","multi-reference","byteplus"]',
   'lilac',
   NULL,
-  '{"kicker":"Photoshoot · Seedream 5.0 Pro","howItWorks":["Upload 1–10 reference photos","@tag each image in your prompt","Pick 1K or 2K and an optional ratio","Generate with BytePlus Seedream 5.0 Pro"]}',
+  '{"kicker":"Photoshoot · Seedream 5.0 Pro","howItWorks":["Upload up to 9 image, video, or audio references","@tag each file in your prompt","Pick 1K or 2K and an optional ratio","Generate with BytePlus Seedream 5.0 Pro"]}',
   'Multi-reference image edit',
-  'BytePlus Seedream 5.0 Pro — precision image editing and multi-reference fusion at 1K or 2K. Upload up to 10 references.',
+  'BytePlus Seedream 5.0 Pro — precision image editing and multi-reference fusion at 1K or 2K. Upload up to 9 image, video, or audio references.',
   NULL,
   NULL,
   0,
