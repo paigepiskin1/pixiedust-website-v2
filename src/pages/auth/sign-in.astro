@@ -8,6 +8,14 @@ import type { Tone } from "../../lib/content";
 // Curated montage videos for the sign-in left panel (hardcoded, in order).
 const slides: { tone: Tone; kicker: string; title: string; cred: string; video?: string; poster?: string }[] = [
   {
+    tone: "amber",
+    kicker: "Presets · before & after",
+    title: "One tap.\nInstant glow-up.",
+    cred: "Made on PixieDust · in seconds",
+    video: "https://pixiecdn.b-cdn.net/media/auth/carousel/presets-ba-1785512174486.mp4",
+    poster: "https://pixiecdn.b-cdn.net/media/auth/carousel/presets-ba-1785512174486.jpg",
+  },
+  {
     tone: "lilac",
     kicker: "Motion · trending",
     title: "Motion that\nstops the scroll.",
@@ -15,11 +23,27 @@ const slides: { tone: Tone; kicker: string; title: string; cred: string; video?:
     video: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/eb9f7e39-8980-4d2b-90b3-acfd64a8fff0.mp4",
   },
   {
+    tone: "mint",
+    kicker: "Photoshoot · one selfie",
+    title: "One photo.\nEndless sets.",
+    cred: "Made on PixieDust · in seconds",
+    video: "https://pixiecdn.b-cdn.net/media/auth/carousel/photoshoot-possibilities-1785512174486.mp4",
+    poster: "https://pixiecdn.b-cdn.net/media/auth/carousel/photoshoot-possibilities-1785512174486.jpg",
+  },
+  {
     tone: "pink",
     kicker: "Photoshoot · trending",
     title: "Your best shot,\nno studio needed.",
     cred: "Made on PixieDust · in seconds",
     video: "https://pixiecdn.b-cdn.net/uploads/ry1mTnFZgZYzASRGD2N0A6TbW5k1/f6aaf3b6-c283-4204-85f9-26efbc5951ea.mp4",
+  },
+  {
+    tone: "teal",
+    kicker: "Presets · lookbook",
+    title: "Film looks\nthat feel real.",
+    cred: "Made on PixieDust · in seconds",
+    video: "https://pixiecdn.b-cdn.net/media/auth/carousel/presets-flip-1785512174486.mp4",
+    poster: "https://pixiecdn.b-cdn.net/media/auth/carousel/presets-flip-1785512174486.jpg",
   },
   {
     tone: "dusk",
@@ -263,7 +287,7 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
           }
         }
         pips.forEach(function (p, i) { p.addEventListener("click", function () { showSlide(i); }); });
-        if (slides.length) { showSlide(0); setInterval(function () { showSlide(si + 1); }, 5200); }
+        if (slides.length) { showSlide(0); setInterval(function () { showSlide(si + 1); }, 7000); }
 
         var form = document.getElementById("pd-auth-form");
         function applyMode() {
