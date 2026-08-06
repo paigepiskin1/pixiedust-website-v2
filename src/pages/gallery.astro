@@ -189,6 +189,9 @@ const tabs = ["All", "Images", "Video"];
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11l9-9M8 2h3v3M5 11H2V8"/></svg>
           </a>
           <div style="flex:1;"></div>
+          <button type="button" id="pd-lb-report" title="Report issue" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);cursor:pointer;">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5 12 11.5H1L6.5 1.5Z"/><path d="M6.5 5.5v2.5M6.5 10h.01"/></svg>
+          </button>
           <button type="button" id="pd-lb-delete" title="Delete" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:transparent;border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);cursor:pointer;">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3h9M4 3V2h4v1M4.5 5v4.5M7.5 5v4.5M2.5 3l.5 7.5h6l.5-7.5"/></svg>
           </button>
@@ -327,6 +330,11 @@ const tabs = ["All", "Images", "Video"];
     document.getElementById("pd-lb-share")!.addEventListener("click", () => {
       navigator.clipboard?.writeText(visible[cur]?.output_url ?? "").catch(() => {});
       (window as any).pdToast?.("Link copied", { accent: "var(--pd-mint)" });
+    });
+    document.getElementById("pd-lb-report")!.addEventListener("click", () => {
+      const id = visible[cur]?.id;
+      if (!id) return;
+      (window as any).pdReportGeneration?.(id, { preferredReason: "bad_result" });
     });
     copyPromptBtn.addEventListener("click", () => {
       const p = visible[cur]?.prompt;
