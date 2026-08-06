@@ -114,10 +114,14 @@ export async function POST({ request, locals }: APIContext) {
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;
-  // "match" = keep the uploaded photo's aspect ratio. The value the model
-  // expects differs: GPT-Image uses "auto"; nano-banana / seedream / flux use
-  // "match_input_image".
-  if (effectiveAspect === "match" || effectiveAspect === "match_input_image") {
+  // "original" / "match" = keep the uploaded photo's aspect ratio. The value the
+  // model expects differs: GPT-Image uses "auto"; nano-banana / seedream / flux
+  // use "match_input_image".
+  if (
+    effectiveAspect === "original" ||
+    effectiveAspect === "match" ||
+    effectiveAspect === "match_input_image"
+  ) {
     effectiveAspect = /gpt-image/i.test(template.model) ? "auto" : "match_input_image";
   }
   // openai/gpt-image-2 on Replicate only accepts 1:1 | 3:2 | 2:3 | auto.
@@ -126,6 +130,9 @@ export async function POST({ request, locals }: APIContext) {
   if (effectiveAspect && /gpt-image/i.test(template.model)) {
     const gptAspect: Record<string, string> = {
       auto: "auto",
+      original: "auto",
+      match: "auto",
+      match_input_image: "auto",
       "1:1": "1:1",
       "3:2": "3:2",
       "2:3": "2:3",
@@ -140,7 +147,16 @@ export async function POST({ request, locals }: APIContext) {
   }
   if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
   // BytePlus (Ark) uses `ratio` instead of `aspect_ratio`.
-  if (effectiveAspect && effectiveAspect !== "match" && "ratio" in input) input.ratio = effectiveAspect;
+  if (
+    effectiveAspect &&
+    effectiveAspect !== "match" &&
+    effectiveAspect !== "match_input_image" &&
+    effectiveAspect !== "original" &&
+    effectiveAspect !== "auto" &&
+    "ratio" in input
+  ) {
+    input.ratio = effectiveAspect;
+  }
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
   if (duration && "duration" in input) input.duration = duration;
   // Map the selected quality to the model's native resolution param. Quality
