@@ -1,0 +1,42 @@
+-- Seedream 5.0 Pro photoshoot template (Replicate via SyncNode).
+-- Image edit + multi-reference (up to 10), 1K/2K size, optional ratios, 5 credits.
+-- Idempotent upsert — live D1 may already have this row from a prior insert.
+
+INSERT OR REPLACE INTO templates (
+  id, title, kind, type, category, provider, model,
+  input_json, fields_json, steps_json,
+  credit_cost, quality_json, aspects_json, quantities_json,
+  engine, eta, tags_json, tone, accent, meta,
+  subtitle, description, preview_image, preview_video,
+  is_featured, is_hidden, is_admin_only, sort_order, updated_at
+) VALUES (
+  'seedream-5-pro',
+  'Seedream 5.0 Pro',
+  'shoot',
+  'image',
+  'Photoshoots',
+  'replicate',
+  'bytedance/seedream-5-pro',
+  '{"prompt":"{{prompt}}","image_input":"{{files*}}","size":"2K","aspect_ratio":"{{aspect}}","output_format":"jpg"}',
+  '[{"key":"files","type":"file","label":"Reference images","required":true,"multiple":true,"max":10,"accept":"image/*","help":"1–10 reference images for editing or multi-reference fusion"},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"placeholder":"Describe the edit or fusion — e.g. put the outfit from image 2 on the person in image 1, studio lighting"}]',
+  NULL,
+  5,
+  '{"2K":1,"1K":1}',
+  '["match","1:1","16:9","9:16","4:3","3:4","3:2","2:3","21:9"]',
+  '[1]',
+  'Seedream 5.0 Pro',
+  '~2 min',
+  '["seedream","photoshoot","edit","multi-reference"]',
+  'lilac',
+  NULL,
+  '{"kicker":"Photoshoot · Seedream 5.0 Pro","howItWorks":["Upload 1–10 reference photos","Describe the edit or how to fuse them","Pick 1K or 2K and an optional ratio","Generate with Seedream 5.0 Pro (~2 min)"]}',
+  'Multi-reference image edit',
+  'ByteDance Seedream 5.0 Pro — precision image editing and multi-reference fusion at 1K or 2K. Upload up to 10 references.',
+  NULL,
+  NULL,
+  0,
+  0,
+  0,
+  0,
+  datetime('now')
+);

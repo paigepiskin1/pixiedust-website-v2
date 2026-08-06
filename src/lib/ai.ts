@@ -69,7 +69,7 @@ Other rules:
 - id: lowercase slug. type: "image" or "video" (the type of the FINAL output). kind ∈ preset|shoot|cinema|i2v|fashion-video|game-video|motion|beauty|fashion|avatar|ad.
 - Models we support:
   • TEXT→IMAGE only (NO image input): black-forest-labs/flux-schnell.
-  • IMAGE EDIT / image+text→image (accepts an "image_input" array of URLs): google/nano-banana, google/nano-banana-pro, bytedance/seedream-4, openai/gpt-image-2.
+  • IMAGE EDIT / image+text→image (accepts an "image_input" array of URLs): google/nano-banana, google/nano-banana-pro, bytedance/seedream-4, bytedance/seedream-5-pro, openai/gpt-image-2.
   • IMAGE→VIDEO (accepts an "image" URL + "prompt"): bytedance/seedance-1-lite, google/veo-3.
 - CRITICAL: any step that consumes a USER photo ({{photoKey}}) or a prior step's image ({{stepId.output}}) MUST use an image-capable model (nano-banana / nano-banana-pro / seedream-4 for image output, or seedance-1-lite / veo-3 for video output). NEVER feed an image into flux-schnell — it ignores images.
 - credit_cost: integer, ~5 per step. tone ∈ teal,lilac,mint,pink,noir,dusk,ice,amber. tags: short string array.
