@@ -1,0 +1,106 @@
+-- Five GPT Image 2 photoshoot presets for /shoots.
+-- Idempotent upserts (safe to re-run).
+-- Apply: node scripts/dev.mjs wrangler d1 execute pixiedust --remote --file scripts/seed-shoot-presets-gpt.sql
+
+INSERT INTO templates (
+  id, title, kind, type, category, provider, model,
+  input_json, fields_json, credit_cost, quality_json, aspects_json, quantities_json,
+  eta, tags_json, tone, accent, subtitle, description, preview_image, meta,
+  is_featured, is_hidden, is_admin_only, is_adult, sort_order, updated_at
+) VALUES
+(
+  'emo-bedroom-makeup',
+  'Emo Bedroom Makeup',
+  'shoot', 'image', 'Glamour', 'replicate', 'openai/gpt-image-2',
+  '{"prompt":"Ultra-realistic candid .5 front-camera photo of the person from the reference photos sitting at a messy emo bedroom vanity, doing makeup in a large mirror. Dim fairy lights, band posters, black bedding, cluttered makeup products, eyeliner pencil in hand, smudged dark eyeliner look in progress, choker optional, soft phone flash mixed with warm string lights, intimate teenage-bedroom atmosphere, sharp facial likeness to the reference, natural skin texture, slightly wide front-camera perspective.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Clear face + upper-body shots work best"}]',
+  5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
+  '~2 min', '["emo","makeup","bedroom","mirror",".5"]', 'noir', 'var(--pd-lilac)',
+  'Mirror · fairy lights · eyeliner',
+  'Doing your makeup in a messy emo bedroom mirror — fairy lights, posters, and that soft front-camera vibe.',
+  NULL,
+  '{"kicker":"Photoshoot · Glamour","howItWorks":["Upload 1–4 clear photos of yourself","We place you at an emo bedroom vanity doing makeup in the mirror","Pick an aspect ratio and generate"]}',
+  1, 0, 0, 0, 1, datetime('now')
+),
+(
+  'macbook-webcam-studio',
+  'MacBook Webcam Studio',
+  'shoot', 'image', 'Lifestyle', 'replicate', 'openai/gpt-image-2',
+  '{"prompt":"Ultra-realistic photo of a MacBook Pro on a clean desk, screen fully visible, showing a webcam photoshoot of the person from the reference photos displayed large on the monitor as if captured by the laptop camera. Soft natural window light on the desk, keyboard and trackpad in frame, slight screen glow, realistic laptop bezel and UI chrome, the on-screen portrait has sharp facial likeness to the reference, shallow depth of field on the keyboard, product-photography meets lifestyle editorial.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Face-forward photos look best on the laptop screen"}]',
+  5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
+  '~2 min', '["macbook","webcam","studio","desk","monitor"]', 'ice', 'var(--pd-mint)',
+  'Laptop screen · webcam frame',
+  'You on a MacBook monitor — like a polished webcam studio still sitting on a desk.',
+  NULL,
+  '{"kicker":"Photoshoot · Lifestyle","howItWorks":["Upload clear photos of yourself","We put you on a MacBook screen as a webcam studio shot","Generate and download"]}',
+  1, 0, 0, 0, 2, datetime('now')
+),
+(
+  'bali-dot5',
+  'Bali .5 Travel',
+  'shoot', 'image', 'Lifestyle', 'replicate', 'openai/gpt-image-2',
+  '{"prompt":"Ultra-realistic candid iPhone .5 ultra-wide front-camera travel selfie of the person from the reference photos in Bali, Indonesia. Tropical villa balcony or rice terrace overlook, lush green palms, bright midday sun, warm skin, vacation energy, arm slightly extended holding the phone, slightly distorted ultra-wide .5 lens look, sharp facial likeness to the reference, natural freckles and skin texture, travel-blogger authenticity, no text overlays.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Sunny outdoor selfies work great"}]',
+  5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
+  '~2 min', '["bali","travel",".5","selfie","tropical"]', 'mint', 'var(--pd-mint)',
+  'Ultra-wide · tropical villa',
+  'A bright Bali .5 travel selfie — palms, sun, and that stretched front-camera look.',
+  NULL,
+  '{"kicker":"Photoshoot · Travel .5","howItWorks":["Upload your photos","We drop you into a sunny Bali .5 travel selfie","Pick ratio and generate"]}',
+  1, 0, 0, 0, 3, datetime('now')
+),
+(
+  'bali-scooter-passenger',
+  'Bali Scooter Passenger',
+  'shoot', 'image', 'Lifestyle', 'replicate', 'openai/gpt-image-2',
+  '{"prompt":"Ultra-realistic candid iPhone .5 ultra-wide travel photo of the person from the reference photos riding as a passenger on the back of a Bali scooter motorcycle through a sunny Ubud street. A tattooed local guy is driving in front (sleeves of tattoos on arms, casual tank or tee, not looking at camera). The passenger matches the reference photos with sharp facial likeness, hair moving in the wind, holding the driver lightly, tropical roadside shops and greenery blurred behind, bright daylight, authentic vacation snapshot energy, slightly wide .5 lens distortion, documentary realism.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Your photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"You become the passenger — clear face shots help"}]',
+  5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
+  '~2 min', '["bali","scooter","motorcycle","travel",".5","tattoo"]', 'teal', 'var(--pd-teal)',
+  'Back of the bike · tattooed driver',
+  'Riding passenger on a Bali scooter with a tattooed guy driving — windy, sunny, ultra-wide .5 energy.',
+  NULL,
+  '{"kicker":"Photoshoot · Travel .5","howItWorks":["Upload photos of yourself","You are the passenger; we add a tattooed Bali scooter driver","Generate the travel still"]}',
+  1, 0, 0, 0, 4, datetime('now')
+),
+(
+  'luxury-drive-nails',
+  'Luxury Drive · Hands & Nails',
+  'shoot', 'image', 'Glamour', 'replicate', 'openai/gpt-image-2',
+  '{"prompt":"Ultra-realistic close-up photoshoot of elegant hands and manicured nails from the reference photos gripping the steering wheel of {{car}}, driving on a sunlit coastal highway. Focus on hands, nails, jewelry, and wheel details; soft luxury-car interior leather, bokeh road light through the windshield, glossy nail finish, fashion-editorial product lighting, sharp likeness of the hands/nails to the reference photos, shallow depth of field, no full face required unless hands show it naturally.","quality":"auto","background":"auto","moderation":"auto","aspect_ratio":"{{aspect}}","input_images":"{{files*}}","output_format":"webp","number_of_images":1,"output_compression":90}',
+  '[{"key":"files","type":"file","label":"Hand / nail photos","required":true,"multiple":true,"max":4,"accept":"image/*","help":"Close-ups of your hands and nails work best"},{"key":"car","type":"select","ui":"dropdown","label":"Car","required":true,"default":"a white Ferrari Roma","options":[{"value":"a white Ferrari Roma","label":"Ferrari Roma — white"},{"value":"a black Porsche 911 Carrera","label":"Porsche 911 — black"},{"value":"a red Ferrari F8 Tributo","label":"Ferrari F8 — red"},{"value":"a silver Mercedes-AMG GT","label":"Mercedes-AMG GT — silver"},{"value":"a yellow Lamborghini Huracán","label":"Lamborghini Huracán — yellow"},{"value":"a British-racing-green Aston Martin DB12","label":"Aston Martin DB12 — green"},{"value":"a midnight-blue Bentley Continental GT","label":"Bentley Continental GT — blue"},{"value":"a white Tesla Model S Plaid","label":"Tesla Model S Plaid — white"},{"value":"an orange McLaren 720S","label":"McLaren 720S — orange"},{"value":"a champagne Rolls-Royce Spectre","label":"Rolls-Royce Spectre — champagne"}]}]',
+  5, NULL, '["match","1:1","2:3","3:2"]', '[1,2,4]',
+  '~2 min', '["luxury","car","nails","hands","drive","glamour"]', 'amber', 'var(--pd-amber)',
+  'Wheel · manicure · pick your car',
+  'Hands and nails on the wheel of a luxury sports car — choose the car from the dropdown.',
+  NULL,
+  '{"kicker":"Photoshoot · Glamour","howItWorks":["Upload close-ups of your hands and nails","Pick the luxury car from the dropdown","Generate the driving still"]}',
+  1, 0, 0, 0, 5, datetime('now')
+)
+ON CONFLICT(id) DO UPDATE SET
+  title=excluded.title,
+  kind=excluded.kind,
+  type=excluded.type,
+  category=excluded.category,
+  provider=excluded.provider,
+  model=excluded.model,
+  input_json=excluded.input_json,
+  fields_json=excluded.fields_json,
+  credit_cost=excluded.credit_cost,
+  quality_json=excluded.quality_json,
+  aspects_json=excluded.aspects_json,
+  quantities_json=excluded.quantities_json,
+  eta=excluded.eta,
+  tags_json=excluded.tags_json,
+  tone=excluded.tone,
+  accent=excluded.accent,
+  subtitle=excluded.subtitle,
+  description=excluded.description,
+  preview_image=COALESCE(excluded.preview_image, templates.preview_image),
+  meta=excluded.meta,
+  is_featured=excluded.is_featured,
+  is_hidden=excluded.is_hidden,
+  is_admin_only=excluded.is_admin_only,
+  sort_order=excluded.sort_order,
+  updated_at=datetime('now');
