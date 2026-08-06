@@ -178,8 +178,8 @@ export async function POST({ request, locals }: APIContext) {
   if (body.quality && "resolution" in input && /^(\d+p|\d+k)$/i.test(body.quality)) {
     input.resolution = body.quality;
   }
-  // Seedream (Replicate / BytePlus image) uses `size`: "1K" | "2K" (and WxH).
-  if (body.quality && "size" in input && /^(1K|2K)$/i.test(body.quality)) {
+  // Seedream (Replicate / BytePlus image) uses `size`: "1K" | "2K" | "4K" (and WxH).
+  if (body.quality && "size" in input && /^(1K|2K|4K)$/i.test(body.quality)) {
     input.size = body.quality.toUpperCase();
   }
 
