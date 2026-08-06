@@ -138,6 +138,18 @@ export async function POST({ request, locals }: APIContext) {
     input.content = built.content;
   }
 
+  // Seedream 4.x on BytePlus rejects `output_format` (5.0 Pro still accepts it).
+  // Strip so a stale template input_json can't 400 the whole request.
+  if (template.provider === "byteplus" && /seedream-4/i.test(template.model)) {
+    delete input.output_format;
+  }
+  // Seedance video never takes image-only params — guard against template drift.
+  if (template.provider === "byteplus" && /seedance/i.test(template.model)) {
+    delete input.output_format;
+    delete input.response_format;
+    delete input.aspect_ratio;
+  }
+
   // BytePlus Seedream accepts mixed media refs — keep images in `image`, and
   // surface video/audio on their own keys so non-image URLs aren't stuffed into
   // the image array (which BytePlus rejects).

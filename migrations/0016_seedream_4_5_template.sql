@@ -18,7 +18,7 @@ INSERT OR REPLACE INTO templates (
   'Photoshoots',
   'byteplus',
   'seedream-4-5-251128',
-  '{"prompt":"{{prompt}}","image":"{{files*}}","size":"2K","aspect_ratio":"{{aspect}}","response_format":"url","watermark":false,"output_format":"jpeg"}',
+  '{"prompt":"{{prompt}}","image":"{{files*}}","size":"2K","aspect_ratio":"{{aspect}}","response_format":"url","watermark":false}',
   '[{"key":"files","type":"file","label":"Reference files","required":true,"multiple":true,"max":9,"accept":"image/*,video/*,audio/*","labeled":true,"help":"Up to 9 references (images, video, or audio). Each gets a label — click to rename, then @tag it in the prompt."},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"mentionFrom":"files","placeholder":"e.g. Use @Image1 as the person. Use @Image2 as the pajama outfit. Keep face and pose from @Image1.","help":"Type @ to mention a reference, or tap the chips under your uploads."}]',
   NULL,
   4,
