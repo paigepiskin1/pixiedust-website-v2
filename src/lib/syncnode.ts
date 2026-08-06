@@ -5,6 +5,16 @@ const BASE = "https://run.syncnode.ai";
 
 export interface SubmitResult {
   jobId: string;
+  /** Present when SyncNode finishes in the submit call (BytePlus Seedream image). */
+  status?: GenStatus;
+  outputs?: string[];
+  error?: string;
+}
+
+/** Seedream image models use SyncNode's sync `/byteplus/image` route; Seedance
+ * video models use async `/byteplus/generate` with a `content[]` payload. */
+function isByteplusImageModel(model: string): boolean {
+  return /seedream/i.test(model);
 }
 
 export async function submitGeneration(
@@ -12,17 +22,19 @@ export async function submitGeneration(
   opts: { provider: string; model: string; input: Record<string, unknown> }
 ): Promise<SubmitResult> {
   const { provider, model, input } = opts;
-  // BytePlus (Ark / Dreamina·Seedance) takes its params at the top level
-  // (content, resolution, ratio, duration, …) rather than nested under `input`.
+  // BytePlus (Ark) takes params at the top level rather than nested under `input`.
   const isByteplus = provider === "byteplus";
+  const isByteplusImage = isByteplus && isByteplusImageModel(model);
   const url =
     provider === "fal"
       ? `${BASE}/fal/generate`
       : provider === "alibaba"
         ? `${BASE}/alibaba/generate`
-        : isByteplus
-          ? `${BASE}/byteplus/generate`
-          : `${BASE}/generate`;
+        : isByteplusImage
+          ? `${BASE}/byteplus/image`
+          : isByteplus
+            ? `${BASE}/byteplus/generate`
+            : `${BASE}/generate`;
 
   const payload = isByteplus ? { apiKey, model, ...input } : { apiKey, model, input };
 
@@ -32,18 +44,42 @@ export async function submitGeneration(
     body: JSON.stringify(payload),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, any>;
-  if (!res.ok || !data.job_id) {
-    const detail =
-      (typeof data.error === "string" && data.error) ||
-      (typeof data.detail === "string" && data.detail) ||
-      (typeof data.message === "string" && data.message) ||
-      (data.error && typeof data.error === "object"
-        ? JSON.stringify(data.error)
-        : "") ||
-      `SyncNode submit failed (${res.status})`;
-    throw new Error(detail);
+  const outputs = normalizeOutputs(data.output);
+  const messageError =
+    (typeof data.error === "string" && data.error) ||
+    (typeof data.detail === "string" && data.detail) ||
+    (typeof data.message === "string" && data.message) ||
+    (data.error && typeof data.error === "object" ? JSON.stringify(data.error) : "") ||
+    "";
+
+  if (!res.ok) {
+    throw new Error(messageError || `SyncNode submit failed (${res.status})`);
   }
-  return { jobId: data.job_id };
+
+  // Sync Seedream image: completed (or failed) in one response.
+  if (isByteplusImage) {
+    if (outputs.length || data.status === "completed") {
+      return {
+        jobId: String(data.job_id || crypto.randomUUID()),
+        status: "completed",
+        outputs,
+      };
+    }
+    const rs = String(data.status || "").toLowerCase();
+    if (rs === "failed" || rs === "error") {
+      throw new Error(messageError || "BytePlus image generation failed");
+    }
+    // Unexpected in-progress from a sync endpoint — still return a job id if any.
+    if (data.job_id) {
+      return { jobId: String(data.job_id), status: "processing", outputs: [] };
+    }
+    throw new Error(messageError || "BytePlus image generation returned no output");
+  }
+
+  if (!data.job_id) {
+    throw new Error(messageError || `SyncNode submit failed (${res.status})`);
+  }
+  return { jobId: data.job_id, status: "processing", outputs: [] };
 }
 
 export type GenStatus = "processing" | "completed" | "failed";

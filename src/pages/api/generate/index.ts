@@ -5,6 +5,7 @@ import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
 import { prepareByteplusAssets } from "../../../lib/byteplus-assets";
+import { buildSeedanceMultimodalContent } from "../../../lib/seedance-content";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
 
 function json(data: unknown, status = 200) {
@@ -111,14 +112,77 @@ export async function POST({ request, locals }: APIContext) {
 
   // ─── Single step ───
   const { input } = resolveInput(template, inputs);
+
+  // Opt-in multimodal Seedance: rebuild Ark `content[]` from prompt + up to 9
+  // labeled image/video/audio refs (meta.multimodal). Template input_json only
+  // needs a text stub; media parts are appended here.
+  let useMultimodal = false;
+  try {
+    const m = template.meta ? JSON.parse(template.meta) : null;
+    useMultimodal = !!(m && m.multimodal);
+  } catch { /* meta isn't JSON */ }
+  if (template.provider === "byteplus" && useMultimodal) {
+    const prompt =
+      typeof inputs.prompt === "string"
+        ? inputs.prompt
+        : typeof input.content === "object" &&
+            Array.isArray((input as any).content) &&
+            typeof (input as any).content[0]?.text === "string"
+          ? (input as any).content[0].text
+          : "";
+    const built = buildSeedanceMultimodalContent(prompt, inputs.files ?? inputs.image);
+    if (built.error) {
+      await adjustBalance(db, userId, cost, { reason: "generation_refund", refType: "generation", refId: genId, note: "multimodal validate failed" });
+      return json({ error: built.error + " — you weren't charged." }, 400);
+    }
+    input.content = built.content;
+  }
+
+  // Seedance video never takes Seedream image-only params.
+  if (template.provider === "byteplus" && /seedance/i.test(template.model)) {
+    delete input.output_format;
+    delete input.response_format;
+    delete input.aspect_ratio;
+  }
+  // Seedream 4.5 multi-ref docs: output_format "png" (jpeg was rejected), no response_format.
+  if (template.provider === "byteplus" && /seedream-4/i.test(template.model)) {
+    delete input.response_format;
+    input.output_format = "png";
+  }
+
+  // BytePlus Seedream accepts mixed media refs — keep images in `image`, and
+  // surface video/audio on their own keys so non-image URLs aren't stuffed into
+  // the image array (which BytePlus rejects).
+  if (
+    template.provider === "byteplus" &&
+    /seedream/i.test(template.model) &&
+    Array.isArray(input.image)
+  ) {
+    const images: string[] = [];
+    const videos: string[] = [];
+    const audios: string[] = [];
+    for (const u of input.image as unknown[]) {
+      if (typeof u !== "string" || !u) continue;
+      if (/\.(mp4|mov|webm)(\?|$)/i.test(u)) videos.push(u);
+      else if (/\.(mp3|wav|m4a|aac|ogg|mpeg)(\?|$)/i.test(u)) audios.push(u);
+      else images.push(u);
+    }
+    if (images.length) input.image = images;
+    else delete input.image;
+    if (videos.length) input.video = videos.length === 1 ? videos[0] : videos;
+    if (audios.length) input.audio = audios.length === 1 ? audios[0] : audios;
+  }
+
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;
   // "match" = keep the uploaded photo's aspect ratio. The value the model
-  // expects differs: GPT-Image uses "auto"; nano-banana / seedream / flux use
-  // "match_input_image".
+  // expects differs: GPT-Image uses "auto"; Replicate nano-banana / seedream /
+  // flux use "match_input_image"; BytePlus Seedream image omits the ratio field.
   if (effectiveAspect === "match" || effectiveAspect === "match_input_image") {
-    effectiveAspect = /gpt-image/i.test(template.model) ? "auto" : "match_input_image";
+    if (/gpt-image/i.test(template.model)) effectiveAspect = "auto";
+    else if (template.provider === "byteplus" && /seedream/i.test(template.model)) effectiveAspect = null;
+    else effectiveAspect = "match_input_image";
   }
   // openai/gpt-image-2 on Replicate only accepts 1:1 | 3:2 | 2:3 | auto.
   // Map common studio ratios to the nearest supported value so 4:5 / 9:16 / 16:9
@@ -139,15 +203,22 @@ export async function POST({ request, locals }: APIContext) {
     effectiveAspect = gptAspect[effectiveAspect] ?? "1:1";
   }
   if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
-  // BytePlus (Ark) uses `ratio` instead of `aspect_ratio`.
+  else if ("aspect_ratio" in input && (!input.aspect_ratio || input.aspect_ratio === "match" || input.aspect_ratio === "match_input_image")) {
+    delete input.aspect_ratio;
+  }
+  // BytePlus video (Seedance) uses `ratio` instead of `aspect_ratio`.
   if (effectiveAspect && effectiveAspect !== "match" && "ratio" in input) input.ratio = effectiveAspect;
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
   if (duration && "duration" in input) input.duration = duration;
-  // Map the selected quality to the model's native resolution param. Quality
+  // Map the selected quality to the model's native resolution/size param. Quality
   // keys for resolution-capable models are the real values (e.g. "720p", "2K");
   // the regex guard prevents abstract tiers (std/pro/cinema) from leaking through.
   if (body.quality && "resolution" in input && /^(\d+p|\d+k)$/i.test(body.quality)) {
     input.resolution = body.quality;
+  }
+  // Seedream (Replicate / BytePlus image) uses `size`: "1K" | "2K" | "4K" (and WxH).
+  if (body.quality && "size" in input && /^(1K|2K|4K)$/i.test(body.quality)) {
+    input.size = body.quality.toUpperCase();
   }
 
   // Opt-in (template meta { "assetLibrary": true }): push each uploaded photo
@@ -177,11 +248,70 @@ export async function POST({ request, locals }: APIContext) {
     .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty)
     .run();
 
+  // BytePlus Seedream (`/byteplus/image`) is synchronous at SyncNode and often
+  // takes 30–90s. Waiting in this request hits Cloudflare's gateway timeout and
+  // the studio only sees a bare 502. Run it under waitUntil and let the studio
+  // poll /api/generate/status for the real completed/failed result.
+  const isByteplusSeedream =
+    template.provider === "byteplus" && /seedream/i.test(template.model);
+
+  if (isByteplusSeedream) {
+    await db
+      .prepare("UPDATE generations SET status='processing', updated_at=datetime('now') WHERE id=?")
+      .bind(genId)
+      .run();
+
+    const finalize = async () => {
+      try {
+        const submitted = await submitGeneration(env.SYNCNODE_API_KEY, {
+          provider: template.provider,
+          model: template.model,
+          input,
+        });
+        if (submitted.status === "completed" && (submitted.outputs?.length ?? 0) > 0) {
+          await db
+            .prepare("UPDATE generations SET status='completed', provider_job_id=?, output_url=?, updated_at=datetime('now') WHERE id=?")
+            .bind(submitted.jobId, submitted.outputs![0], genId)
+            .run();
+          return;
+        }
+        if (submitted.jobId) {
+          await db
+            .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
+            .bind(submitted.jobId, genId)
+            .run();
+          return;
+        }
+        throw new Error(submitted.error || "BytePlus image generation returned no output");
+      } catch (err) {
+        const detail = String((err as Error).message || err || "Could not start generation");
+        await adjustBalance(db, userId, cost, { reason: "generation_refund", refType: "generation", refId: genId, note: "dispatch failed" });
+        await db
+          .prepare("UPDATE generations SET status='failed', error=?, credits_refunded=?, updated_at=datetime('now') WHERE id=?")
+          .bind(detail, cost, genId)
+          .run();
+      }
+    };
+
+    const ctx = (locals.runtime as any).ctx;
+    if (ctx?.waitUntil) ctx.waitUntil(finalize());
+    else finalize().catch(() => {});
+
+    return json({ id: genId, status: "processing", balance: deb.balance, cost });
+  }
+
   try {
-    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
+    const submitted = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
+    if (submitted.status === "completed" && (submitted.outputs?.length ?? 0) > 0) {
+      await db
+        .prepare("UPDATE generations SET status='completed', provider_job_id=?, output_url=?, updated_at=datetime('now') WHERE id=?")
+        .bind(submitted.jobId, submitted.outputs![0], genId)
+        .run();
+      return json({ id: genId, status: "completed", outputs: submitted.outputs, balance: deb.balance, cost });
+    }
     await db
       .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
-      .bind(jobId, genId)
+      .bind(submitted.jobId, genId)
       .run();
     return json({ id: genId, status: "processing", balance: deb.balance, cost });
   } catch (err) {

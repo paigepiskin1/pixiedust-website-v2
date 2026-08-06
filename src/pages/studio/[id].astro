@@ -215,6 +215,22 @@ const config = {
             </div>
           )}
 
+          {/^seedream-(5-pro|4-5)$/.test(template.id) && (
+            <div class="mb-3.5 flex items-start gap-2 rounded-lg" style="padding:9px 11px;background:color-mix(in srgb, var(--pd-amber) 11%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-amber) 34%, transparent);">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--pd-amber)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px;"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4"/><circle cx="8" cy="11" r="0.4" fill="var(--pd-amber)"/></svg>
+              <span class="text-ink-2" style="font-size:11.5px;line-height:1.45;">{template.id === "seedream-4-5"
+                ? "ByteDance Seedream 4.5 usually takes 1–2 minutes. Upload reference images (image 1, image 2, …), then describe the edit — e.g. “Replace the clothing in image 1 with the outfit from image 2.”"
+                : "BytePlus Seedream 5.0 Pro usually takes 1–2 minutes. Upload up to 9 image, video, or audio refs, label them, then @tag them in your prompt (e.g. “use @Image1 as the person, @Image2 as the outfit”)."}</span>
+            </div>
+          )}
+
+          {template.id === "byteplus-seedance-multimodal" && (
+            <div class="mb-3.5 flex items-start gap-2 rounded-lg" style="padding:9px 11px;background:color-mix(in srgb, var(--pd-mint) 11%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-mint) 34%, transparent);">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--pd-mint)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px;"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4"/><circle cx="8" cy="11" r="0.4" fill="var(--pd-mint)"/></svg>
+              <span class="text-ink-2" style="font-size:11.5px;line-height:1.45;">Multimodal Seedance 2.0 — optional refs (up to 9 images, or mix in video/audio). Label each file and @tag it in the prompt. Audio needs at least one image or video. Real-person photos go through the BytePlus asset library.</span>
+            </div>
+          )}
+
           <FieldPanel fields={fields} id="pd-field-panel" />
 
           <div class="mt-4 flex flex-col gap-4">
@@ -478,15 +494,22 @@ const config = {
     // Humanize provider errors and make clear the user wasn't charged. Most
     // failures (e.g. the model's safety filter) aren't the user's fault.
     function friendlyError(raw: unknown): string {
-      const e = String(raw ?? "").replace(/\s*\(refunded\)\s*$/i, "");
+      const e = String(raw ?? "")
+        .replace(/\s*—\s*credits refunded\.?\s*$/i, "")
+        .replace(/\s*\(refunded\)\s*$/i, "");
       // GPT Image E005 / "flagged as sensitive" — check first so image presets
       // like Tumblr Aesthetic never get the Seedance video copy.
       if (/e005|flagged as sensitive|safety|moderation|content policy|nsfw|sensitive/i.test(e))
         return "The model's safety filter blocked this — it often triggers on real faces or sensitive content. You weren't charged; try a different photo or prompt.";
+      // BytePlus Seedream copyright / IP filter (OutputImageSensitiveContentDetected.PolicyViolation).
+      if (/copyright|policyviolation|OutputImageSensitiveContentDetected/i.test(e))
+        return "BytePlus blocked this for copyright / IP policy. You weren't charged — try different reference images or a more specific edit prompt.";
       // BytePlus Seedance: "input image may contain real person" — only that phrasing.
       if (/contain real person/i.test(e))
         return "BytePlus blocked this photo — Seedance can't animate real people. You weren't charged; try an illustration, AI portrait, or a different model.";
       if (/rate limit|slow down/i.test(e)) return "Too many requests right now. You weren't charged — try again in a minute.";
+      if (/timeout|timed out|\b524\b|\b502\b/i.test(e) && /byteplus|seedream|could not start/i.test(e))
+        return "BytePlus took too long to respond. You weren't charged — try again in a moment.";
       if (/timeout|timed out/i.test(e)) return "This took too long and timed out. You weren't charged — try again.";
       if (/not enough credits/i.test(e)) return "Not enough credits.";
       if (/\b422\b|aspect_ratio|invalid.*(aspect|ratio|input)/i.test(e))
@@ -719,6 +742,11 @@ const config = {
           credits += per;
           refreshButton();
           tileFail(tile, friendlyError(data.error || "Could not start generation."));
+          return;
+        }
+        // BytePlus Seedream finishes in the generate response (SyncNode /byteplus/image).
+        if (data.status === "completed" && Array.isArray(data.outputs) && data.outputs.length) {
+          tileResult(tile, data.outputs, data.id);
           return;
         }
         await poll(data.id, tile);

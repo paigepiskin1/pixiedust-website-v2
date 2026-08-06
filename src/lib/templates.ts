@@ -31,6 +31,16 @@ export interface TemplateField {
   multiple?: boolean;
   /** For select fields: "buttons" (default) or "dropdown". */
   ui?: "buttons" | "dropdown";
+  /**
+   * Multi-file images: show Image 1…N badges and expose @tags for the prompt
+   * (Seedream-style multi-reference role assignment).
+   */
+  labeled?: boolean;
+  /**
+   * Textarea: enable @-mention insert from the given multi-file field key
+   * (must be a `labeled` file field in the same panel).
+   */
+  mentionFrom?: string;
 }
 
 export interface TemplateStep {
