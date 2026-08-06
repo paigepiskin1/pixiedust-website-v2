@@ -186,10 +186,60 @@ export async function POST({ request, locals }: APIContext) {
     .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty)
     .run();
 
+  // BytePlus Seedream (`/byteplus/image`) is synchronous at SyncNode and often
+  // takes 30–90s. Waiting in this request hits Cloudflare's gateway timeout and
+  // the studio only sees a bare 502. Run it under waitUntil and let the studio
+  // poll /api/generate/status for the real completed/failed result.
+  const isByteplusSeedream =
+    template.provider === "byteplus" && /seedream/i.test(template.model);
+
+  if (isByteplusSeedream) {
+    await db
+      .prepare("UPDATE generations SET status='processing', updated_at=datetime('now') WHERE id=?")
+      .bind(genId)
+      .run();
+
+    const finalize = async () => {
+      try {
+        const submitted = await submitGeneration(env.SYNCNODE_API_KEY, {
+          provider: template.provider,
+          model: template.model,
+          input,
+        });
+        if (submitted.status === "completed" && (submitted.outputs?.length ?? 0) > 0) {
+          await db
+            .prepare("UPDATE generations SET status='completed', provider_job_id=?, output_url=?, updated_at=datetime('now') WHERE id=?")
+            .bind(submitted.jobId, submitted.outputs![0], genId)
+            .run();
+          return;
+        }
+        if (submitted.jobId) {
+          await db
+            .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
+            .bind(submitted.jobId, genId)
+            .run();
+          return;
+        }
+        throw new Error(submitted.error || "BytePlus image generation returned no output");
+      } catch (err) {
+        const detail = String((err as Error).message || err || "Could not start generation");
+        await adjustBalance(db, userId, cost, { reason: "generation_refund", refType: "generation", refId: genId, note: "dispatch failed" });
+        await db
+          .prepare("UPDATE generations SET status='failed', error=?, credits_refunded=?, updated_at=datetime('now') WHERE id=?")
+          .bind(detail, cost, genId)
+          .run();
+      }
+    };
+
+    const ctx = (locals.runtime as any).ctx;
+    if (ctx?.waitUntil) ctx.waitUntil(finalize());
+    else finalize().catch(() => {});
+
+    return json({ id: genId, status: "processing", balance: deb.balance, cost });
+  }
+
   try {
     const submitted = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
-    // BytePlus Seedream via SyncNode `/byteplus/image` completes in the submit
-    // response — finalize immediately so the studio doesn't wait on a poll.
     if (submitted.status === "completed" && (submitted.outputs?.length ?? 0) > 0) {
       await db
         .prepare("UPDATE generations SET status='completed', provider_job_id=?, output_url=?, updated_at=datetime('now') WHERE id=?")
