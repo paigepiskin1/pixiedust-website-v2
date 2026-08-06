@@ -109,9 +109,20 @@ const config = {
   credits,
   signedIn,
 };
+
+// Social share cards (iMessage / Snap / X / Discord) read og:image from the
+// HTML. Use the template cover so shared /studio/<id> links show that look.
+const shareDescription =
+  (template.description || template.subtitle || `Try ${template.title} on PixieDust — AI image & video studio.`).slice(0, 200);
+const shareImage = template.previewImage || undefined;
 ---
 
-<AppShell title={`${template.title} — PixieDust`} credits={credits}>
+<AppShell
+  title={`${template.title} — PixieDust`}
+  description={shareDescription}
+  ogImage={shareImage}
+  credits={credits}
+>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <div class="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_minmax(0,1fr)] lg:[grid-auto-rows:1fr] lg:min-h-[calc(100vh-128px)]">
       <!-- LEFT: template card -->

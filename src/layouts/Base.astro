@@ -25,7 +25,15 @@ const {
 
 const SITE = "https://pixiedustapp.com";
 const canonicalURL = new URL(Astro.url.pathname, SITE).href;
-const resolvedOgImage = ogImage ?? `${SITE}/og-default.png`;
+const defaultOg = `${SITE}/og-default.png`;
+// Accept absolute CDN covers or site-relative paths; scrapers require absolute URLs.
+const resolvedOgImage = (() => {
+  if (!ogImage) return defaultOg;
+  if (/^https?:\/\//i.test(ogImage)) return ogImage;
+  if (ogImage.startsWith("/")) return `${SITE}${ogImage}`;
+  return defaultOg;
+})();
+const isDefaultOg = resolvedOgImage === defaultOg;
 
 // Base WebSite + WebApplication JSON-LD — always present on every page
 const baseJsonLd = {
@@ -89,8 +97,9 @@ const baseJsonLd = {
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={resolvedOgImage} />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image:secure_url" content={resolvedOgImage} />
+    {isDefaultOg && <meta property="og:image:width" content="1200" />}
+    {isDefaultOg && <meta property="og:image:height" content="630" />}
     <meta property="og:site_name" content="PixieDust" />
     <meta property="og:locale" content="en_US" />
 
