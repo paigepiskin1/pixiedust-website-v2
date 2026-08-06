@@ -72,8 +72,15 @@ export async function POST({ request, locals }: APIContext) {
     if (provider === "byteplus" && body.assetLibrary) {
       await prepareByteplusAssets(env.SYNCNODE_API_KEY, env.DB, input);
     }
-    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider, model, input });
-    return json({ ok: true, jobId, provider, input });
+    const submitted = await submitGeneration(env.SYNCNODE_API_KEY, { provider, model, input });
+    return json({
+      ok: true,
+      jobId: submitted.jobId,
+      provider,
+      input,
+      status: submitted.status ?? "processing",
+      outputs: submitted.outputs ?? [],
+    });
   } catch (err) {
     return json({ error: String((err as Error).message || err) }, 502);
   }

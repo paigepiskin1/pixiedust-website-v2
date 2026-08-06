@@ -99,6 +99,31 @@ GET  /alibaba/status?job_id=<job_id>
 - Video models are async; auto-polled by cron or via `/alibaba/status`
 - **Cost** $0.02 per successful call
 
+### BytePlus Seedance video (async)
+
+```
+POST /byteplus/generate
+Body: { apiKey, model, content, resolution?, ratio?, duration?, watermark? }
+GET  /byteplus/status?job_id=<job_id>
+```
+
+- `content` — required array of parts, e.g. `[{ "type":"text","text":"..." }]`
+- Used for Dreamina / Seedance video models
+- **Cost** $0.02 per successful call
+
+### BytePlus Seedream image (synchronous)
+
+```
+POST /byteplus/image
+Body: { apiKey, model, prompt, image?, size?, response_format?, watermark?, ... }
+```
+
+- Seedream image models (e.g. `dola-seedream-5-0-pro-260628`) use this route — **not** `/byteplus/generate`
+- Returns `{ success, job_id, status: "completed", output }` in one call (no polling)
+- `image` can be a URL or array of reference URLs (multi-reference edit)
+- Extra fields are forwarded to Ark unchanged
+- **Cost** $0.02 per successful call
+
 ### Chat completion via OpenRouter
 
 ```

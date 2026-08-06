@@ -115,10 +115,12 @@ export async function POST({ request, locals }: APIContext) {
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;
   // "match" = keep the uploaded photo's aspect ratio. The value the model
-  // expects differs: GPT-Image uses "auto"; nano-banana / seedream / flux use
-  // "match_input_image".
+  // expects differs: GPT-Image uses "auto"; Replicate nano-banana / seedream /
+  // flux use "match_input_image"; BytePlus Seedream image omits the ratio field.
   if (effectiveAspect === "match" || effectiveAspect === "match_input_image") {
-    effectiveAspect = /gpt-image/i.test(template.model) ? "auto" : "match_input_image";
+    if (/gpt-image/i.test(template.model)) effectiveAspect = "auto";
+    else if (template.provider === "byteplus" && /seedream/i.test(template.model)) effectiveAspect = null;
+    else effectiveAspect = "match_input_image";
   }
   // openai/gpt-image-2 on Replicate only accepts 1:1 | 3:2 | 2:3 | auto.
   // Map common studio ratios to the nearest supported value so 4:5 / 9:16 / 16:9
@@ -139,7 +141,10 @@ export async function POST({ request, locals }: APIContext) {
     effectiveAspect = gptAspect[effectiveAspect] ?? "1:1";
   }
   if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
-  // BytePlus (Ark) uses `ratio` instead of `aspect_ratio`.
+  else if ("aspect_ratio" in input && (!input.aspect_ratio || input.aspect_ratio === "match" || input.aspect_ratio === "match_input_image")) {
+    delete input.aspect_ratio;
+  }
+  // BytePlus video (Seedance) uses `ratio` instead of `aspect_ratio`.
   if (effectiveAspect && effectiveAspect !== "match" && "ratio" in input) input.ratio = effectiveAspect;
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
   if (duration && "duration" in input) input.duration = duration;
@@ -182,10 +187,19 @@ export async function POST({ request, locals }: APIContext) {
     .run();
 
   try {
-    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
+    const submitted = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
+    // BytePlus Seedream via SyncNode `/byteplus/image` completes in the submit
+    // response — finalize immediately so the studio doesn't wait on a poll.
+    if (submitted.status === "completed" && (submitted.outputs?.length ?? 0) > 0) {
+      await db
+        .prepare("UPDATE generations SET status='completed', provider_job_id=?, output_url=?, updated_at=datetime('now') WHERE id=?")
+        .bind(submitted.jobId, submitted.outputs![0], genId)
+        .run();
+      return json({ id: genId, status: "completed", outputs: submitted.outputs, balance: deb.balance, cost });
+    }
     await db
       .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
-      .bind(jobId, genId)
+      .bind(submitted.jobId, genId)
       .run();
     return json({ id: genId, status: "processing", balance: deb.balance, cost });
   } catch (err) {
