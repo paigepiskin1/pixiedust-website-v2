@@ -3,12 +3,14 @@ export const prerender = false;
 import AdminShell from "../../layouts/AdminShell.astro";
 import { isAdmin } from "../../lib/admin";
 import { clickyStats, clickyVisitors, type ClickyItem } from "../../lib/clicky";
+import { getUserGrowth, rangeToDays } from "../../lib/user-growth";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
 
 const env = Astro.locals.runtime.env;
+const db = env.DB;
 
-// Range for the breakdown lists (the stat cards always show all periods).
+// Range for the breakdown lists + growth chart (the visitor cards always show all periods).
 const RANGES: Record<string, string> = {
   today: "Today",
   yesterday: "Yesterday",
@@ -23,7 +25,7 @@ const range = (Astro.url.searchParams.get("range") || "last-7-days") in RANGES
 const configured = !!env.CLICKY_SITE_ID && !!env.CLICKY_SITEKEY;
 
 // Visitor totals across all periods + the breakdown lists for the chosen range.
-const [today, yesterday, week, month, year, lists] = configured
+const [today, yesterday, week, month, year, lists, growth] = configured
   ? await Promise.all([
       clickyVisitors(env, "today"),
       clickyVisitors(env, "yesterday"),
@@ -31,8 +33,13 @@ const [today, yesterday, week, month, year, lists] = configured
       clickyVisitors(env, "last-30-days"),
       clickyVisitors(env, "last-365-days"),
       clickyStats(env, ["traffic-sources", "pages", "links-domains"], range, 10),
+      getUserGrowth(db, rangeToDays(range)),
     ])
-  : [0, 0, 0, 0, 0, {} as Record<string, ClickyItem[]>];
+  : [
+      0, 0, 0, 0, 0,
+      {} as Record<string, ClickyItem[]>,
+      await getUserGrowth(db, rangeToDays(range)),
+    ];
 
 const cards = [
   { label: "Today", value: today },
@@ -55,6 +62,45 @@ function cleanPage(it: ClickyItem): string {
   }
   return it.title || "—";
 }
+
+// ── Chart geometry (SVG) ────────────────────────────────────────────────────
+const W = 720;
+const H = 220;
+const PAD = { t: 18, r: 16, b: 28, l: 36 };
+const innerW = W - PAD.l - PAD.r;
+const innerH = H - PAD.t - PAD.b;
+const maxY = Math.max(1, ...growth.days.map((d) => Math.max(d.started, d.joined)));
+const n = Math.max(1, growth.days.length);
+
+function xAt(i: number): number {
+  return PAD.l + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+}
+function yAt(v: number): number {
+  return PAD.t + innerH - (v / maxY) * innerH;
+}
+function linePath(key: "started" | "joined"): string {
+  return growth.days
+    .map((d, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(d[key]).toFixed(1)}`)
+    .join(" ");
+}
+function areaPath(key: "started" | "joined"): string {
+  if (!growth.days.length) return "";
+  const top = linePath(key);
+  const lastX = xAt(growth.days.length - 1).toFixed(1);
+  const firstX = xAt(0).toFixed(1);
+  const baseY = (PAD.t + innerH).toFixed(1);
+  return `${top} L${lastX},${baseY} L${firstX},${baseY} Z`;
+}
+
+const yTicks = [0, Math.round(maxY / 2), maxY].filter((v, i, a) => a.indexOf(v) === i);
+const labelEvery = n > 60 ? 30 : n > 20 ? 7 : n > 10 ? 2 : 1;
+const fmtDay = (iso: string) => {
+  const [, m, d] = iso.split("-");
+  return `${Number(m)}/${Number(d)}`;
+};
+const showPoint = (i: number) => n <= 45 || i % labelEvery === 0 || i === n - 1;
+const showLabel = (i: number) => i % labelEvery === 0 || i === n - 1;
+const hasActivity = growth.days.some((d) => d.started > 0 || d.joined > 0);
 ---
 
 <AdminShell title="Analytics — PixieDust Admin" tab="analytics">
@@ -80,7 +126,7 @@ function cleanPage(it: ClickyItem): string {
     ))}
   </div>
 
-  <!-- Range selector for the breakdown lists -->
+  <!-- Range selector for the breakdown lists + growth chart -->
   <div class="mt-7 mb-3 flex items-center gap-2">
     <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.7px;">Breakdown</span>
     <div class="flex flex-wrap gap-1.5">
@@ -116,5 +162,98 @@ function cleanPage(it: ClickyItem): string {
         )}
       </div>
     ))}
+  </div>
+
+  <!-- ── User growth ─────────────────────────────────────────────────────── -->
+  <div class="mt-10 mb-3 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h2 class="font-display font-medium text-ink" style="font-size:24px;letter-spacing:-0.5px;">User growth</h2>
+      <p class="mt-1 text-ink-3" style="font-size:13px;">
+        Signups that still need email verify vs people who joined (got the Welcome to PixieDust email).
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-3 items-center" style="font-size:11.5px;">
+      <span class="inline-flex items-center gap-1.5 text-ink-2">
+        <span style="width:10px;height:10px;border-radius:999px;background:var(--pd-lilac);display:inline-block;"></span>
+        Started · need verify
+      </span>
+      <span class="inline-flex items-center gap-1.5 text-ink-2">
+        <span style="width:10px;height:10px;border-radius:999px;background:var(--pd-mint);display:inline-block;"></span>
+        Joined · welcome sent
+      </span>
+    </div>
+  </div>
+
+  <div class="grid gap-3 mb-4" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+    <div style={cardStyle}>
+      <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.7px;">Pending verify</div>
+      <div class="mt-1.5 font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.5px;color:var(--pd-lilac);">{fmt(growth.pendingVerify)}</div>
+      <div class="text-ink-4" style="font-size:10.5px;">signed up, not joined yet</div>
+    </div>
+    <div style={cardStyle}>
+      <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.7px;">Joined (all time)</div>
+      <div class="mt-1.5 font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.5px;color:var(--pd-mint);">{fmt(growth.joinedTotal)}</div>
+      <div class="text-ink-4" style="font-size:10.5px;">welcome email sent</div>
+    </div>
+    <div style={cardStyle}>
+      <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.7px;">Started · {RANGES[range]}</div>
+      <div class="mt-1.5 font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.5px;">{fmt(growth.startedInRange)}</div>
+      <div class="text-ink-4" style="font-size:10.5px;">first verify email</div>
+    </div>
+    <div style={cardStyle}>
+      <div class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.7px;">Joined · {RANGES[range]}</div>
+      <div class="mt-1.5 font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.5px;">{fmt(growth.joinedInRange)}</div>
+      <div class="text-ink-4" style="font-size:10.5px;">welcome emails</div>
+    </div>
+  </div>
+
+  <div style={cardStyle + "padding:16px 14px 12px;"}>
+    <div class="mb-2 flex items-center justify-between gap-2">
+      <div class="font-semibold text-ink" style="font-size:13px;">Daily signups</div>
+      <div class="font-mono text-ink-4" style="font-size:10px;">{RANGES[range]} · max {fmt(maxY)}/day</div>
+    </div>
+
+    {!hasActivity ? (
+      <div class="text-ink-4" style="font-size:12px;padding:36px 8px;text-align:center;">
+        No signup activity in this period yet.
+      </div>
+    ) : (
+      <div style="width:100%;overflow-x:auto;">
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="240" style="display:block;min-width:320px;" role="img" aria-label="User growth chart">
+          {yTicks.map((t) => (
+            <g>
+              <line x1={PAD.l} x2={W - PAD.r} y1={yAt(t)} y2={yAt(t)} stroke="var(--pd-hairline)" stroke-width="1" />
+              <text x={PAD.l - 8} y={yAt(t) + 3.5} text-anchor="end" fill="var(--pd-ink4)" style="font-size:10px;font-family:var(--font-mono);">{t}</text>
+            </g>
+          ))}
+
+          <path d={areaPath("started")} fill="color-mix(in srgb, var(--pd-lilac) 18%, transparent)" />
+          <path d={areaPath("joined")} fill="color-mix(in srgb, var(--pd-mint) 16%, transparent)" />
+
+          <path d={linePath("started")} fill="none" stroke="var(--pd-lilac)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" />
+          <path d={linePath("joined")} fill="none" stroke="var(--pd-mint)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" />
+
+          {growth.days.map((d, i) =>
+            showPoint(i) ? (
+              <g>
+                {d.started > 0 ? <circle cx={xAt(i)} cy={yAt(d.started)} r="2.6" fill="var(--pd-lilac)" /> : null}
+                {d.joined > 0 ? <circle cx={xAt(i)} cy={yAt(d.joined)} r="2.6" fill="var(--pd-mint)" /> : null}
+              </g>
+            ) : null
+          )}
+
+          {growth.days.map((d, i) =>
+            showLabel(i) ? (
+              <text x={xAt(i)} y={H - 8} text-anchor="middle" fill="var(--pd-ink4)" style="font-size:10px;font-family:var(--font-mono);">{fmtDay(d.day)}</text>
+            ) : null
+          )}
+        </svg>
+      </div>
+    )}
+
+    <p class="mt-2 text-ink-4" style="font-size:11px;line-height:1.45;">
+      <strong style="color:var(--pd-ink3);font-weight:600;">Started</strong> counts the first verification email per account (password signups waiting to confirm).
+      <strong style="color:var(--pd-ink3);font-weight:600;">Joined</strong> counts accounts that received the Welcome to PixieDust email (includes Google/Apple sign-ins that skip verify).
+    </p>
   </div>
 </AdminShell>
