@@ -5,6 +5,7 @@ import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
 import { prepareByteplusAssets } from "../../../lib/byteplus-assets";
+import { buildSeedanceMultimodalContent } from "../../../lib/seedance-content";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
 
 function json(data: unknown, status = 200) {
@@ -111,6 +112,31 @@ export async function POST({ request, locals }: APIContext) {
 
   // ─── Single step ───
   const { input } = resolveInput(template, inputs);
+
+  // Opt-in multimodal Seedance: rebuild Ark `content[]` from prompt + up to 9
+  // labeled image/video/audio refs (meta.multimodal). Template input_json only
+  // needs a text stub; media parts are appended here.
+  let useMultimodal = false;
+  try {
+    const m = template.meta ? JSON.parse(template.meta) : null;
+    useMultimodal = !!(m && m.multimodal);
+  } catch { /* meta isn't JSON */ }
+  if (template.provider === "byteplus" && useMultimodal) {
+    const prompt =
+      typeof inputs.prompt === "string"
+        ? inputs.prompt
+        : typeof input.content === "object" &&
+            Array.isArray((input as any).content) &&
+            typeof (input as any).content[0]?.text === "string"
+          ? (input as any).content[0].text
+          : "";
+    const built = buildSeedanceMultimodalContent(prompt, inputs.files ?? inputs.image);
+    if (built.error) {
+      await adjustBalance(db, userId, cost, { reason: "generation_refund", refType: "generation", refId: genId, note: "multimodal validate failed" });
+      return json({ error: built.error + " — you weren't charged." }, 400);
+    }
+    input.content = built.content;
+  }
 
   // BytePlus Seedream accepts mixed media refs — keep images in `image`, and
   // surface video/audio on their own keys so non-image URLs aren't stuffed into
