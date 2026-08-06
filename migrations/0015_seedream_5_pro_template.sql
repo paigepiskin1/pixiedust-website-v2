@@ -18,7 +18,7 @@ INSERT OR REPLACE INTO templates (
   'replicate',
   'bytedance/seedream-5-pro',
   '{"prompt":"{{prompt}}","image_input":"{{files*}}","size":"2K","aspect_ratio":"{{aspect}}","output_format":"jpeg"}',
-  '[{"key":"files","type":"file","label":"Reference images","required":true,"multiple":true,"max":10,"accept":"image/*","help":"1–10 reference images for editing or multi-reference fusion"},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"placeholder":"Describe the edit or fusion — e.g. put the outfit from image 2 on the person in image 1, studio lighting"}]',
+  '[{"key":"files","type":"file","label":"Reference images","required":true,"multiple":true,"max":10,"accept":"image/*","labeled":true,"help":"1–10 references — each gets an Image label. Click a label to rename, then @tag it in the prompt."},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"mentionFrom":"files","placeholder":"e.g. Use @Image1 as the person. Use @Image2 as the pajama outfit. Keep face and pose from @Image1.","help":"Type @ to mention a reference, or tap the chips under your uploads."}]',
   NULL,
   5,
   '{"2K":1,"1K":1}',

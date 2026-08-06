@@ -32,7 +32,7 @@ function formatAccept(accept: string) {
     f.type === "file" ? (
       <div class="block">
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
-        <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
+        <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-labeled={f.labeled ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
           <div class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
@@ -40,7 +40,14 @@ function formatAccept(accept: string) {
             <input data-field={f.key} type="file" accept={f.accept} multiple={f.multiple || undefined} class="absolute inset-0 cursor-pointer opacity-0" style="z-index:1;" />
           </div>
           {f.multiple ? (
-            <div class="pd-multi-previews" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+            <>
+              <div class="pd-multi-previews" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+              {f.labeled && (
+                <div class="pd-ref-chips" style="display:none;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;">
+                  <span class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:0.5px;">Insert in prompt</span>
+                </div>
+              )}
+            </>
           ) : (
             <div class="pd-file-preview overflow-hidden rounded-xl" style="display:none;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);margin-top:4px;">
               <img class="pd-preview-img block" style="max-height:300px;max-width:100%;width:100%;height:auto;object-fit:contain;margin:0 auto;background:var(--pd-bg3);" alt="" />
@@ -55,10 +62,15 @@ function formatAccept(accept: string) {
         {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
       </div>
     ) : (
-      <label class="block">
+      <div class="block">
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         {f.type === "textarea" ? (
-          <textarea data-field={f.key} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
+          <div class="pd-mention-wrap" style="position:relative;" data-mention-from={f.mentionFrom || undefined}>
+            <textarea data-field={f.key} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
+            {f.mentionFrom && (
+              <div class="pd-mention-menu" hidden style="position:absolute;left:0;right:0;top:100%;z-index:20;margin-top:4px;max-height:180px;overflow:auto;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);box-shadow:0 8px 24px rgba(0,0,0,.18);"></div>
+            )}
+          </div>
         ) : f.type === "select" && (f.options ?? []).some((o) => (o as any).image) ? (
           <>
             <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
@@ -102,7 +114,7 @@ function formatAccept(accept: string) {
           <input data-field={f.key} type={f.type === "url" ? "url" : f.type === "email" ? "email" : "text"} placeholder={f.placeholder} value={String(f.default ?? "")} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;" />
         )}
         {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
-      </label>
+      </div>
     )
   ))}
 </div>
@@ -139,12 +151,13 @@ function formatAccept(accept: string) {
 
     if (type === "file") {
       const isMulti = !!f.multiple;
+      const labeled = !!f.labeled;
       const maxFiles = Number(f.max ?? 4);
       const accept = String(f.accept ?? "");
       const acceptLabel = accept ? accept.replace(/image\//g,"").replace(/video\//g,"").replace(/,\s*/g,", ").toUpperCase() : "";
       return `<div>
         <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
-        <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
+        <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${labeled?` data-labeled="true"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
           <div class="pd-upload-zone" style="position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);border-radius:12px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
@@ -152,7 +165,7 @@ function formatAccept(accept: string) {
             <input data-field="${key}" type="file"${accept?` accept="${accept}"`:""}${isMulti?" multiple":""} style="position:absolute;inset:0;opacity:0;cursor:pointer;z-index:1;" />
           </div>
           ${isMulti
-            ? `<div class="pd-multi-previews" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>`
+            ? `<div class="pd-multi-previews" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>${labeled?`<div class="pd-ref-chips" style="display:none;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;"><span style="font-size:10px;font-family:ui-monospace,monospace;color:var(--pd-ink4);letter-spacing:0.5px;text-transform:uppercase;">Insert in prompt</span></div>`:""}`
             : `<div class="pd-file-preview" style="display:none;overflow:hidden;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);margin-top:4px;">
                 <img class="pd-preview-img" style="display:block;max-width:100%;width:100%;height:auto;max-height:300px;object-fit:contain;margin:0 auto;background:var(--pd-bg3);" alt="" />
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-top:0.5px solid var(--pd-hairline);">
@@ -169,7 +182,11 @@ function formatAccept(accept: string) {
 
     let input = "";
     if (type === "textarea") {
-      input = `<textarea data-field="${key}" rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
+      const mf = f.mentionFrom ? String(f.mentionFrom) : "";
+      input = `<div class="pd-mention-wrap" style="position:relative;"${mf?` data-mention-from="${escAttr(mf)}"`:""}>
+        <textarea data-field="${key}" rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>
+        ${mf?`<div class="pd-mention-menu" hidden style="position:absolute;left:0;right:0;top:100%;z-index:20;margin-top:4px;max-height:180px;overflow:auto;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);box-shadow:0 8px 24px rgba(0,0,0,.18);"></div>`:""}
+      </div>`;
     } else if (type === "select" && Array.isArray(f.options) && f.options.some((o: any) => o && o.image)) {
       const current = def || String(f.options[0]?.value ?? "");
       const cards = f.options.map((o: any) => {
@@ -199,10 +216,10 @@ function formatAccept(accept: string) {
       const t = type === "url" ? "url" : type === "email" ? "email" : "text";
       input = `<input data-field="${key}" type="${t}" placeholder="${escAttr(ph)}" value="${escAttr(def)}" style="${S}" />`;
     }
-    return `<label style="display:block;">
+    return `<div style="display:block;">
       <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
       ${input}${help}
-    </label>`;
+    </div>`;
   }).join("");
 };
 
@@ -312,27 +329,180 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     }
   }
 
+  // Labeled multi-ref metadata: { index, tag, alias, phrase, url }
+  type RefMeta = { index: number; tag: string; alias: string; phrase: string; url: string };
+  const refMeta: Record<string, RefMeta[]> = ((root as any)._pdRefMeta = (root as any)._pdRefMeta || {});
+
+  function defaultAlias(i: number) { return `Image${i}`; }
+  function defaultPhrase(i: number) { return `image ${i}`; }
+  function sanitizeAlias(raw: string, fallback: string) {
+    const s = String(raw || "").trim().replace(/\s+/g, "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24);
+    return s || fallback;
+  }
+
+  function getRefs(key: string): RefMeta[] {
+    return refMeta[key] || [];
+  }
+
+  function refreshMentionUi() {
+    // Rebuild chip bars under each labeled file field.
+    root.querySelectorAll<HTMLElement>(".pd-file-wrap[data-labeled='true']").forEach((wrap) => {
+      const key = wrap.dataset.fieldkey || "";
+      const chips = wrap.querySelector<HTMLElement>(".pd-ref-chips");
+      if (!chips) return;
+      const refs = getRefs(key);
+      chips.style.display = refs.length ? "flex" : "none";
+      // Keep the leading label span; replace buttons.
+      chips.querySelectorAll("button.pd-ref-chip").forEach((b) => b.remove());
+      for (const r of refs) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "pd-ref-chip";
+        btn.dataset.tag = r.tag;
+        btn.dataset.filekey = key;
+        btn.textContent = r.tag;
+        btn.title = `Insert ${r.tag} → model sees “${r.phrase}”`;
+        btn.style.cssText = "padding:5px 9px;border-radius:999px;font-size:11.5px;font-weight:600;cursor:pointer;background:color-mix(in srgb,var(--pd-lilac) 12%,var(--pd-bg));border:0.5px solid color-mix(in srgb,var(--pd-lilac) 40%,transparent);color:var(--pd-ink);";
+        btn.addEventListener("click", () => insertMention(key, r.tag));
+        chips.appendChild(btn);
+      }
+    });
+  }
+
+  function insertAtCursor(ta: HTMLTextAreaElement, text: string) {
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(end);
+    const needsSpaceBefore = before.length > 0 && !/\s$/.test(before);
+    const insert = (needsSpaceBefore ? " " : "") + text + (after && !/^\s/.test(after) ? " " : after.startsWith(" ") ? "" : " ");
+    ta.value = before + insert + after.replace(/^\s?/, "");
+    const pos = (before + insert).length;
+    ta.focus();
+    ta.setSelectionRange(pos, pos);
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function insertMention(fileKey: string, tag: string) {
+    // Prefer a textarea that declares mentionFrom=fileKey; else first textarea.
+    const safe = fileKey.replace(/["\\]/g, "");
+    const preferred = root.querySelector<HTMLTextAreaElement>(`.pd-mention-wrap[data-mention-from="${safe}"] textarea[data-field]`);
+    const ta = preferred || root.querySelector<HTMLTextAreaElement>("textarea[data-field]");
+    if (!ta) return;
+    insertAtCursor(ta, tag);
+  }
+
+  function expandMentions(text: string): string {
+    let out = text;
+    const all = Object.values(refMeta).flat();
+    // Longest tags first so @Image10 beats @Image1
+    const sorted = [...all].sort((a, b) => b.tag.length - a.tag.length);
+    for (const r of sorted) {
+      const re = new RegExp(r.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+      out = out.replace(re, r.phrase);
+    }
+    return out;
+  }
+  (root as any)._pdExpandMentions = expandMentions;
+
   root.querySelectorAll<HTMLInputElement>('input[type="file"][data-field]').forEach((el) => {
     const key = el.dataset.field!;
     const wrap = el.closest(".pd-file-wrap") as HTMLElement|null;
     const isMulti = wrap?.dataset.multiple === "true";
+    const labeled = wrap?.dataset.labeled === "true";
     const maxFiles = Number(wrap?.dataset.max ?? 4);
     const zone = wrap?.querySelector<HTMLElement>(".pd-upload-zone");
 
     if (isMulti) {
       const thumbsEl = wrap?.querySelector<HTMLElement>(".pd-multi-previews");
       let urls: string[] = [];
+      // Parallel alias map keyed by url (survives renumbering)
+      const aliases: Record<string, string> = {};
+
+      function rebuildMeta() {
+        const used = new Set<string>();
+        refMeta[key] = urls.map((url, i) => {
+          const index = i + 1;
+          const fallback = defaultAlias(index);
+          let alias = aliases[url] || fallback;
+          // Auto-renumber default ImageN labels when order changes.
+          if (/^Image\d+$/i.test(alias)) alias = fallback;
+          alias = sanitizeAlias(alias, fallback);
+          let base = alias;
+          let n = 2;
+          while (used.has(alias.toLowerCase())) alias = `${base}${n++}`;
+          used.add(alias.toLowerCase());
+          aliases[url] = alias;
+          return { index, tag: `@${alias}`, alias, phrase: defaultPhrase(index), url };
+        });
+        // Update badge text on thumbs
+        if (thumbsEl && labeled) {
+          Array.from(thumbsEl.querySelectorAll<HTMLElement>(".pd-ref-thumb")).forEach((thumb, i) => {
+            const meta = refMeta[key][i];
+            const badge = thumb.querySelector<HTMLElement>(".pd-ref-label");
+            if (badge && meta) {
+              badge.textContent = meta.alias.replace(/^Image(\d+)$/i, "Image $1");
+              badge.dataset.alias = meta.alias;
+            }
+          });
+        }
+        refreshMentionUi();
+      }
 
       function syncZone() {
         if (zone) zone.style.display = urls.length >= maxFiles ? "none" : "";
         if (thumbsEl) thumbsEl.style.display = urls.length > 0 ? "flex" : "none";
         fileUrls[key] = urls.length > 0 ? [...urls] : [];
+        if (labeled) rebuildMeta();
+        else refreshMentionUi();
+      }
+
+      function attachRemove(thumb: HTMLElement, url: string) {
+        const x = document.createElement("button");
+        x.type = "button"; x.textContent = "✕";
+        x.setAttribute("aria-label", "Remove");
+        x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;z-index:2;";
+        x.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          urls = urls.filter((u) => u !== url);
+          delete aliases[url];
+          thumb.remove();
+          syncZone();
+        });
+        thumb.appendChild(x);
+      }
+
+      function attachLabelBadge(thumb: HTMLElement, url: string) {
+        if (!labeled) return;
+        const badge = document.createElement("button");
+        badge.type = "button";
+        badge.className = "pd-ref-label";
+        badge.title = "Click to rename (used as @tag in the prompt)";
+        badge.style.cssText = "position:absolute;left:3px;right:3px;bottom:3px;padding:2px 4px;border-radius:6px;border:none;cursor:pointer;font-size:9.5px;font-weight:700;letter-spacing:0.2px;color:#fff;background:rgba(0,0,0,0.62);backdrop-filter:blur(4px);text-align:center;z-index:2;line-height:1.2;";
+        badge.addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const idx = urls.indexOf(url) + 1;
+          const current = aliases[url] || defaultAlias(idx);
+          const next = window.prompt("Label for this image (used as @tag)", current.replace(/^Image(\d+)$/, "Image$1"));
+          if (next == null) return;
+          aliases[url] = sanitizeAlias(next, defaultAlias(idx));
+          rebuildMeta();
+        });
+        thumb.appendChild(badge);
+      }
+
+      function makeThumbShell(): HTMLElement {
+        const thumb = document.createElement("div");
+        thumb.className = labeled ? "pd-ref-thumb" : "";
+        thumb.style.cssText = labeled
+          ? "position:relative;width:84px;height:84px;border-radius:12px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;"
+          : "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
+        return thumb;
       }
 
       async function addFile(file: File) {
         if (urls.length >= maxFiles) return;
-        const thumb = document.createElement("div");
-        thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
+        const thumb = makeThumbShell();
         const img = document.createElement("img");
         img.style.cssText = "width:100%;height:100%;object-fit:cover;";
         img.src = URL.createObjectURL(file);
@@ -350,15 +520,14 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           const d = await r.json();
           if (r.ok) {
             const blobSrc = img.src;
-            urls.push(d.url);
-            img.src = d.url;
+            const url = String(d.url);
+            urls.push(url);
+            aliases[url] = defaultAlias(urls.length);
+            img.src = url;
             URL.revokeObjectURL(blobSrc);
             spinner.remove();
-            const x = document.createElement("button");
-            x.type = "button"; x.textContent = "✕";
-            x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
-            x.addEventListener("click", () => { urls = urls.filter(u => u !== d.url); thumb.remove(); syncZone(); });
-            thumb.appendChild(x);
+            attachRemove(thumb, url);
+            attachLabelBadge(thumb, url);
           } else { thumb.remove(); }
         } catch { thumb.remove(); }
         finally { bump(-1); }
@@ -377,18 +546,16 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       // Render a thumb for an already-hosted URL (preloaded reference images).
       function addExisting(url: string) {
         if (!url || urls.length >= maxFiles) return;
-        const thumb = document.createElement("div");
-        thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
+        const thumb = makeThumbShell();
         const img = document.createElement("img");
         img.style.cssText = "width:100%;height:100%;object-fit:cover;";
         img.src = url;
-        const x = document.createElement("button");
-        x.type = "button"; x.textContent = "✕";
-        x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
-        x.addEventListener("click", () => { urls = urls.filter(u => u !== url); thumb.remove(); syncZone(); });
-        thumb.appendChild(img); thumb.appendChild(x);
-        thumbsEl?.appendChild(thumb);
+        thumb.appendChild(img);
+        attachRemove(thumb, url);
         urls.push(url);
+        aliases[url] = defaultAlias(urls.length);
+        attachLabelBadge(thumb, url);
+        thumbsEl?.appendChild(thumb);
       }
       // Preload reference images from the field's default.
       try {
@@ -439,6 +606,82 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     } catch { /* ignore bad default */ }
   });
 
+  // @ autocomplete on textareas with data-mention-from
+  root.querySelectorAll<HTMLElement>(".pd-mention-wrap[data-mention-from]").forEach((wrap) => {
+    const fileKey = wrap.dataset.mentionFrom || "";
+    const ta = wrap.querySelector<HTMLTextAreaElement>("textarea[data-field]");
+    const menu = wrap.querySelector<HTMLElement>(".pd-mention-menu");
+    if (!ta || !menu) return;
+
+    let activeIdx = 0;
+    let filtered: RefMeta[] = [];
+
+    function hide() {
+      menu.hidden = true;
+      menu.innerHTML = "";
+      activeIdx = 0;
+    }
+
+    function renderMenu(items: RefMeta[]) {
+      filtered = items;
+      if (!items.length) { hide(); return; }
+      menu.hidden = false;
+      menu.innerHTML = items.map((r, i) =>
+        `<button type="button" data-i="${i}" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border:none;background:${i===activeIdx?"color-mix(in srgb,var(--pd-lilac) 12%,transparent)":"transparent"};cursor:pointer;text-align:left;font-size:12.5px;color:var(--pd-ink);">` +
+          `<span style="font-weight:700;color:var(--pd-lilac);">${r.tag}</span>` +
+          `<span style="color:var(--pd-ink3);font-size:11px;">→ ${r.phrase}</span>` +
+        `</button>`
+      ).join("");
+      menu.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          pick(Number(btn.dataset.i));
+        });
+      });
+    }
+
+    function currentQuery(): { start: number; q: string } | null {
+      const pos = ta.selectionStart ?? 0;
+      const before = ta.value.slice(0, pos);
+      const m = before.match(/@([A-Za-z0-9_-]*)$/);
+      if (!m) return null;
+      return { start: pos - m[0].length, q: m[1] };
+    }
+
+    function pick(i: number) {
+      const item = filtered[i];
+      const q = currentQuery();
+      if (!item || !q) { hide(); return; }
+      const before = ta.value.slice(0, q.start);
+      const after = ta.value.slice(ta.selectionStart ?? ta.value.length);
+      const insert = item.tag + (after && !/^\s/.test(after) ? " " : "");
+      ta.value = before + insert + after;
+      const pos = (before + insert).length;
+      ta.focus();
+      ta.setSelectionRange(pos, pos);
+      hide();
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    ta.addEventListener("input", () => {
+      const q = currentQuery();
+      if (!q) { hide(); return; }
+      const refs = getRefs(fileKey);
+      const qq = q.q.toLowerCase();
+      const items = refs.filter((r) => !qq || r.alias.toLowerCase().includes(qq) || r.tag.toLowerCase().includes(qq));
+      activeIdx = 0;
+      renderMenu(items);
+    });
+    ta.addEventListener("keydown", (e) => {
+      if (menu.hidden || !filtered.length) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); activeIdx = (activeIdx + 1) % filtered.length; renderMenu(filtered); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = (activeIdx - 1 + filtered.length) % filtered.length; renderMenu(filtered); }
+      else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(activeIdx); }
+      else if (e.key === "Escape") { hide(); }
+    });
+    ta.addEventListener("blur", () => setTimeout(hide, 120));
+  });
+
   // Thumbnail-card option groups (a <select> whose options carry images). Clicks
   // update the sibling hidden input so pdCollectFieldValues picks up the value.
   root.querySelectorAll<HTMLElement>(".pd-opt-cards").forEach((group) => {
@@ -479,13 +722,19 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
 // ── Collect all field values ──────────────────────────────────────────────────
 (window as any).pdCollectFieldValues = function(root: HTMLElement, fileUrls: Record<string, any>): Record<string, any> {
   const out: Record<string, any> = {};
+  const expand = (root as any)._pdExpandMentions as ((s: string) => string) | undefined;
   root.querySelectorAll<HTMLElement>("[data-field]").forEach((el) => {
     const key = (el as HTMLInputElement).dataset.field!;
     if ((el as HTMLInputElement).type === "file") {
       if (fileUrls[key] != null) out[key] = fileUrls[key];
       return;
     }
-    out[key] = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+    let val = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+    // Expand @Image1 / custom @tags → "image 1" for models like Seedream.
+    if (expand && typeof val === "string" && val.includes("@") && el.tagName === "TEXTAREA") {
+      val = expand(val);
+    }
+    out[key] = val;
   });
   return out;
 };
