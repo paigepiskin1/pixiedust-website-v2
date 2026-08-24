@@ -31,6 +31,14 @@ export interface TemplateField {
   multiple?: boolean;
   /** For select fields: "buttons" (default) or "dropdown". */
   ui?: "buttons" | "dropdown";
+  /**
+   * For textarea fields: enable an `@`-mention autocomplete that inserts tags
+   * (`@Image1`, `@Image2`, …) for the images uploaded in the referenced
+   * multi-file field. `mentionFrom` is that field's key; `mentionLabel` is the
+   * tag prefix (defaults to "Image"). Used by reference-driven video templates.
+   */
+  mentionFrom?: string;
+  mentionLabel?: string;
 }
 
 export interface TemplateStep {

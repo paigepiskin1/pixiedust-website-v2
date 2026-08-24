@@ -25,7 +25,7 @@ INSERT OR REPLACE INTO templates (
   'byteplus',
   'dreamina-seedance-2-0-260128',
   '{"prompt":"{{prompt}}","reference_images":"{{references*}}","resolution":"720p","ratio":"16:9","duration":5,"generate_audio":true,"watermark":false}',
-  '[{"key":"references","type":"file","label":"Reference images","required":true,"multiple":true,"max":8,"accept":"image/png,image/jpeg,image/webp","help":"Upload up to 8 references. They become @Image1, @Image2 and so on in upload order — tag them in your prompt below."},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"placeholder":"@Image1 as the main character, walking through the neon city from @Image2. Cinematic, slow dolly-in.","help":"Reference each uploaded image by its @ tag and say what it controls (identity, scene, style). Order matches your uploads: @Image1 is the first image."}]',
+  '[{"key":"references","type":"file","label":"Reference images","required":true,"multiple":true,"max":8,"accept":"image/png,image/jpeg,image/webp","help":"Upload up to 8 references. They become @Image1, @Image2 and so on in upload order — tag them in your prompt below."},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"mentionFrom":"references","mentionLabel":"Image","placeholder":"@Image1 as the main character, walking through the neon city from @Image2. Cinematic, slow dolly-in.","help":"Type @ to insert a reference (@Image1, @Image2 …), then say what each controls — identity, scene, or style. Order matches your uploads."}]',
   50,
   10,
   '[5,8,10]',

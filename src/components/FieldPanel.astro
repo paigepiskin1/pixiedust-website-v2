@@ -58,7 +58,7 @@ function formatAccept(accept: string) {
       <label class="block">
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         {f.type === "textarea" ? (
-          <textarea data-field={f.key} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
+          <textarea data-field={f.key} data-mention-from={f.mentionFrom || undefined} data-mention-label={f.mentionLabel || undefined} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
         ) : f.type === "select" && (f.options ?? []).some((o) => (o as any).image) ? (
           <>
             <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
@@ -169,7 +169,8 @@ function formatAccept(accept: string) {
 
     let input = "";
     if (type === "textarea") {
-      input = `<textarea data-field="${key}" rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
+      const mf = f.mentionFrom ? ` data-mention-from="${escAttr(String(f.mentionFrom))}"${f.mentionLabel ? ` data-mention-label="${escAttr(String(f.mentionLabel))}"` : ""}` : "";
+      input = `<textarea data-field="${key}"${mf} rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
     } else if (type === "select" && Array.isArray(f.options) && f.options.some((o: any) => o && o.image)) {
       const current = def || String(f.options[0]?.value ?? "");
       const cards = f.options.map((o: any) => {
@@ -474,6 +475,112 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       });
     });
   });
+
+  // ── @-mention autocomplete ────────────────────────────────────────────────
+  // A textarea with data-mention-from="<fileKey>" gets an @-picker that inserts
+  // @Image1, @Image2, … for the images uploaded in that multi-file field (in
+  // upload order). Lets users "call" a reference into the prompt by typing @.
+  function setupMention(textarea: HTMLTextAreaElement) {
+    const fromKey = textarea.dataset.mentionFrom;
+    if (!fromKey) return;
+    const label = textarea.dataset.mentionLabel || "Image";
+    const wrap = textarea.parentElement as HTMLElement | null;
+    if (!wrap) return;
+    if (getComputedStyle(wrap).position === "static") wrap.style.position = "relative";
+
+    const menu = document.createElement("div");
+    menu.className = "pd-mention-menu";
+    menu.style.cssText =
+      "display:none;position:absolute;z-index:60;max-height:220px;overflow-y:auto;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,0.45);padding:5px;";
+    wrap.appendChild(menu);
+
+    let items: { el: HTMLElement; tag: string }[] = [];
+    let active = -1;
+
+    const urls = (): string[] => {
+      const v = (fileUrls as Record<string, unknown>)[fromKey];
+      if (Array.isArray(v)) return v.filter((u): u is string => typeof u === "string" && u.length > 0);
+      return typeof v === "string" && v ? [v] : [];
+    };
+
+    // The active @-token immediately before the caret (if any).
+    const token = (): { at: number; end: number; query: string } | null => {
+      const pos = textarea.selectionStart ?? 0;
+      const pre = textarea.value.slice(0, pos);
+      const m = /(^|[^\w@])@(\w*)$/.exec(pre);
+      if (!m) return null;
+      return { at: pos - m[2].length - 1, end: pos, query: m[2] };
+    };
+
+    const place = () => {
+      menu.style.top = textarea.offsetTop + textarea.offsetHeight + 4 + "px";
+      menu.style.left = textarea.offsetLeft + "px";
+      menu.style.width = textarea.offsetWidth + "px";
+    };
+    const hide = () => { menu.style.display = "none"; active = -1; };
+    const setActive = (i: number) => {
+      active = i;
+      items.forEach((it, j) => {
+        it.el.style.background = j === i ? "color-mix(in srgb,var(--pd-lilac) 16%,transparent)" : "transparent";
+      });
+    };
+    const choose = (tag: string) => {
+      const t = token();
+      if (!t) { hide(); return; }
+      const before = textarea.value.slice(0, t.at);
+      const after = textarea.value.slice(t.end);
+      const ins = "@" + tag + " ";
+      textarea.value = before + ins + after;
+      const caret = (before + ins).length;
+      textarea.setSelectionRange(caret, caret);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      hide();
+      textarea.focus();
+    };
+    const update = () => {
+      const t = token();
+      const list = urls();
+      if (!t || list.length === 0) { hide(); return; }
+      const q = t.query.toLowerCase();
+      const opts = list
+        .map((url, i) => ({ url, tag: `${label}${i + 1}`, n: i + 1 }))
+        .filter((o) => !q || o.tag.toLowerCase().includes(q) || String(o.n) === q);
+      if (!opts.length) { hide(); return; }
+      menu.innerHTML = "";
+      items = opts.map((o) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.style.cssText =
+          "display:flex;align-items:center;gap:9px;width:100%;padding:6px 7px;border-radius:9px;cursor:pointer;background:transparent;border:none;text-align:left;color:var(--pd-ink);";
+        b.innerHTML =
+          `<span style="width:34px;height:34px;border-radius:7px;overflow:hidden;flex:none;background:var(--pd-bg3);display:block;">` +
+          `<img src="${o.url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" /></span>` +
+          `<span style="font-size:13px;font-weight:600;">@${o.tag}</span>`;
+        b.addEventListener("mousedown", (e) => { e.preventDefault(); choose(o.tag); });
+        menu.appendChild(b);
+        return { el: b, tag: o.tag };
+      });
+      items.forEach((it, i) => it.el.addEventListener("mouseenter", () => setActive(i)));
+      place();
+      menu.style.display = "block";
+      setActive(0);
+    };
+
+    textarea.addEventListener("input", update);
+    textarea.addEventListener("click", update);
+    textarea.addEventListener("keyup", (e) => {
+      if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) update();
+    });
+    textarea.addEventListener("keydown", (e) => {
+      if (menu.style.display === "none") return;
+      if (e.key === "ArrowDown") { e.preventDefault(); if (items.length) setActive((active + 1) % items.length); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); if (items.length) setActive((active - 1 + items.length) % items.length); }
+      else if (e.key === "Enter" || e.key === "Tab") { if (items.length && active >= 0) { e.preventDefault(); choose(items[active].tag); } }
+      else if (e.key === "Escape") { e.preventDefault(); hide(); }
+    });
+    textarea.addEventListener("blur", () => setTimeout(hide, 150));
+  }
+  root.querySelectorAll<HTMLTextAreaElement>("textarea[data-field][data-mention-from]").forEach(setupMention);
 };
 
 // ── Collect all field values ──────────────────────────────────────────────────
