@@ -7,6 +7,41 @@ export interface SubmitResult {
   jobId: string;
 }
 
+/**
+ * Shape a resolved template input into the BytePlus (Ark / Dreamina·Seedance)
+ * multimodal request body.
+ *
+ * Ark expects a `content` array that mixes a text item with typed media items
+ * (`role: reference_image | first_frame | last_frame | reference_video | …`).
+ * Templates that already provide a ready `content` array pass through unchanged.
+ *
+ * Omni-reference templates can't hand-write that array because the number of
+ * references is chosen by the user at runtime, so they instead supply a flat
+ * `prompt` string + a `reference_images` array of URLs (from a multi-file
+ * upload field). We assemble the Ark `content` here: the prompt becomes the
+ * text item and each URL becomes a `role: reference_image` item, in upload
+ * order, so the prompt's `@Image1`, `@Image2`, … tags bind to the right image.
+ */
+export function shapeByteplusInput(input: Record<string, unknown>): Record<string, unknown> {
+  // A template-authored `content` array is already in Ark form — don't touch it.
+  if (Array.isArray(input.content)) return input;
+  // Nothing to assemble unless the flat omni-reference shape is present.
+  if (!("prompt" in input) && !("reference_images" in input)) return input;
+
+  const { prompt, reference_images, ...rest } = input as Record<string, unknown> & {
+    prompt?: unknown;
+    reference_images?: unknown;
+  };
+  const refs = Array.isArray(reference_images)
+    ? reference_images.filter((u): u is string => typeof u === "string" && u.length > 0)
+    : [];
+
+  const content: unknown[] = [{ type: "text", text: String(prompt ?? "") }];
+  for (const url of refs) content.push({ type: "image_url", image_url: { url }, role: "reference_image" });
+
+  return { ...rest, content };
+}
+
 export async function submitGeneration(
   apiKey: string,
   opts: { provider: string; model: string; input: Record<string, unknown> }
@@ -15,6 +50,7 @@ export async function submitGeneration(
   // BytePlus (Ark / Dreamina·Seedance) takes its params at the top level
   // (content, resolution, ratio, duration, …) rather than nested under `input`.
   const isByteplus = provider === "byteplus";
+  const shaped = isByteplus ? shapeByteplusInput(input) : input;
   const url =
     provider === "fal"
       ? `${BASE}/fal/generate`
@@ -24,7 +60,7 @@ export async function submitGeneration(
           ? `${BASE}/byteplus/generate`
           : `${BASE}/generate`;
 
-  const payload = isByteplus ? { apiKey, model, ...input } : { apiKey, model, input };
+  const payload = isByteplus ? { apiKey, model, ...shaped } : { apiKey, model, input };
 
   const res = await fetch(url, {
     method: "POST",

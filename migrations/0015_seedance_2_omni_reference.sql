@@ -1,0 +1,45 @@
+-- Seedance 2.0 · Omni Reference (BytePlus)
+--
+-- Image→video template that lets users upload up to 8 reference images and tag
+-- them in the prompt as @Image1, @Image2, … to control identity, scene, and
+-- style. Routes through the `byteplus` provider (SyncNode /byteplus/generate →
+-- Ark /contents/generations/tasks). The flat `prompt` + `reference_images`
+-- shape below is assembled into Ark's multimodal `content` array (one
+-- role:reference_image item per upload, in order) by shapeByteplusInput() in
+-- src/lib/syncnode.ts, so @ImageN binds to the Nth uploaded reference.
+--
+-- INSERT OR REPLACE = idempotent + safe to re-run and to apply over an existing
+-- row when re-pricing or tweaking copy.
+INSERT OR REPLACE INTO templates (
+  id, title, kind, type, category, provider, model,
+  input_json, fields_json,
+  credit_cost, price_per_second, durations_json, quality_json, aspects_json, quantities_json,
+  engine, eta, tags_json, tone, accent, meta, subtitle, description,
+  is_featured, is_hidden, is_admin_only, sort_order, updated_at
+) VALUES (
+  'seedance-2-omni-reference',
+  'Seedance 2.0 · Omni Reference',
+  'i2v',
+  'video',
+  'Reference',
+  'byteplus',
+  'dreamina-seedance-2-0-260128',
+  '{"prompt":"{{prompt}}","reference_images":"{{references*}}","resolution":"720p","ratio":"16:9","duration":5,"generate_audio":true,"watermark":false}',
+  '[{"key":"references","type":"file","label":"Reference images","required":true,"multiple":true,"max":8,"accept":"image/png,image/jpeg,image/webp","help":"Upload up to 8 references. They become @Image1, @Image2 and so on in upload order — tag them in your prompt below."},{"key":"prompt","type":"textarea","label":"Prompt","required":true,"placeholder":"@Image1 as the main character, walking through the neon city from @Image2. Cinematic, slow dolly-in.","help":"Reference each uploaded image by its @ tag and say what it controls (identity, scene, style). Order matches your uploads: @Image1 is the first image."}]',
+  50,
+  10,
+  '[5,8,10]',
+  '{"480p":0.6,"720p":1}',
+  '["16:9","9:16","1:1","4:3","3:4","adaptive"]',
+  '[1,2]',
+  'Seedance 2.0',
+  '~2–4 min',
+  '["Video","Reference","Seedance"]',
+  'pink',
+  'var(--pd-pink)',
+  '{"kicker":"Omni Reference","howItWorks":["Upload up to 8 reference images","Tag them in your prompt as @Image1, @Image2 …","Say what each reference controls — identity, scene, or style","Pick aspect, duration and resolution, then Generate"]}',
+  'Multi-reference video with @-tagged prompts',
+  'Upload up to 8 reference images and tag them in your prompt (@Image1, @Image2 …) to control identity, scene, and style. Powered by BytePlus Seedance 2.0.',
+  1, 0, 0, 0,
+  datetime('now')
+);
