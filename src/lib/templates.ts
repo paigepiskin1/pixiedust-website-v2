@@ -39,6 +39,13 @@ export interface TemplateField {
    */
   mentionFrom?: string;
   mentionLabel?: string;
+  /**
+   * When true, this (select) field lets the user choose the generation model.
+   * Its option `value`s are model ids; the chosen value overrides the template's
+   * `model` at generation time (see `resolveModel`). The field is metadata only —
+   * it is not substituted into `input_json`.
+   */
+  asModel?: boolean;
 }
 
 export interface TemplateStep {
@@ -321,6 +328,20 @@ export function resolveChainStep(
     return v;
   };
   return sub(inputObj);
+}
+
+/**
+ * The model to generate with. If a field is flagged `asModel`, return the
+ * user-chosen model (validated against that field's option values); otherwise
+ * fall back to the template's default `model`. Guards against arbitrary model
+ * injection by only accepting values the template explicitly offers.
+ */
+export function resolveModel(t: Template, inputs: Record<string, unknown>): string {
+  const mf = allFields(t).find((f) => f.asModel && Array.isArray(f.options) && f.options.length > 0);
+  if (!mf) return t.model;
+  const chosen = String(inputs[mf.key] ?? mf.default ?? "");
+  const allowed = (mf.options ?? []).map((o) => o.value);
+  return chosen && allowed.includes(chosen) ? chosen : t.model;
 }
 
 /** Workspace URL for a template. */

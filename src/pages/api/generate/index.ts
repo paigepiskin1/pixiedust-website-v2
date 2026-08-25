@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults } from "../../../lib/templates";
+import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults, resolveModel } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration, createPortraitGroup, registerPortraitAsset } from "../../../lib/syncnode";
@@ -128,6 +128,8 @@ export async function POST({ request, locals }: APIContext) {
 
   // ─── Single step ───
   const { input } = resolveInput(template, inputs);
+  // Optional user-chosen model (e.g. a "Model" select offering Seedance 2.0 / 2.5).
+  const model = resolveModel(template, inputs);
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;
@@ -200,11 +202,11 @@ export async function POST({ request, locals }: APIContext) {
       `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
     )
-    .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty)
-    .run();
+      .bind(genId, userId, template.id, template.kind, template.type, template.provider, model, JSON.stringify(input), cost, body.quality ?? null, qty)
+      .run();
 
   try {
-    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
+    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model, input });
     await db
       .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
       .bind(jobId, genId)

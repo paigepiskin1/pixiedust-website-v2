@@ -7,7 +7,7 @@
  * Run: npx tsx scripts/test-seedance-omni.ts
  */
 import assert from "node:assert/strict";
-import { resolveInput, type Template } from "../src/lib/templates";
+import { resolveInput, resolveModel, type Template } from "../src/lib/templates";
 import { shapeByteplusInput } from "../src/lib/syncnode";
 
 // Mirror of migrations/0015_seedance_2_omni_reference.sql (input_json + fields_json).
@@ -106,6 +106,29 @@ const ok = (name: string) => { passed++; console.log(`  ✓ ${name}`); };
   const { errors: e2 } = resolveInput(template, { prompt: "x" });
   assert.ok(e2.some((e) => /reference images is required/i.test(e)), "missing references flagged");
   ok("required prompt + references enforced");
+}
+
+// ── 6. Model chooser (Seedance 2.0 / 2.5) ─────────────────────────────────────
+{
+  const M20 = "dreamina-seedance-2-0-260128";
+  const M25 = "dreamina-seedance-2-5-260628";
+  const withPicker = {
+    model: M20,
+    steps: null,
+    fields: [
+      { key: "model_version", type: "select", asModel: true, default: M20,
+        options: [{ value: M20, label: "Seedance 2.0" }, { value: M25, label: "Seedance 2.5" }] },
+      ...fields,
+    ],
+  } as unknown as Template;
+
+  assert.equal(resolveModel(withPicker, {}), M20, "defaults to Seedance 2.0");
+  assert.equal(resolveModel(withPicker, { model_version: M25 }), M25, "picks Seedance 2.5 when chosen");
+  assert.equal(resolveModel(withPicker, { model_version: "evil/model" }), M20, "rejects a value not in options");
+  // No asModel field → the template's own model, even if inputs try to set one.
+  const noPicker = { model: "some/model", steps: null, fields } as unknown as Template;
+  assert.equal(resolveModel(noPicker, { model_version: M25 }), "some/model", "no picker → template model");
+  ok("resolveModel honors the Model select and rejects unlisted values");
 }
 
 console.log(`\nAll ${passed} checks passed.`);

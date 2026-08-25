@@ -486,6 +486,9 @@ const config = {
     // failures (e.g. the model's safety filter) aren't the user's fault.
     function friendlyError(raw: unknown): string {
       const e = String(raw ?? "").replace(/\s*\(refunded\)\s*$/i, "");
+      // Model chooser picked a model the account hasn't turned on yet (e.g. Seedance 2.5).
+      if (/not activated|modelnotopen|activate the model/i.test(e))
+        return "That model isn't activated on this account yet — enable it in the BytePlus Ark Console, then try again. You weren't charged.";
       // GPT Image E005 / "flagged as sensitive" — check first so image presets
       // like Tumblr Aesthetic never get the Seedance video copy.
       if (/e005|flagged as sensitive|safety|moderation|content policy|nsfw|sensitive/i.test(e))
