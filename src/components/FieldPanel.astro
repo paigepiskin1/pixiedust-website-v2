@@ -218,6 +218,8 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
   // Track in-flight uploads on the panel element so callers (e.g. the studio
   // Generate button) can avoid submitting before files finish uploading.
   (root as any)._pdUploading = Number((root as any)._pdUploading) || 0;
+  const filePrefill: Record<string, (urls: string | string[]) => void> = {};
+  (root as any)._pdFilePrefill = filePrefill;
   const bump = (n: number) => {
     (root as any)._pdUploading = Math.max(0, (Number((root as any)._pdUploading) || 0) + n);
   };
@@ -397,6 +399,14 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         for (const u of arr.slice(0, maxFiles)) addExisting(String(u));
       } catch { /* ignore bad default */ }
 
+      filePrefill[key] = (incoming: string | string[]) => {
+        urls = [];
+        thumbsEl && (thumbsEl.innerHTML = "");
+        const list = Array.isArray(incoming) ? incoming : incoming ? [incoming] : [];
+        for (const u of list.slice(0, maxFiles)) addExisting(String(u));
+        syncZone();
+      };
+
       syncZone();
       return;
     }
@@ -437,6 +447,25 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         if (status) { status.textContent = "Reference image (replace if you like)"; status.style.color = "var(--pd-ink3)"; }
       }
     } catch { /* ignore bad default */ }
+
+    filePrefill[key] = (incoming: string | string[]) => {
+      const url = Array.isArray(incoming) ? incoming[0] : incoming;
+      if (!url) {
+        delete fileUrls[key];
+        el.value = "";
+        if (previewImg) previewImg.src = "";
+        if (preview) preview.style.display = "none";
+        if (zone) zone.style.display = "";
+        if (errorEl) { errorEl.style.display = "none"; errorEl.textContent = ""; }
+        return;
+      }
+      fileUrls[key] = String(url);
+      if (previewImg) previewImg.src = String(url);
+      if (preview) { preview.classList.remove("hidden"); preview.style.display = "block"; }
+      if (zone) zone.style.display = "none";
+      if (status) { status.textContent = "Reused from previous generation"; status.style.color = "var(--pd-ink3)"; }
+      if (errorEl) { errorEl.style.display = "none"; errorEl.textContent = ""; }
+    };
   });
 
   // Thumbnail-card option groups (a <select> whose options carry images). Clicks
@@ -488,6 +517,83 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     out[key] = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
   });
   return out;
+};
+
+/** Set a segmented control group (aspect, duration, quality, quantity). */
+(window as any).pdSetSegmentControl = function(groupName: string, value: string | number) {
+  const wrap = document.querySelector<HTMLElement>(`[data-controls="${groupName}"]`);
+  if (!wrap) return;
+  const val = String(value);
+  wrap.querySelectorAll<HTMLElement>(".pd-seg").forEach((btn) => {
+    btn.setAttribute("data-active", btn.dataset.val === val ? "true" : "false");
+  });
+};
+
+/** Prefill a field panel with saved inputs (text + reference image URLs). Does not submit. */
+(window as any).pdPrefillFieldPanel = function(root: HTMLElement, values: Record<string, unknown>, fileUrls?: Record<string, any>) {
+  const urls = fileUrls ?? (root as any)._pdFileUrls ?? {};
+  const prefill = (root as any)._pdFilePrefill as Record<string, (u: string | string[]) => void> | undefined;
+
+  for (const [key, val] of Object.entries(values)) {
+    if (val == null || val === "") continue;
+    const el = root.querySelector<HTMLElement>(`[data-field="${key}"]`);
+    if (!el) continue;
+
+    if ((el as HTMLInputElement).type === "file") {
+      const list = Array.isArray(val) ? val.map(String) : [String(val)];
+      if (prefill?.[key]) prefill[key](list);
+      else urls[key] = Array.isArray(val) ? list : list[0];
+      continue;
+    }
+
+    if (el.tagName === "SELECT" || el.tagName === "TEXTAREA" || (el as HTMLInputElement).type !== "hidden") {
+      (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value = String(val);
+      continue;
+    }
+
+    // Hidden input backing option cards / segmented selects.
+    if ((el as HTMLInputElement).type === "hidden") {
+      (el as HTMLInputElement).value = String(val);
+      const cards = el.parentElement?.querySelector<HTMLElement>(".pd-opt-cards");
+      if (cards) {
+        cards.querySelectorAll<HTMLElement>(".pd-opt-card").forEach((c) => {
+          const on = c.dataset.val === String(val);
+          c.dataset.active = on ? "true" : "false";
+          c.style.borderColor = on ? "var(--pd-lilac)" : "var(--pd-hairline2)";
+          c.style.background = on ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)";
+        });
+      }
+      const segs = el.parentElement?.querySelector<HTMLElement>(".pd-opt-segs");
+      if (segs) {
+        segs.querySelectorAll<HTMLElement>(".pd-opt-seg").forEach((s) => {
+          const on = s.dataset.val === String(val);
+          s.dataset.active = on ? "true" : "false";
+          s.style.background = on ? "var(--pd-ink)" : "var(--pd-bg)";
+          s.style.color = on ? "var(--pd-bg)" : "var(--pd-ink)";
+          s.style.borderColor = on ? "transparent" : "var(--pd-hairline2)";
+        });
+      }
+    }
+  }
+};
+
+/** Fetch a generation's saved inputs and prefill the form (no auto-generate). */
+(window as any).pdLoadReuseInputs = async function(genId: string, opts: {
+  fieldPanel?: HTMLElement;
+  fileUrls?: Record<string, any>;
+  onLoaded?: (payload: { inputs: Record<string, unknown>; aspect?: string; duration?: number; quality?: string }) => void;
+} = {}) {
+  const res = await fetch(`/api/generations/reuse?id=${encodeURIComponent(genId)}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Could not load inputs");
+  if (opts.fieldPanel) {
+    (window as any).pdPrefillFieldPanel(opts.fieldPanel, data.inputs ?? {}, opts.fileUrls);
+    if (data.aspect) (window as any).pdSetSegmentControl?.("aspect", data.aspect);
+    if (data.duration) (window as any).pdSetSegmentControl?.("duration", data.duration);
+    if (data.quality) (window as any).pdSetSegmentControl?.("quality", data.quality);
+  }
+  opts.onLoaded?.(data);
+  return data;
 };
 
 // Auto-init any .pd-field-panel already in the DOM (server-rendered, e.g. studio)

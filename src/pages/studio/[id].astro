@@ -461,6 +461,19 @@ const config = {
     const fieldPanel = document.getElementById("pd-field-panel") as HTMLElement;
     const fileUrls: Record<string, string | string[]> = (fieldPanel as any)?._pdFileUrls ?? {};
 
+    /** Snapshots of inputs per job — powers in-session "reuse" on result tiles. */
+    const jobSnapshots = new Map<string, { inputs: Record<string, unknown>; aspect?: string; duration?: number; quality?: string }>();
+
+    function applyReuseSnapshot(snap: { inputs: Record<string, unknown>; aspect?: string; duration?: number; quality?: string }) {
+      (window as any).pdPrefillFieldPanel?.(fieldPanel, snap.inputs, fileUrls);
+      if (snap.aspect) (window as any).pdSetSegmentControl?.("aspect", snap.aspect);
+      if (snap.duration) (window as any).pdSetSegmentControl?.("duration", snap.duration);
+      if (snap.quality) (window as any).pdSetSegmentControl?.("quality", snap.quality);
+      refreshButton();
+      fieldPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      (window as any).pdToast?.("Prompt and references loaded — edit and generate when ready", { accent: "var(--pd-mint)" });
+    }
+
     function collectInputs(): Record<string, unknown> {
       return (window as any).pdCollectFieldValues?.(fieldPanel, fileUrls) ?? {};
     }
@@ -633,6 +646,18 @@ const config = {
       });
       tile.appendChild(wrap);
 
+      // Reuse inputs (top-left) — prefills form, does not regenerate.
+      const snap = genId ? jobSnapshots.get(genId) : null;
+      if (snap) {
+        const reuseBtn = document.createElement("button");
+        reuseBtn.type = "button";
+        reuseBtn.title = "Reuse prompt & references";
+        reuseBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2.5H8v5.5M8.5 2.5 5 6M5 8.5H2.5V3"/></svg>`;
+        reuseBtn.style.cssText = "position:absolute;top:7px;left:7px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
+        reuseBtn.addEventListener("click", (e) => { e.stopPropagation(); applyReuseSnapshot(snap); });
+        tile.appendChild(reuseBtn);
+      }
+
       // Expand icon (top-right)
       const expandBtn = document.createElement("button");
       expandBtn.type = "button";
@@ -685,6 +710,12 @@ const config = {
     // template can produce several in parallel.
     async function launchJob(inputs: Record<string, unknown>, per: number) {
       const tile = createTile();
+      const snap = {
+        inputs: { ...inputs },
+        aspect: controlValue("aspect") || undefined,
+        duration: duration() || undefined,
+        quality: qualityTiers.length ? undefined : (controlValue("quality") || undefined),
+      };
       activeJobs++;
       credits -= per; // optimistic debit
       refreshButton();
@@ -721,6 +752,7 @@ const config = {
           tileFail(tile, friendlyError(data.error || "Could not start generation."));
           return;
         }
+        jobSnapshots.set(data.id, snap);
         await poll(data.id, tile);
       } catch (err) {
         credits += per;
@@ -830,6 +862,20 @@ const config = {
 
     genBtn.addEventListener("click", generate);
     refreshButton();
+
+    // Gallery / deep-link: ?reuse=<generation id> prefills the form without generating.
+    const reuseId = new URLSearchParams(location.search).get("reuse");
+    if (reuseId) {
+      (window as any).pdLoadReuseInputs?.(reuseId, {
+        fieldPanel,
+        fileUrls,
+        onLoaded: () => {
+          refreshButton();
+          (window as any).pdToast?.("Prompt and references loaded — edit and generate when ready", { accent: "var(--pd-mint)" });
+          history.replaceState({}, "", location.pathname);
+        },
+      }).catch(() => {});
+    }
   </script>
 
   <script is:inline>

@@ -42,6 +42,12 @@ export async function POST({ request, locals }: APIContext) {
   const qty = Math.max(1, Math.min(Number(body.quantity) || 1, 4));
   const duration = Number(body.duration) || undefined;
   const cost = computeCost(template, { quality: body.quality, quantity: qty, duration });
+  const userInputsJson = JSON.stringify({
+    inputs,
+    aspect: body.aspect ?? undefined,
+    duration: duration ?? undefined,
+    quality: body.quality ?? undefined,
+  });
 
   // Limits
   const tier = await getUserTier(db, userId);
@@ -89,10 +95,10 @@ export async function POST({ request, locals }: APIContext) {
 
     await db
       .prepare(
-        `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, chain_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
+        `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, chain_json, user_inputs_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`
       )
-      .bind(genId, userId, template.id, template.kind, template.type, steps[0].provider, steps[0].model, JSON.stringify(step0Input), cost, body.quality ?? null, qty, JSON.stringify(chain))
+      .bind(genId, userId, template.id, template.kind, template.type, steps[0].provider, steps[0].model, JSON.stringify(step0Input), cost, body.quality ?? null, qty, JSON.stringify(chain), userInputsJson)
       .run();
 
     try {
@@ -171,10 +177,10 @@ export async function POST({ request, locals }: APIContext) {
 
   await db
     .prepare(
-      `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+      `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, user_inputs_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
     )
-    .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty)
+    .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty, userInputsJson)
     .run();
 
   try {

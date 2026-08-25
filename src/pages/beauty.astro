@@ -207,6 +207,44 @@ const config = {
     const emptyEl = $("#pd-out-empty");
     const jobsEl = $("#pd-jobs");
 
+    const jobSnapshots = new Map<string, { inputs: Record<string, unknown>; meta: Record<string, unknown> }>();
+
+    function setMode(next: string) {
+      mode = next;
+      document.querySelectorAll<HTMLElement>("#pd-mode-tabs .pd-seg").forEach((b) => b.setAttribute("data-active", String(b.dataset.mode === next)));
+      const isRef = next === "reference";
+      $("#pd-look-wrap").style.display = isRef ? "none" : "block";
+      $("#pd-ref-wrap").style.display = isRef ? "block" : "none";
+    }
+
+    function applyStudioInputs(inputs: Record<string, unknown>, meta?: Record<string, unknown>) {
+      const images = Array.isArray(inputs.images) ? inputs.images.map(String) : inputs.person ? [String(inputs.person)] : [];
+      if (images[0]) {
+        (window as any).pdPrefillFieldPanel?.(personPanel, { person: images[0] }, (personPanel as any)._pdFileUrls);
+      }
+      if (meta?.mode === "reference" || images.length > 1) {
+        setMode("reference");
+        if (images[1]) {
+          (window as any).pdPrefillFieldPanel?.(refPanel, { reference: images[1] }, (refPanel as any)._pdFileUrls);
+        }
+        selectedLook = null;
+        document.querySelectorAll<HTMLElement>(".pd-look-card").forEach((c) => (c.dataset.active = "false"));
+      } else if (meta?.selectedLook) {
+        setMode("looks");
+        selectedLook = String(meta.selectedLook);
+        document.querySelectorAll<HTMLElement>(".pd-look-card").forEach((c) => (c.dataset.active = String(c.dataset.lookId === selectedLook)));
+      }
+      if (meta?.target) {
+        target = String(meta.target);
+        document.querySelectorAll<HTMLElement>("#pd-target .pd-seg").forEach((b) => b.setAttribute("data-active", String(b.dataset.target === target)));
+        targetText.style.display = target === "describe" ? "block" : "none";
+        if (meta.targetText) targetText.value = String(meta.targetText);
+      }
+      refreshButton();
+      personPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      (window as any).pdToast?.("Photo and references loaded — edit and generate when ready", { accent: "var(--pd-mint)" });
+    }
+
     function quantity(): number {
       const a = document.querySelector<HTMLElement>('#pd-qty .pd-seg[data-active="true"]');
       return Number(a?.dataset.val) || 1;
@@ -344,6 +382,16 @@ const config = {
       img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;";
       img.addEventListener("click", () => openLb(url));
       tile.appendChild(img);
+      const snap = genId ? jobSnapshots.get(genId) : null;
+      if (snap) {
+        const reuseBtn = document.createElement("button");
+        reuseBtn.type = "button";
+        reuseBtn.title = "Reuse prompt & references";
+        reuseBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2.5H8v5.5M8.5 2.5 5 6M5 8.5H2.5V3"/></svg>`;
+        reuseBtn.style.cssText = "position:absolute;top:7px;left:7px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
+        reuseBtn.addEventListener("click", (e) => { e.stopPropagation(); applyStudioInputs(snap.inputs, snap.meta); });
+        tile.appendChild(reuseBtn);
+      }
       const dl = document.createElement("a");
       dl.href = genId ? `/api/download?id=${encodeURIComponent(genId)}` : url;
       if (!genId) dl.setAttribute("download", "");
@@ -380,6 +428,10 @@ const config = {
 
     async function launchJob(inputs: Record<string, unknown>, per: number, templateId: string) {
       const tile = createTile();
+      const snap = {
+        inputs: { ...inputs },
+        meta: { mode, selectedLook, target, targetText: targetText.value },
+      };
       activeJobs++;
       credits -= per;
       refreshButton();
@@ -396,6 +448,7 @@ const config = {
           else tileFail(tile, friendlyError(data.error || "Could not start generation."));
           return;
         }
+        jobSnapshots.set(data.id, snap);
         await poll(data.id, tile, per);
       } catch {
         credits += per; refreshButton();
@@ -427,5 +480,15 @@ const config = {
 
     genBtn.addEventListener("click", generate);
     refreshButton();
+
+    const reuseId = new URLSearchParams(location.search).get("reuse");
+    if (reuseId) {
+      (window as any).pdLoadReuseInputs?.(reuseId, {
+        onLoaded: (data: { inputs: Record<string, unknown> }) => {
+          applyStudioInputs(data.inputs ?? {});
+          history.replaceState({}, "", location.pathname);
+        },
+      }).catch(() => {});
+    }
   </script>
 </AppShell>

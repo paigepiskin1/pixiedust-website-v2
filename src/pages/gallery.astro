@@ -64,7 +64,7 @@ const tabs = ["All", "Images", "Video"];
     <PageHeader
       kicker={`${items.length} creation${items.length === 1 ? "" : "s"}`}
       title="My creations"
-      sub="Everything you've made. Click any to pop it out — download, share, remix, or delete."
+      sub="Everything you've made. Click any to pop it out — download, share, reuse inputs, or delete."
     >
       <a slot="right" href="/" class="shrink-0 rounded-xl font-bold" style="padding:10px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;">+ New project</a>
     </PageHeader>
@@ -185,7 +185,7 @@ const tabs = ["All", "Images", "Video"];
           <button type="button" id="pd-lb-copy-prompt" title="Copy prompt" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="display:none;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);cursor:pointer;">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3.5" y="3.5" width="6" height="6" rx="1.2"/><path d="M1.5 8.5V2h6.5"/></svg>
           </button>
-          <a id="pd-lb-remix" href="#" title="Remix" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);">
+          <a id="pd-lb-remix" href="#" title="Reuse prompt & references" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11l9-9M8 2h3v3M5 11H2V8"/></svg>
           </a>
           <div style="flex:1;"></div>
@@ -275,6 +275,14 @@ const tabs = ["All", "Images", "Video"];
     [confirmYesEl, confirmNoEl].forEach((btn, i) => btn.addEventListener("click", () => { confirmEl.style.display = "none"; _confirmRes?.(i === 0); _confirmRes = null; }));
     confirmEl.addEventListener("click", e => { if (e.target === confirmEl) { confirmEl.style.display = "none"; _confirmRes?.(false); _confirmRes = null; } });
 
+    function reusePageHref(templateId: string | null): string {
+      if (!templateId) return "/";
+      if (/^beauty-studio/i.test(templateId)) return "/beauty";
+      if (/^hair-studio/i.test(templateId)) return "/hair";
+      if (/^(avatar-studio|tattoo-studio)/i.test(templateId)) return "/avatar";
+      return `/studio/${templateId}`;
+    }
+
     // ── Lightbox ──────────────────────────────────────────────
     function render() {
       const it = visible[cur];
@@ -293,7 +301,7 @@ const tabs = ["All", "Images", "Video"];
       titleEl.textContent = it.template_title || it.kind;
       metaEl.textContent = `${it.type === "video" ? "Video" : "Image"} · ${it.created}`;
       dlLink.href = `/api/download?id=${it.id}`;
-      remixLink.href = it.template_id ? `/studio/${it.template_id}` : "/";
+      remixLink.href = it.template_id ? `${reusePageHref(it.template_id)}?reuse=${it.id}` : "/";
       const hasPrompt = !!it.prompt;
       copyPromptBtn.style.display = hasPrompt ? "flex" : "none";
     }
