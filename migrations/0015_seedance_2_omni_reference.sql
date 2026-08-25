@@ -1,4 +1,4 @@
--- Seedance 2.0 · Omni Reference (BytePlus)
+-- Movie Studio — Seedance omni-reference (BytePlus), id `movie-studio`
 --
 -- Image→video template that lets users upload up to 8 reference images and tag
 -- them in the prompt as @Image1, @Image2, … to control identity, scene, and
@@ -17,8 +17,8 @@ INSERT OR REPLACE INTO templates (
   engine, eta, tags_json, tone, accent, meta, subtitle, description,
   is_featured, is_hidden, is_admin_only, sort_order, updated_at
 ) VALUES (
-  'seedance-2-omni-reference',
-  'Seedance 2.0 · Omni Reference',
+  'movie-studio',
+  'Movie Studio',
   'i2v',
   'video',
   'Reference',
@@ -39,7 +39,7 @@ INSERT OR REPLACE INTO templates (
   'var(--pd-pink)',
   '{"kicker":"Omni Reference","howItWorks":["Upload up to 8 reference images","Tag them in your prompt as @Image1, @Image2 …","Say what each reference controls — identity, scene, or style","Pick aspect, duration and resolution, then Generate"]}',
   'Multi-reference video with @-tagged prompts',
-  'Upload up to 8 reference images and tag them in your prompt (@Image1, @Image2 …) to control identity, scene, and style. Powered by BytePlus Seedance 2.0.',
+  'Upload up to 8 reference images and tag them in your prompt (@Image1, @Image2 …) to control identity, scene, and style. Powered by BytePlus Seedance.',
   1, 0, 0, 0,
   datetime('now')
 );
