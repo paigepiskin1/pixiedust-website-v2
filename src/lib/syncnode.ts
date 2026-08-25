@@ -42,6 +42,79 @@ export function shapeByteplusInput(input: Record<string, unknown>): Record<strin
   return { ...rest, content };
 }
 
+// ── BytePlus Real-Human Portrait Library ─────────────────────────────────────
+// Seedance blocks raw photos of real people. To use an actual person, register
+// their photo to the Portrait Library to get an `asset://<id>` id, then pass
+// that id (instead of the raw URL) as a reference_image. SyncNode proxies the
+// AK/SK-signed library APIs; the account needs "Advanced Creation Rights".
+
+async function byteplusAsset(apiKey: string, action: string, params: Record<string, unknown>): Promise<Record<string, any>> {
+  const res = await fetch(`${BASE}/byteplus/asset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey, action, params }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, any>;
+  if (!res.ok) {
+    const detail =
+      (data?.ResponseMetadata?.Error?.Message as string) ||
+      (typeof data.error === "string" && data.error) ||
+      `BytePlus asset ${action} failed (${res.status})`;
+    throw new Error(detail);
+  }
+  return data;
+}
+
+/** Create a portrait asset group and return its id. */
+export async function createPortraitGroup(apiKey: string, name: string): Promise<string> {
+  const d = await byteplusAsset(apiKey, "CreateAssetGroup", { Name: name, ProjectName: "default" });
+  const id = d?.Result?.Id;
+  if (!id) throw new Error("CreateAssetGroup returned no Id");
+  return String(id);
+}
+
+/**
+ * Register an image URL to the Portrait Library and poll until it is ready.
+ * Returns the asset id plus whether it became `Active` (a valid real-human
+ * portrait). Non-face images resolve as `active:false` (Failed or timed out),
+ * so the caller can keep the raw URL for them.
+ */
+export async function registerPortraitAsset(
+  apiKey: string,
+  groupId: string,
+  url: string,
+  opts: { pollMs?: number; timeoutMs?: number } = {}
+): Promise<{ assetId: string; active: boolean }> {
+  const created = await byteplusAsset(apiKey, "CreateAsset", {
+    GroupId: groupId,
+    URL: url,
+    AssetType: "Image",
+    ProjectName: "default",
+  });
+  const assetId = created?.Result?.Id;
+  if (!assetId) throw new Error("CreateAsset returned no Id");
+
+  const pollMs = opts.pollMs ?? 2500;
+  const deadline = Date.now() + (opts.timeoutMs ?? 30000);
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, pollMs));
+    const got = await byteplusAsset(apiKey, "GetAsset", { Id: assetId, ProjectName: "default" });
+    const status = got?.Result?.Status;
+    if (status === "Active") return { assetId: String(assetId), active: true };
+    if (status === "Failed") return { assetId: String(assetId), active: false };
+  }
+  return { assetId: String(assetId), active: false };
+}
+
+/** Best-effort delete of a portrait asset (used to minimize face retention). */
+export async function deletePortraitAsset(apiKey: string, assetId: string): Promise<void> {
+  try {
+    await byteplusAsset(apiKey, "DeleteAsset", { Id: assetId, ProjectName: "default" });
+  } catch {
+    /* best effort — leaving a stray asset is not fatal */
+  }
+}
+
 export async function submitGeneration(
   apiKey: string,
   opts: { provider: string; model: string; input: Record<string, unknown> }

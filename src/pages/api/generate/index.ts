@@ -3,8 +3,26 @@ import type { APIContext } from "astro";
 import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
-import { submitGeneration } from "../../../lib/syncnode";
+import { submitGeneration, createPortraitGroup, registerPortraitAsset } from "../../../lib/syncnode";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
+import { getSetting, setSetting } from "../../../lib/app-settings";
+
+const PORTRAIT_GROUP_KEY = "byteplus_portrait_group";
+
+// Reuse a single Portrait Library group across the app (created lazily, id cached
+// in app_settings) so we don't spawn a new group per generation.
+async function ensurePortraitGroup(apiKey: string, db: import("@cloudflare/workers-types").D1Database): Promise<string | null> {
+  try {
+    const cached = await getSetting(db, PORTRAIT_GROUP_KEY);
+    if (cached) return cached;
+    const gid = await createPortraitGroup(apiKey, "pixiedust-portraits");
+    await setSetting(db, PORTRAIT_GROUP_KEY, gid);
+    return gid;
+  } catch (err) {
+    console.error("[generate] portrait group ensure failed:", err);
+    return null;
+  }
+}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -147,6 +165,28 @@ export async function POST({ request, locals }: APIContext) {
   // the regex guard prevents abstract tiers (std/pro/cinema) from leaking through.
   if (body.quality && "resolution" in input && /^(\d+p|\d+k)$/i.test(body.quality)) {
     input.resolution = body.quality;
+  }
+
+  // BytePlus real-person support: Seedance rejects raw photos of real people, so
+  // register each reference to the Portrait Library and swap the raw URL for the
+  // returned asset:// id. Images that aren't valid portraits (products, scenes)
+  // fail registration and keep their raw URL, which Seedance accepts directly.
+  if (template.provider === "byteplus" && Array.isArray(input.reference_images) && input.reference_images.length) {
+    const groupId = await ensurePortraitGroup(env.SYNCNODE_API_KEY, db);
+    if (groupId) {
+      input.reference_images = await Promise.all(
+        (input.reference_images as unknown[]).map(async (u) => {
+          if (typeof u !== "string" || !/^https?:\/\//i.test(u)) return u;
+          try {
+            const r = await registerPortraitAsset(env.SYNCNODE_API_KEY, groupId, u);
+            return r.active ? `asset://${r.assetId}` : u;
+          } catch (err) {
+            console.error("[generate] portrait register failed:", err);
+            return u;
+          }
+        })
+      );
+    }
   }
 
   await db
