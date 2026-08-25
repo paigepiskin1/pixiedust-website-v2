@@ -40,6 +40,13 @@ export interface TemplateField {
   mentionFrom?: string;
   mentionLabel?: string;
   /**
+   * For multi-file fields: register each uploaded image to the BytePlus Portrait
+   * Library at upload time and store the returned `asset://` id as the field
+   * value (so real people are allowed and generation stays fast). Non-person
+   * images fall back to their raw URL.
+   */
+  registerPortrait?: boolean;
+  /**
    * When true, this (select) field lets the user choose the generation model.
    * Its option `value`s are model ids; the chosen value overrides the template's
    * `model` at generation time (see `resolveModel`). The field is metadata only —

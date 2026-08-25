@@ -32,7 +32,7 @@ function formatAccept(accept: string) {
     f.type === "file" ? (
       <div class="block">
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
-        <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
+        <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-register-portrait={f.registerPortrait ? "true" : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
           <div class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
@@ -144,7 +144,7 @@ function formatAccept(accept: string) {
       const acceptLabel = accept ? accept.replace(/image\//g,"").replace(/video\//g,"").replace(/,\s*/g,", ").toUpperCase() : "";
       return `<div>
         <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
-        <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
+        <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.registerPortrait?` data-register-portrait="true"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
           <div class="pd-upload-zone" style="position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);border-radius:12px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
@@ -324,12 +324,18 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
 
     if (isMulti) {
       const thumbsEl = wrap?.querySelector<HTMLElement>(".pd-multi-previews");
+      const registerPortrait = wrap?.dataset.registerPortrait === "true";
       let urls: string[] = [];
+      // Maps a displayed (CDN) URL → the value sent to the model. For portrait
+      // fields that's the `asset://` id from the Portrait Library; otherwise the
+      // URL itself. Lets thumbnails show the real image while generation uses the
+      // registered asset id.
+      const valueByUrl = new Map<string, string>();
 
       function syncZone() {
         if (zone) zone.style.display = urls.length >= maxFiles ? "none" : "";
         if (thumbsEl) thumbsEl.style.display = urls.length > 0 ? "flex" : "none";
-        fileUrls[key] = urls.length > 0 ? [...urls] : [];
+        fileUrls[key] = urls.length > 0 ? urls.map((u) => valueByUrl.get(u) ?? u) : [];
       }
 
       async function addFile(file: File) {
@@ -356,12 +362,25 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
             urls.push(d.url);
             img.src = d.url;
             URL.revokeObjectURL(blobSrc);
-            spinner.remove();
             const x = document.createElement("button");
             x.type = "button"; x.textContent = "✕";
             x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
-            x.addEventListener("click", () => { urls = urls.filter(u => u !== d.url); thumb.remove(); syncZone(); });
+            x.addEventListener("click", () => { urls = urls.filter(u => u !== d.url); valueByUrl.delete(d.url); thumb.remove(); syncZone(); });
             thumb.appendChild(x);
+            // Register real people to the Portrait Library now (spread out per
+            // upload) so generation can use them and stays fast. bump() keeps the
+            // Generate button waiting until this finishes.
+            if (registerPortrait) {
+              spinner.textContent = "⋯";
+              bump(1);
+              try {
+                const rr = await fetch("/api/byteplus/portrait", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: d.url }) });
+                const rd = await rr.json().catch(() => ({}));
+                if (rr.ok && rd && typeof rd.ref === "string") valueByUrl.set(d.url, rd.ref);
+              } catch { /* keep the raw URL as the value */ }
+              finally { bump(-1); }
+            }
+            spinner.remove();
           } else { thumb.remove(); }
         } catch { thumb.remove(); }
         finally { bump(-1); }
