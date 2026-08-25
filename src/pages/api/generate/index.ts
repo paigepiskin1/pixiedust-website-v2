@@ -24,6 +24,37 @@ async function ensurePortraitGroup(apiKey: string, db: import("@cloudflare/worke
   }
 }
 
+// Per-model limits from the template meta ({ models: { <id>: { maxRefs, durations } } }).
+// Used to clamp duration + trim references to what the chosen model actually allows.
+function modelLimits(metaJson: string | null, model: string): { maxRefs?: number; durations?: number[] } {
+  if (!metaJson) return {};
+  try {
+    const cfg = (JSON.parse(metaJson) as { models?: Record<string, any> }).models?.[model];
+    if (!cfg) return {};
+    return {
+      maxRefs: typeof cfg.maxRefs === "number" ? cfg.maxRefs : undefined,
+      durations: Array.isArray(cfg.durations) ? cfg.durations.map(Number) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+// Run `fn` over items with bounded concurrency (keeps asset-registration bursts
+// under SyncNode's rate limit while still being faster than fully sequential).
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
@@ -57,7 +88,16 @@ export async function POST({ request, locals }: APIContext) {
   if (missing.length) return json({ error: `${missing[0].label} is required`, errors: missing.map((f) => `${f.label} is required`) }, 400);
 
   const qty = Math.max(1, Math.min(Number(body.quantity) || 1, 4));
-  const duration = Number(body.duration) || undefined;
+  // Resolve the chosen model (e.g. Seedance 2.0 vs 2.5) and clamp the requested
+  // duration to what that model supports, so an out-of-range value can't slip
+  // through (the client already restricts, this is the server-side safety net).
+  const model = resolveModel(template, inputs);
+  const limits = modelLimits(template.meta, model);
+  let duration = Number(body.duration) || undefined;
+  if (duration && limits.durations && limits.durations.length) {
+    const maxD = Math.max(...limits.durations);
+    if (duration > maxD) duration = maxD;
+  }
   const cost = computeCost(template, { quality: body.quality, quantity: qty, duration });
 
   // Limits
@@ -128,8 +168,6 @@ export async function POST({ request, locals }: APIContext) {
 
   // ─── Single step ───
   const { input } = resolveInput(template, inputs);
-  // Optional user-chosen model (e.g. a "Model" select offering Seedance 2.0 / 2.5).
-  const model = resolveModel(template, inputs);
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;
@@ -174,26 +212,24 @@ export async function POST({ request, locals }: APIContext) {
   // returned asset:// id. Images that aren't valid portraits (products, scenes)
   // fail registration and keep their raw URL, which Seedance accepts directly.
   if (template.provider === "byteplus" && Array.isArray(input.reference_images) && input.reference_images.length) {
+    // Trim to the chosen model's reference cap before registering anything.
+    if (limits.maxRefs && (input.reference_images as unknown[]).length > limits.maxRefs) {
+      input.reference_images = (input.reference_images as unknown[]).slice(0, limits.maxRefs);
+    }
     const groupId = await ensurePortraitGroup(env.SYNCNODE_API_KEY, db);
     if (groupId) {
-      // Register sequentially (not in parallel): SyncNode rate-limits the asset
-      // endpoint, so a burst of concurrent registrations for many references
-      // trips 429s. Sequential + the 429 backoff in byteplusAsset keeps it safe.
-      const registered: unknown[] = [];
-      for (const u of input.reference_images as unknown[]) {
-        if (typeof u !== "string" || !/^https?:\/\//i.test(u)) {
-          registered.push(u);
-          continue;
-        }
+      // Register with bounded concurrency (plus the 429 backoff in byteplusAsset)
+      // so many references don't trip SyncNode's rate limit or take too long.
+      input.reference_images = await mapLimit(input.reference_images as unknown[], 3, async (u) => {
+        if (typeof u !== "string" || !/^https?:\/\//i.test(u)) return u;
         try {
           const r = await registerPortraitAsset(env.SYNCNODE_API_KEY, groupId, u);
-          registered.push(r.active ? `asset://${r.assetId}` : u);
+          return r.active ? `asset://${r.assetId}` : u;
         } catch (err) {
           console.error("[generate] portrait register failed:", err);
-          registered.push(u);
+          return u;
         }
-      }
-      input.reference_images = registered;
+      });
     }
   }
 

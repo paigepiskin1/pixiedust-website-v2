@@ -29,11 +29,15 @@ let studioKicker = "";
 let hideSwitch = false;
 let qualityTiers: QualityTier[] = [];
 let defaultTierId = "";
+// Per-model limits (e.g. { <modelId>: { maxRefs, durations } }) so the studio can
+// adjust the reference cap + duration options when the user switches models.
+let modelConfigs: Record<string, { maxRefs?: number; durations?: number[] }> = {};
 try {
   const m = template.meta ? JSON.parse(template.meta) : null;
   if (m && Array.isArray(m.howItWorks)) howItWorks = m.howItWorks.filter((s: unknown) => typeof s === "string").slice(0, 6);
   if (m && typeof m.kicker === "string") studioKicker = m.kicker.trim();
   if (m && m.hideSwitch === true) hideSwitch = true;
+  if (m && m.models && typeof m.models === "object") modelConfigs = m.models;
   if (m && Array.isArray(m.qualityTiers)) {
     qualityTiers = m.qualityTiers
       .filter((t: any) => t && typeof t.id === "string" && typeof t.templateId === "string")
@@ -106,6 +110,7 @@ const config = {
   quality: template.quality,
   qualityTiers,
   defaultTier: defaultTierId || null,
+  models: modelConfigs,
   credits,
   signedIn,
 };
@@ -462,6 +467,43 @@ const config = {
         });
       });
     });
+
+    // ── Per-model limits ──
+    // When a "Model" picker exists (e.g. Seedance 2.0 vs 2.5), each model can allow
+    // different durations + a different reference cap. Reconfigure the controls when
+    // the model changes so users can't pick an out-of-range value.
+    function applyModelLimits(model: string) {
+      const mc = cfg.models && cfg.models[model];
+      if (!mc) return;
+      const durWrap = root.querySelector('[data-controls="duration"]');
+      if (durWrap && Array.isArray(mc.durations) && mc.durations.length) {
+        const allowed = mc.durations.map(Number);
+        let activeOk = false;
+        let firstVisible: HTMLElement | null = null;
+        durWrap.querySelectorAll<HTMLElement>(".pd-seg").forEach((btn) => {
+          const ok = allowed.includes(Number(btn.dataset.val));
+          btn.style.display = ok ? "" : "none";
+          if (ok && !firstVisible) firstVisible = btn;
+          if (btn.getAttribute("data-active") === "true") {
+            if (ok) activeOk = true;
+            else btn.setAttribute("data-active", "false");
+          }
+        });
+        if (!activeOk && firstVisible) (firstVisible as HTMLElement).setAttribute("data-active", "true");
+      }
+      const refWrap = root.querySelector<HTMLElement>('.pd-file-wrap[data-fieldkey="references"]');
+      if (refWrap && typeof (refWrap as any)._pdApplyMax === "function" && typeof mc.maxRefs === "number") {
+        (refWrap as any)._pdApplyMax(mc.maxRefs);
+      }
+      refreshButton();
+    }
+
+    const modelInput = root.querySelector<HTMLInputElement>('[data-field="model_version"]');
+    if (modelInput && cfg.models && Object.keys(cfg.models).length) {
+      modelInput.addEventListener("change", () => applyModelLimits(modelInput.value));
+      // Defer the initial pass so FieldPanel has wired the reference field first.
+      setTimeout(() => applyModelLimits(modelInput.value), 0);
+    }
 
     // File URLs populated by FieldPanel's shared upload logic (pdInitFieldPanel).
     // Wait for FieldPanel to auto-init (it runs on DOMContentLoaded via its own script).

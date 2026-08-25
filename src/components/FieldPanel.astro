@@ -36,7 +36,7 @@ function formatAccept(accept: string) {
           <div class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
-            {f.accept && <span style="font-size:10.5px;color:var(--pd-ink4);pointer-events:none;">{formatAccept(f.accept)} · {f.multiple ? `up to ${f.max ?? 4} files` : "1 file max"}</span>}
+            {f.accept && <span style="font-size:10.5px;color:var(--pd-ink4);pointer-events:none;">{formatAccept(f.accept)} · {f.multiple ? (<span class="pd-file-max">up to {f.max ?? 4} files</span>) : "1 file max"}</span>}
             <input data-field={f.key} type="file" accept={f.accept} multiple={f.multiple || undefined} class="absolute inset-0 cursor-pointer opacity-0" style="z-index:1;" />
           </div>
           {f.multiple ? (
@@ -317,7 +317,9 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     const key = el.dataset.field!;
     const wrap = el.closest(".pd-file-wrap") as HTMLElement|null;
     const isMulti = wrap?.dataset.multiple === "true";
-    const maxFiles = Number(wrap?.dataset.max ?? 4);
+    // `maxFiles` is mutable so callers can raise/lower the cap at runtime (e.g. the
+    // studio switching between models with different reference limits).
+    let maxFiles = Number(wrap?.dataset.max ?? 4);
     const zone = wrap?.querySelector<HTMLElement>(".pd-upload-zone");
 
     if (isMulti) {
@@ -398,6 +400,17 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         for (const u of arr.slice(0, maxFiles)) addExisting(String(u));
       } catch { /* ignore bad default */ }
 
+      // Let external code (e.g. the studio model switcher) change the cap at
+      // runtime: relabel, trim any now-excess uploads, and re-sync the dropzone.
+      (wrap as any)._pdApplyMax = (n: number) => {
+        maxFiles = Number(n) || maxFiles;
+        if (wrap) wrap.dataset.max = String(maxFiles);
+        const lbl = wrap?.querySelector<HTMLElement>(".pd-file-max");
+        if (lbl) lbl.textContent = `up to ${maxFiles} files`;
+        while (urls.length > maxFiles) { urls.pop(); thumbsEl?.lastElementChild?.remove(); }
+        syncZone();
+      };
+
       syncZone();
       return;
     }
@@ -464,7 +477,10 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     const segs = Array.from(group.querySelectorAll<HTMLElement>(".pd-opt-seg"));
     segs.forEach((seg) => {
       seg.addEventListener("click", () => {
-        if (hidden) hidden.value = seg.dataset.val ?? "";
+        if (hidden) {
+          hidden.value = seg.dataset.val ?? "";
+          hidden.dispatchEvent(new Event("change", { bubbles: true }));
+        }
         segs.forEach((s) => {
           const on = s === seg;
           s.dataset.active = on ? "true" : "false";
