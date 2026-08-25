@@ -88,8 +88,11 @@ export async function POST({ request, locals }: APIContext) {
       .bind(detail, cost, genId)
       .run();
     // Pass the provider message through so the studio can show a useful reason
-    // (e.g. BytePlus real-person blocks) instead of a generic network error.
-    return json({ error: detail + " — credits refunded." }, 502);
+    // (e.g. BytePlus real-person blocks / "activate this model"). Use 400, NOT a
+    // 5xx: Cloudflare's edge replaces gateway statuses (502/503/504) with its own
+    // "error code: 502" page, which strips our JSON body — so the real reason
+    // never reached the client and every dispatch failure looked like a bare 502.
+    return json({ error: detail + " — credits refunded." }, 400);
   };
 
   // ─── Multi-step chain ───
