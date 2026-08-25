@@ -373,12 +373,24 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
             if (registerPortrait) {
               spinner.textContent = "⋯";
               bump(1);
+              let portrait = false;
               try {
                 const rr = await fetch("/api/byteplus/portrait", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: d.url }) });
                 const rd = await rr.json().catch(() => ({}));
                 if (rr.ok && rd && typeof rd.ref === "string") valueByUrl.set(d.url, rd.ref);
+                portrait = !!(rr.ok && rd && rd.active === true);
               } catch { /* keep the raw URL as the value */ }
               finally { bump(-1); }
+              // Mark references that couldn't be saved as a portrait. Fine for
+              // objects/scenes (used as-is), but if it's a real person BytePlus
+              // will block it — so the user can see which photo to swap.
+              if (!portrait) {
+                const badge = document.createElement("div");
+                badge.textContent = "!";
+                badge.title = "Not saved as a portrait — it'll be used as-is. If this is a real person, use a clear, front-facing solo photo (group shots, side angles, or full-body get blocked).";
+                badge.style.cssText = "position:absolute;bottom:3px;left:3px;width:15px;height:15px;border-radius:50%;background:var(--pd-amber);color:#0a0a0b;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:help;z-index:2;";
+                thumb.appendChild(badge);
+              }
             }
             spinner.remove();
           } else { thumb.remove(); }

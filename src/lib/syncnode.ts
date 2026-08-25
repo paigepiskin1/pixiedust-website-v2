@@ -106,7 +106,7 @@ export async function registerPortraitAsset(
   if (!assetId) throw new Error("CreateAsset returned no Id");
 
   const pollMs = opts.pollMs ?? 2500;
-  const deadline = Date.now() + (opts.timeoutMs ?? 30000);
+  const deadline = Date.now() + (opts.timeoutMs ?? 45000);
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, pollMs));
     const got = await byteplusAsset(apiKey, "GetAsset", { Id: assetId, ProjectName: "default" });
