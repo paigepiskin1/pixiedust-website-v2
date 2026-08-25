@@ -535,6 +535,9 @@ const config = {
       // like Tumblr Aesthetic never get the Seedance video copy.
       if (/e005|flagged as sensitive|safety|moderation|content policy|nsfw|sensitive/i.test(e))
         return "The model's safety filter blocked this — it often triggers on real faces or sensitive content. You weren't charged; try a different photo or prompt.";
+      // A registered portrait reference is missing (e.g. cleared/stale) — ask to re-upload.
+      if (/asset\s.*\bis not found\b|specified asset\s.*not found/i.test(e))
+        return "One of your reference photos is no longer available — remove and re-upload it, then try again. You weren't charged.";
       // BytePlus Seedance: "input image may contain real person" — only that phrasing.
       if (/contain real person/i.test(e))
         return "One of your reference photos couldn't be saved as a portrait (look for the amber ! on a thumbnail), so BytePlus blocked it. For a real person, use a clear, front-facing solo headshot — group shots, side angles, or full-body photos get rejected. You weren't charged.";

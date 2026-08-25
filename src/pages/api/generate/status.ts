@@ -2,26 +2,14 @@ export const prerender = false;
 import type { APIContext } from "astro";
 import { getUserByUid } from "../../../lib/users";
 import { adjustBalance } from "../../../lib/credits";
-import { pollStatus, submitGeneration, deletePortraitAsset } from "../../../lib/syncnode";
+import { pollStatus, submitGeneration } from "../../../lib/syncnode";
 import { resolveChainStep } from "../../../lib/templates";
 
-// After a BytePlus generation settles, delete any Portrait Library assets it used
-// (the `asset://<id>` reference_images) so real-person faces aren't retained.
-function cleanupPortraitAssets(apiKey: string, inputJson: string | null): Promise<void> {
-  if (!inputJson) return Promise.resolve();
-  let ids: string[] = [];
-  try {
-    const refs = (JSON.parse(inputJson) as { reference_images?: unknown }).reference_images;
-    if (Array.isArray(refs)) {
-      ids = refs
-        .filter((u): u is string => typeof u === "string" && u.startsWith("asset://"))
-        .map((u) => u.slice("asset://".length));
-    }
-  } catch {
-    /* not JSON — nothing to clean */
-  }
-  return Promise.all(ids.map((id) => deletePortraitAsset(apiKey, id))).then(() => undefined);
-}
+// NOTE: we intentionally do NOT delete Portrait Library assets after a generation.
+// The same uploaded reference (one `asset://` id) is reused across parallel jobs
+// (quantity > 1) and re-generations in a session, so deleting on the first
+// completion made later jobs fail with "asset not found". Assets are left in place;
+// retention is handled out-of-band (manual purge / future periodic sweep).
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -136,20 +124,11 @@ export async function GET({ url, locals }: APIContext) {
 
   const poll = await pollStatus(env.SYNCNODE_API_KEY, gen.provider, gen.provider_job_id);
 
-  // Fire-and-forget Portrait Library cleanup once the job settles.
-  const runCleanup = () => {
-    const p = cleanupPortraitAssets(env.SYNCNODE_API_KEY, gen.input_json);
-    const ctx = locals.runtime?.ctx;
-    if (ctx?.waitUntil) ctx.waitUntil(p);
-    else p.catch(() => {});
-  };
-
   if (poll.status === "completed") {
     await db
       .prepare("UPDATE generations SET status = 'completed', output_url = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(poll.outputs[0] ?? null, id)
       .run();
-    runCleanup();
     return json({ id, status: "completed", outputs: poll.outputs });
   }
 
@@ -166,7 +145,6 @@ export async function GET({ url, locals }: APIContext) {
       .prepare("UPDATE generations SET status = 'failed', error = ?, credits_refunded = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(poll.error ?? "Generation failed", gen.credits_charged, id)
       .run();
-    runCleanup();
     return json({ id, status: "failed", error: poll.error, refunded: true });
   }
 
