@@ -48,12 +48,23 @@ export function shapeByteplusInput(input: Record<string, unknown>): Record<strin
 // that id (instead of the raw URL) as a reference_image. SyncNode proxies the
 // AK/SK-signed library APIs; the account needs "Advanced Creation Rights".
 
-async function byteplusAsset(apiKey: string, action: string, params: Record<string, unknown>): Promise<Record<string, any>> {
+async function byteplusAsset(
+  apiKey: string,
+  action: string,
+  params: Record<string, unknown>,
+  attempt = 0
+): Promise<Record<string, any>> {
   const res = await fetch(`${BASE}/byteplus/asset`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey, action, params }),
   });
+  // SyncNode rate-limits the asset endpoint; back off and retry on 429/5xx so a
+  // multi-reference generation doesn't fail just from call bursts.
+  if ((res.status === 429 || res.status >= 500) && attempt < 4) {
+    await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt)); // 1.5s, 3s, 6s, 12s
+    return byteplusAsset(apiKey, action, params, attempt + 1);
+  }
   const data = (await res.json().catch(() => ({}))) as Record<string, any>;
   if (!res.ok) {
     const detail =

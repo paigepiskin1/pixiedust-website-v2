@@ -174,18 +174,24 @@ export async function POST({ request, locals }: APIContext) {
   if (template.provider === "byteplus" && Array.isArray(input.reference_images) && input.reference_images.length) {
     const groupId = await ensurePortraitGroup(env.SYNCNODE_API_KEY, db);
     if (groupId) {
-      input.reference_images = await Promise.all(
-        (input.reference_images as unknown[]).map(async (u) => {
-          if (typeof u !== "string" || !/^https?:\/\//i.test(u)) return u;
-          try {
-            const r = await registerPortraitAsset(env.SYNCNODE_API_KEY, groupId, u);
-            return r.active ? `asset://${r.assetId}` : u;
-          } catch (err) {
-            console.error("[generate] portrait register failed:", err);
-            return u;
-          }
-        })
-      );
+      // Register sequentially (not in parallel): SyncNode rate-limits the asset
+      // endpoint, so a burst of concurrent registrations for many references
+      // trips 429s. Sequential + the 429 backoff in byteplusAsset keeps it safe.
+      const registered: unknown[] = [];
+      for (const u of input.reference_images as unknown[]) {
+        if (typeof u !== "string" || !/^https?:\/\//i.test(u)) {
+          registered.push(u);
+          continue;
+        }
+        try {
+          const r = await registerPortraitAsset(env.SYNCNODE_API_KEY, groupId, u);
+          registered.push(r.active ? `asset://${r.assetId}` : u);
+        } catch (err) {
+          console.error("[generate] portrait register failed:", err);
+          registered.push(u);
+        }
+      }
+      input.reference_images = registered;
     }
   }
 
