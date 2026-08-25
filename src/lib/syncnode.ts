@@ -63,8 +63,8 @@ async function byteplusAsset(
   // references in a row trips 429s. Back off and retry persistently (capped) so a
   // real portrait still registers under burst pressure instead of falling back to
   // a raw URL (which BytePlus then blocks as a real person).
-  if ((res.status === 429 || res.status >= 500) && attempt < 6) {
-    await new Promise((r) => setTimeout(r, Math.min(1500 * 2 ** attempt, 12000))); // 1.5,3,6,12,12,12s
+  if ((res.status === 429 || res.status >= 500) && attempt < 5) {
+    await new Promise((r) => setTimeout(r, Math.min(1500 * 2 ** attempt, 10000))); // 1.5,3,6,10,10s
     return byteplusAsset(apiKey, action, params, attempt + 1);
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, any>;
@@ -107,14 +107,30 @@ export async function registerPortraitAsset(
   const assetId = created?.Result?.Id;
   if (!assetId) throw new Error("CreateAsset returned no Id");
 
-  const pollMs = opts.pollMs ?? 2500;
-  const deadline = Date.now() + (opts.timeoutMs ?? 45000);
+  // Poll for readiness with a lightweight direct fetch (NOT byteplusAsset, which
+  // backs off hard on 429 and would eat the whole budget). A rate-limited status
+  // check just skips this tick and we try again — so a burst of registrations
+  // still converges instead of aborting to active:false.
+  const pollMs = opts.pollMs ?? 3000;
+  const deadline = Date.now() + (opts.timeoutMs ?? 60000);
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, pollMs));
-    const got = await byteplusAsset(apiKey, "GetAsset", { Id: assetId, ProjectName: "default" });
-    const status = got?.Result?.Status;
-    if (status === "Active") return { assetId: String(assetId), active: true };
-    if (status === "Failed") return { assetId: String(assetId), active: false };
+    try {
+      const res = await fetch(`${BASE}/byteplus/asset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey, action: "GetAsset", params: { Id: assetId, ProjectName: "default" } }),
+      });
+      if (res.ok) {
+        const got = (await res.json().catch(() => ({}))) as Record<string, any>;
+        const status = got?.Result?.Status;
+        if (status === "Active") return { assetId: String(assetId), active: true };
+        if (status === "Failed") return { assetId: String(assetId), active: false };
+      }
+      // non-ok (e.g. 429) → just poll again next tick
+    } catch {
+      /* transient network error — keep polling */
+    }
   }
   return { assetId: String(assetId), active: false };
 }
