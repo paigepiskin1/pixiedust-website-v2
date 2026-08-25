@@ -59,10 +59,12 @@ async function byteplusAsset(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey, action, params }),
   });
-  // SyncNode rate-limits the asset endpoint; back off and retry on 429/5xx so a
-  // multi-reference generation doesn't fail just from call bursts.
-  if ((res.status === 429 || res.status >= 500) && attempt < 4) {
-    await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt)); // 1.5s, 3s, 6s, 12s
+  // SyncNode aggressively rate-limits the asset endpoint, so registering several
+  // references in a row trips 429s. Back off and retry persistently (capped) so a
+  // real portrait still registers under burst pressure instead of falling back to
+  // a raw URL (which BytePlus then blocks as a real person).
+  if ((res.status === 429 || res.status >= 500) && attempt < 6) {
+    await new Promise((r) => setTimeout(r, Math.min(1500 * 2 ** attempt, 12000))); // 1.5,3,6,12,12,12s
     return byteplusAsset(apiKey, action, params, attempt + 1);
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, any>;
