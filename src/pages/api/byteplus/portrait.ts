@@ -50,9 +50,9 @@ export async function POST({ request, locals }: APIContext) {
 
   try {
     const r = await registerPortraitAsset(env.SYNCNODE_API_KEY, groupId, url);
-    return json({ ref: r.active ? `asset://${r.assetId}` : url, active: r.active });
+    return json({ ref: r.active ? `asset://${r.assetId}` : url, active: r.active, reason: r.reason });
   } catch (err) {
     console.error("[portrait] register failed:", err);
-    return json({ ref: url, active: false });
+    return json({ ref: url, active: false, reason: "error" });
   }
 }

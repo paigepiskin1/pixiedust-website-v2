@@ -543,7 +543,7 @@ const config = {
         return "One of your reference photos is no longer available — remove and re-upload it, then try again. You weren't charged.";
       // BytePlus Seedance: "input image may contain real person" — only that phrasing.
       if (/contain real person/i.test(e))
-        return "One of your reference photos couldn't be saved as a portrait (look for the amber ! on a thumbnail), so BytePlus blocked it. For a real person, use a clear, front-facing solo headshot — group shots, side angles, or full-body photos get rejected. You weren't charged.";
+        return "One of your reference photos of a real person couldn't be registered to the portrait library (look for the amber ! on a thumbnail), so BytePlus blocked the raw photo. This is usually temporary — remove and re-upload that photo, then try again. You weren't charged.";
       if (/rate limit|slow down/i.test(e)) return "Too many requests right now. You weren't charged — try again in a minute.";
       if (/timeout|timed out/i.test(e)) return "This took too long and timed out. You weren't charged — try again.";
       if (/not enough credits/i.test(e)) return "Not enough credits.";
