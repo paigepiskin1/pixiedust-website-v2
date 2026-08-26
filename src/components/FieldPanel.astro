@@ -338,6 +338,34 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         fileUrls[key] = urls.length > 0 ? urls.map((u) => valueByUrl.get(u) ?? u) : [];
       }
 
+      // Register one hosted CDN url to the Portrait Library, storing the returned
+      // asset:// id as the field value and badging the thumb if it couldn't be
+      // saved. Shared by fresh uploads and by "reuse" (which re-registers so a
+      // stale asset id from a past generation is never submitted).
+      async function registerPortraitFor(url: string, thumb: HTMLElement) {
+        bump(1);
+        let portrait = false;
+        let reason = "";
+        try {
+          const rr = await fetch("/api/byteplus/portrait", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+          const rd = await rr.json().catch(() => ({}));
+          if (rr.ok && rd && typeof rd.ref === "string") valueByUrl.set(url, rd.ref);
+          portrait = !!(rr.ok && rd && rd.active === true);
+          reason = rd && typeof rd.reason === "string" ? rd.reason : "";
+        } catch { /* keep the raw URL as the value */ }
+        finally { bump(-1); }
+        if (!portrait) {
+          const busy = reason === "pool_full" || reason === "timeout" || reason === "error";
+          const badge = document.createElement("div");
+          badge.textContent = "!";
+          badge.title = busy
+            ? "Couldn't save this as a portrait right now — the portrait service was busy. Remove and re-upload it in a moment to try again."
+            : "Couldn't be saved as a portrait, so it'll be used as-is. That's fine for objects/scenes; if it's a real person, generation may block it — try re-uploading, or use a clearer, front-facing photo.";
+          badge.style.cssText = "position:absolute;bottom:3px;left:3px;width:15px;height:15px;border-radius:50%;background:var(--pd-amber);color:#0a0a0b;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:help;z-index:2;";
+          thumb.appendChild(badge);
+        }
+      }
+
       async function addFile(file: File) {
         if (urls.length >= maxFiles) return;
         const thumb = document.createElement("div");
@@ -370,34 +398,11 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
             // Register real people to the Portrait Library now (spread out per
             // upload) so generation can use them and stays fast. bump() keeps the
             // Generate button waiting until this finishes.
+            // Register real people to the Portrait Library now (spread out per
+            // upload) so generation can use them and stays fast.
             if (registerPortrait) {
               spinner.textContent = "⋯";
-              bump(1);
-              let portrait = false;
-              let reason = "";
-              try {
-                const rr = await fetch("/api/byteplus/portrait", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: d.url }) });
-                const rd = await rr.json().catch(() => ({}));
-                if (rr.ok && rd && typeof rd.ref === "string") valueByUrl.set(d.url, rd.ref);
-                portrait = !!(rr.ok && rd && rd.active === true);
-                reason = rd && typeof rd.reason === "string" ? rd.reason : "";
-              } catch { /* keep the raw URL as the value */ }
-              finally { bump(-1); }
-              // Mark references that couldn't be saved as a portrait. Fine for
-              // objects/scenes (used as-is), but if it's a real person BytePlus
-              // will block it — so the user can see which photo to swap. The
-              // message depends on WHY it failed: a full/busy portrait pool is
-              // temporary (retry), whereas "rejected" means the photo itself.
-              if (!portrait) {
-                const busy = reason === "pool_full" || reason === "timeout" || reason === "error";
-                const badge = document.createElement("div");
-                badge.textContent = "!";
-                badge.title = busy
-                  ? "Couldn't save this as a portrait right now — the portrait service was busy. Remove and re-upload it in a moment to try again."
-                  : "Couldn't be saved as a portrait, so it'll be used as-is. That's fine for objects/scenes; if it's a real person, generation may block it — try re-uploading, or use a clearer, front-facing photo.";
-                badge.style.cssText = "position:absolute;bottom:3px;left:3px;width:15px;height:15px;border-radius:50%;background:var(--pd-amber);color:#0a0a0b;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:help;z-index:2;";
-                thumb.appendChild(badge);
-              }
+              await registerPortraitFor(d.url, thumb);
             }
             spinner.remove();
           } else { thumb.remove(); }
@@ -472,6 +477,45 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           thumbsEl?.appendChild(thumb);
           urls.push(disp);
           if (it.value && it.value !== disp) valueByUrl.set(disp, it.value);
+        }
+        syncZone();
+      };
+
+      // Load a set of hosted CDN urls as references and (for portrait fields)
+      // re-register each so a fresh asset:// id is used — this powers "Reuse"
+      // from the gallery, where the original asset id may have expired. Keeps the
+      // Generate button waiting (via bump) until every registration settles.
+      (wrap as any)._pdLoadReferences = async (list: string[]) => {
+        urls = [];
+        valueByUrl.clear();
+        if (thumbsEl) thumbsEl.innerHTML = "";
+        syncZone();
+        for (const raw of Array.isArray(list) ? list : []) {
+          if (urls.length >= maxFiles) break;
+          const url = String(raw || "");
+          if (!/^https?:\/\//i.test(url)) continue; // skip asset:// / non-displayable
+          const thumb = document.createElement("div");
+          thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
+          const img = document.createElement("img");
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          img.src = url;
+          const x = document.createElement("button");
+          x.type = "button"; x.textContent = "✕";
+          x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
+          x.addEventListener("click", () => { urls = urls.filter((u) => u !== url); valueByUrl.delete(url); thumb.remove(); syncZone(); });
+          thumb.appendChild(img); thumb.appendChild(x);
+          thumbsEl?.appendChild(thumb);
+          urls.push(url);
+          syncZone();
+          if (registerPortrait) {
+            const spinner = document.createElement("div");
+            spinner.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);font-size:9px;color:#fff;";
+            spinner.textContent = "⋯";
+            thumb.appendChild(spinner);
+            await registerPortraitFor(url, thumb);
+            spinner.remove();
+          }
+          syncZone();
         }
         syncZone();
       };

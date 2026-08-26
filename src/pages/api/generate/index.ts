@@ -26,6 +26,32 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
 
+// Sanitize the client's reuse snapshot before persisting it (used by the gallery
+// to reload a creation into the studio). Keeps only durable https reference URLs
+// and bounds every field so a crafted payload can't bloat the row.
+function buildReuseJson(reuse: unknown, maxRefs?: number): string | null {
+  if (!reuse || typeof reuse !== "object") return null;
+  const r = reuse as Record<string, unknown>;
+  const refsRaw = Array.isArray(r.references) ? r.references : [];
+  const references = refsRaw
+    .filter((u): u is string => typeof u === "string" && /^https?:\/\//i.test(u) && u.length < 1024)
+    .slice(0, maxRefs && maxRefs > 0 ? maxRefs : 40);
+  const clip = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : null);
+  const payload = {
+    prompt: clip(r.prompt, 4000) ?? "",
+    references,
+    model: clip(r.model, 128),
+    aspect: clip(r.aspect, 32),
+    duration: r.duration == null ? null : String(r.duration).slice(0, 16),
+    quality: clip(r.quality, 32),
+  };
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return null;
+  }
+}
+
 export async function POST({ request, locals }: APIContext) {
   const user = locals.user;
   if (!user) return json({ error: "Sign in to generate." }, 401);
@@ -36,7 +62,7 @@ export async function POST({ request, locals }: APIContext) {
   if (!dbUser) return json({ error: "Account not found." }, 401);
   const userId = dbUser.id;
 
-  let body: { templateId?: string; inputs?: Record<string, unknown>; quality?: string; quantity?: number; aspect?: string; duration?: number };
+  let body: { templateId?: string; inputs?: Record<string, unknown>; quality?: string; quantity?: number; aspect?: string; duration?: number; reuse?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -193,12 +219,13 @@ export async function POST({ request, locals }: APIContext) {
     input.reference_images = (input.reference_images as unknown[]).slice(0, limits.maxRefs);
   }
 
+  const reuseJson = buildReuseJson(body.reuse, limits.maxRefs);
   await db
     .prepare(
-      `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+      `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, reuse_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
     )
-      .bind(genId, userId, template.id, template.kind, template.type, template.provider, model, JSON.stringify(input), cost, body.quality ?? null, qty)
+      .bind(genId, userId, template.id, template.kind, template.type, template.provider, model, JSON.stringify(input), cost, body.quality ?? null, qty, reuseJson)
       .run();
 
   try {

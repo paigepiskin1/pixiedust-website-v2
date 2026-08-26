@@ -766,7 +766,7 @@ const config = {
 
     // One independent job per output (each charged the unit cost), so any
     // template can produce several in parallel.
-    async function launchJob(inputs: Record<string, unknown>, per: number, state?: any) {
+    async function launchJob(inputs: Record<string, unknown>, per: number, state?: any, reuse?: any) {
       const tile = createTile();
       (tile as any)._pdState = state;
       activeJobs++;
@@ -783,6 +783,7 @@ const config = {
             quantity: 1,
             aspect: controlValue("aspect") || undefined,
             duration: duration() || undefined,
+            reuse,
           }),
         });
         let data: any = {};
@@ -965,6 +966,50 @@ const config = {
       (window as any).pdToast?.("Loaded — edit or hit Generate", { accent: "var(--pd-mint)" });
     }
 
+    // Reload a creation from the gallery: restore prompt, model, aspect/duration/
+    // quality and the reference images (re-registering portraits so a stale
+    // asset:// id from the original generation is never reused).
+    async function applyGalleryReuse(p: any) {
+      if (!p) return;
+      const promptEl =
+        fieldPanel.querySelector<HTMLTextAreaElement | HTMLInputElement>('[data-field="prompt"]') ||
+        fieldPanel.querySelector<HTMLTextAreaElement>("textarea[data-field]");
+      if (promptEl && typeof p.prompt === "string") {
+        promptEl.value = p.prompt;
+        promptEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      const modelEl = fieldPanel.querySelector<HTMLInputElement>('[data-field="model_version"]');
+      if (modelEl && p.model) {
+        modelEl.value = String(p.model);
+        if (modelEl.type === "hidden") syncSelectHidden(modelEl);
+        modelEl.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      setControl("aspect", p.aspect != null ? String(p.aspect) : null);
+      setControl("duration", p.duration != null ? String(p.duration) : null);
+      setControl("quality", p.quality != null ? String(p.quality) : null);
+      refreshButton();
+      fieldPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      const refWrap = fieldPanel.querySelector<HTMLElement>(".pd-file-wrap[data-fieldkey]");
+      const loader = refWrap && (refWrap as any)._pdLoadReferences;
+      if (typeof loader === "function" && Array.isArray(p.references) && p.references.length) {
+        (window as any).pdToast?.("Loading your creation…", { accent: "var(--pd-mint)" });
+        try { await loader(p.references); } catch { /* keep whatever loaded */ }
+      }
+      refreshButton();
+      (window as any).pdToast?.("Loaded — edit or hit Generate", { accent: "var(--pd-mint)" });
+    }
+
+    // On load, apply a gallery "Reuse" payload handed off via sessionStorage.
+    (function initGalleryReuse() {
+      let raw: string | null = null;
+      try { raw = sessionStorage.getItem("pd-reuse"); } catch { return; }
+      if (!raw) return;
+      let parsed: any = null;
+      try { parsed = JSON.parse(raw); } catch { parsed = null; }
+      try { sessionStorage.removeItem("pd-reuse"); } catch { /* ignore */ }
+      if (parsed && parsed.templateId === cfg.id) setTimeout(() => applyGalleryReuse(parsed), 80);
+    })();
+
     function copyPrompt(state: any) {
       const p = String(state?.promptText ?? state?.inputs?.prompt ?? "");
       const done = () => (window as any).pdToast?.("Prompt copied", { accent: "var(--pd-mint)" });
@@ -1000,7 +1045,25 @@ const config = {
       const per = unitCost();
       const inputs = collectInputs(); // snapshot once for all parallel jobs
       const state = captureState(inputs); // for the "Reuse"/"Copy prompt" actions
-      for (let i = 0; i < n; i++) launchJob(inputs, per, state);
+      const reuse = buildReusePayload(inputs, state); // persisted so the gallery can reload it later
+      for (let i = 0; i < n; i++) launchJob(inputs, per, state, reuse);
+    }
+
+    // Compact, durable snapshot stored with the generation so "Reuse" from the
+    // gallery can reload it: the reference CDN (display) URLs — not the volatile
+    // asset:// ids — plus prompt, model and the aspect/duration/quality controls.
+    function buildReusePayload(inputs: Record<string, unknown>, state: any) {
+      const dispKeys = Object.keys(state?.displays || {});
+      const references = dispKeys.length ? (state.displays[dispKeys[0]] || []) : [];
+      const modelEl = root.querySelector<HTMLInputElement>('[data-field="model_version"]');
+      return {
+        prompt: state?.promptText || (typeof inputs.prompt === "string" ? inputs.prompt : ""),
+        references,
+        model: modelEl ? modelEl.value : null,
+        aspect: state?.aspect ?? null,
+        duration: state?.duration ?? null,
+        quality: state?.quality ?? null,
+      };
     }
 
     genBtn.addEventListener("click", generate);
