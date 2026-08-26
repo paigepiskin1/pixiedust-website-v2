@@ -334,30 +334,69 @@ const config = {
       (tile.firstElementChild as HTMLElement).textContent = msg;
     }
     function tileResult(tile: HTMLElement, outputs: string[], genId?: string) {
-      tile.innerHTML = "";
       const url = outputs[0];
       if (!url) { tileFail(tile, "No output."); return; }
+      const snap = genId ? jobSnapshots.get(genId) : null;
+      const inputs = (snap?.inputs || {}) as Record<string, unknown>;
+      const prompt = typeof inputs.prompt === "string" ? inputs.prompt : "";
+      const refs: string[] = [];
+      const addRef = (u: unknown) => { if (typeof u === "string" && /^https?:\/\//.test(u) && !refs.includes(u)) refs.push(u); };
+      addRef(inputs.person);
+      if (Array.isArray(inputs.images)) inputs.images.forEach(addRef);
+
+      tile.innerHTML = "";
+      tile.style.cssText = "position:relative;border-radius:14px;overflow:hidden;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);display:flex;flex-direction:column;aspect-ratio:auto;";
+
+      const mediaBox = document.createElement("div");
+      mediaBox.style.cssText = "position:relative;width:100%;aspect-ratio:1/1.1;overflow:hidden;background:var(--pd-bg);flex:none;";
       const img = document.createElement("img");
       img.src = url;
       img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;";
       img.addEventListener("click", () => openLb(url, genId));
-      tile.appendChild(img);
-      const snap = genId ? jobSnapshots.get(genId) : null;
-      if (snap) {
-        const reuseBtn = document.createElement("button");
-        reuseBtn.type = "button";
-        reuseBtn.title = "Reuse photo & prompt";
-        reuseBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2.5H8v5.5M8.5 2.5 5 6M5 8.5H2.5V3"/></svg>`;
-        reuseBtn.style.cssText = "position:absolute;top:7px;left:7px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
-        reuseBtn.addEventListener("click", (e) => { e.stopPropagation(); applyStudioInputs(snap.inputs); });
-        tile.appendChild(reuseBtn);
-      }
+      mediaBox.appendChild(img);
       const dl = document.createElement("a");
       dl.href = genId ? `/api/download?id=${encodeURIComponent(genId)}` : url;
       if (!genId) dl.setAttribute("download", "");
       dl.textContent = "↓"; dl.title = "Download";
       dl.style.cssText = "position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center;";
-      tile.appendChild(dl);
+      mediaBox.appendChild(dl);
+      tile.appendChild(mediaBox);
+
+      const details = document.createElement("div");
+      details.style.cssText = "padding:10px 11px 11px;display:flex;flex-direction:column;gap:8px;background:var(--pd-bg2);border-top:0.5px solid var(--pd-hairline);";
+      if (refs.length) {
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;align-items:center;gap:6px;overflow-x:auto;";
+        const label = document.createElement("span");
+        label.style.cssText = "font-family:ui-monospace,monospace;font-size:9px;color:var(--pd-ink4);letter-spacing:0.5px;text-transform:uppercase;flex:none;";
+        label.textContent = "Refs";
+        row.appendChild(label);
+        refs.slice(0, 4).forEach((u) => {
+          const thumb = document.createElement("img");
+          thumb.src = u; thumb.alt = ""; thumb.loading = "lazy";
+          thumb.style.cssText = "width:28px;height:28px;border-radius:6px;object-fit:cover;border:0.5px solid var(--pd-hairline);flex:none;cursor:zoom-in;";
+          thumb.addEventListener("click", (e) => { e.stopPropagation(); window.open(u, "_blank"); });
+          row.appendChild(thumb);
+        });
+        details.appendChild(row);
+      }
+      if (prompt) {
+        const p = document.createElement("div");
+        p.textContent = prompt; p.title = prompt;
+        p.style.cssText = "font-size:11.5px;line-height:1.4;color:var(--pd-ink2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;";
+        details.appendChild(p);
+      }
+      const reuseBtn = document.createElement("button");
+      reuseBtn.type = "button";
+      reuseBtn.textContent = "Reuse inputs";
+      reuseBtn.style.cssText = "width:100%;padding:8px 10px;border-radius:9px;background:var(--pd-lilac);color:#0A0A0B;font-size:12px;font-weight:700;border:none;cursor:pointer;";
+      reuseBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (snap) applyStudioInputs(snap.inputs);
+        else if (genId) (window as any).pdLoadReuseInputs?.(genId, { onLoaded: (d: any) => applyStudioInputs(d.inputs ?? {}) });
+      });
+      details.appendChild(reuseBtn);
+      tile.appendChild(details);
     }
 
     // Detail lightbox with prompt / references / reuse
