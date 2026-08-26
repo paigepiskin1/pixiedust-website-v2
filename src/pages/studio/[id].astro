@@ -388,6 +388,9 @@ const config = {
     // How many jobs are currently in flight (submitted + still polling). Drives
     // the "you already have N running — queue more?" confirm before re-charging.
     let activeJobs = 0;
+    // Reference display URLs whose portrait asset was freed after a completed
+    // generation; re-registered on the next Generate so we never submit a dead id.
+    const spentRefs = new Set<string>();
     const qualityTiers: any[] = Array.isArray(cfg.qualityTiers) ? cfg.qualityTiers : [];
     let activeTier: any = qualityTiers.find((t: any) => t.id === cfg.defaultTier) || qualityTiers[0] || null;
 
@@ -753,6 +756,10 @@ const config = {
         else tileStage(tile, stages[Math.min(tick, stages.length - 1)] + "…", Math.min(12 + tick * 14, 92));
         if (data.status === "completed") {
           tileResult(tile, data.outputs || [], id);
+          // The server frees this job's portrait assets on completion, so mark
+          // its references "spent" — a later Generate re-registers them fresh.
+          const st = (tile as any)._pdState;
+          if (st && st.displays) for (const k in st.displays) for (const u of st.displays[k]) spentRefs.add(u);
           return;
         }
         if (data.status === "failed") {
@@ -948,15 +955,20 @@ const config = {
         if ((el as HTMLInputElement).type === "hidden") { syncSelectHidden(el as HTMLInputElement); el.dispatchEvent(new Event("change", { bubbles: true })); }
         else el.dispatchEvent(new Event("input", { bubbles: true }));
       });
-      // File fields (references) — restore thumbnails + values.
+      // File fields (references) — reload from the display (CDN) URLs and
+      // re-register (the original asset:// may have been freed after that job
+      // completed). Falls back to setting values directly if no display URLs.
       fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]").forEach((w) => {
         const key = w.dataset.fieldkey!;
-        const setter = (w as any)._pdSetReferences;
-        if (typeof setter !== "function") return;
         const raw = inputs[key];
         const values: string[] = Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : [];
-        const disp: string[] = (state.displays && state.displays[key]) || values;
-        setter(disp.map((d: string, i: number) => ({ display: d, value: values[i] ?? d })));
+        const disp: string[] = (state.displays && state.displays[key]) || [];
+        const loader = (w as any)._pdLoadReferences;
+        const setter = (w as any)._pdSetReferences;
+        if (typeof loader === "function" && disp.length) loader(disp);
+        else if (typeof setter === "function") setter(values.map((v: string) => ({ display: v, value: v })));
+        // These references are freshly (re)registered — clear any spent marks.
+        for (const d of disp) spentRefs.delete(d);
       });
       setControl("aspect", state.aspect);
       setControl("duration", state.duration);
@@ -1041,12 +1053,27 @@ const config = {
         if (!ok) return;
       }
       errEl.classList.add("hidden");
+      // Re-register any references consumed by a previous generation (their assets
+      // were freed on completion) so this batch submits live asset:// ids.
+      await refreshSpentReferences();
       const n = quantity();
       const per = unitCost();
       const inputs = collectInputs(); // snapshot once for all parallel jobs
       const state = captureState(inputs); // for the "Reuse"/"Copy prompt" actions
       const reuse = buildReusePayload(inputs, state); // persisted so the gallery can reload it later
       for (let i = 0; i < n; i++) launchJob(inputs, per, state, reuse);
+    }
+
+    // Re-register the references whose portrait asset a finished generation freed,
+    // so a subsequent Generate uses a fresh, live asset:// instead of a deleted id.
+    async function refreshSpentReferences() {
+      if (!spentRefs.size) return;
+      const arr = Array.from(spentRefs);
+      for (const w of Array.from(fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]"))) {
+        const fn = (w as any)._pdReregister;
+        if (typeof fn === "function") await fn(arr);
+      }
+      spentRefs.clear();
     }
 
     // Compact, durable snapshot stored with the generation so "Reuse" from the

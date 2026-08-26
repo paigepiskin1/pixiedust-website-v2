@@ -523,6 +523,28 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         syncZone();
       };
 
+      // Re-register references whose portrait asset was consumed by a finished
+      // generation (the server deletes those on completion). Called before a
+      // subsequent Generate so a fresh, live asset:// is submitted instead of a
+      // deleted one. Only touches the given display URLs.
+      (wrap as any)._pdReregister = async (displays: string[]) => {
+        if (!registerPortrait || !thumbsEl) return;
+        const set = new Set(Array.isArray(displays) ? displays : []);
+        for (const thumb of Array.from(thumbsEl.children) as HTMLElement[]) {
+          const img = thumb.querySelector("img");
+          const url = img?.src;
+          if (!url || !set.has(url)) continue;
+          thumb.querySelectorAll("div").forEach((d) => { if (d.textContent === "!") d.remove(); });
+          const spinner = document.createElement("div");
+          spinner.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);font-size:9px;color:#fff;";
+          spinner.textContent = "⋯";
+          thumb.appendChild(spinner);
+          await registerPortraitFor(url, thumb);
+          spinner.remove();
+          syncZone();
+        }
+      };
+
       syncZone();
       return;
     }
