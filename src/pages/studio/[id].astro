@@ -362,6 +362,9 @@ const config = {
     .pd-sw-card { transition: transform 0.12s, border-color 0.12s; }
     .pd-sw-card:hover { transform: translateY(-2px); border-color: var(--pd-hairline3); }
     .pd-sw-card[data-current="true"] { outline: 2px solid var(--pd-lilac); outline-offset: -1px; }
+    @media (max-width: 800px) {
+      #pd-lb-card { grid-template-columns: 1fr !important; max-height: calc(100vh - 32px) !important; }
+    }
   </style>
 
   <script>
@@ -461,6 +464,19 @@ const config = {
     const fieldPanel = document.getElementById("pd-field-panel") as HTMLElement;
     const fileUrls: Record<string, string | string[]> = (fieldPanel as any)?._pdFileUrls ?? {};
 
+    /** Snapshots of inputs per job — powers in-session "reuse" on result tiles. */
+    const jobSnapshots = new Map<string, { inputs: Record<string, unknown>; aspect?: string; duration?: number; quality?: string }>();
+
+    function applyReuseSnapshot(snap: { inputs: Record<string, unknown>; aspect?: string; duration?: number; quality?: string }) {
+      (window as any).pdPrefillFieldPanel?.(fieldPanel, snap.inputs, fileUrls);
+      if (snap.aspect) (window as any).pdSetSegmentControl?.("aspect", snap.aspect);
+      if (snap.duration) (window as any).pdSetSegmentControl?.("duration", snap.duration);
+      if (snap.quality) (window as any).pdSetSegmentControl?.("quality", snap.quality);
+      refreshButton();
+      fieldPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      (window as any).pdToast?.("Prompt and references loaded — edit and generate when ready", { accent: "var(--pd-mint)" });
+    }
+
     function collectInputs(): Record<string, unknown> {
       return (window as any).pdCollectFieldValues?.(fieldPanel, fileUrls) ?? {};
     }
@@ -499,26 +515,79 @@ const config = {
     let lbList: string[] = [];
     let lbCur = 0;
     let lbIsVideo = false;
+    let lbGenId: string | undefined;
+
+    function promptFromInputs(inputs: Record<string, unknown> | undefined): string | null {
+      if (!inputs) return null;
+      for (const k of ["prompt", "caption", "text", "motion", "style"]) {
+        const v = inputs[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+      }
+      return null;
+    }
+    function refsFromInputs(inputs: Record<string, unknown> | undefined): string[] {
+      if (!inputs) return [];
+      const keys = ["image_input", "images", "input_images", "image", "photo", "person", "file", "files", "first_frame_image", "start_image", "target_image", "character_image", "reference"];
+      const out: string[] = [];
+      const seen = new Set<string>();
+      const add = (u: unknown) => {
+        if (typeof u === "string" && /^https?:\/\//.test(u) && !seen.has(u)) { seen.add(u); out.push(u); }
+      };
+      for (const k of keys) {
+        const v = inputs[k];
+        if (Array.isArray(v)) v.forEach(add); else add(v);
+      }
+      return out;
+    }
 
     function buildLb() {
       if (lbEl) return;
       lbEl = document.createElement("div");
-      lbEl.style.cssText = "display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);align-items:center;justify-content:center;cursor:zoom-out;";
+      lbEl.style.cssText = "display:none;position:fixed;inset:0;z-index:9999;background:rgba(5,5,8,.82);backdrop-filter:blur(14px);align-items:center;justify-content:center;padding:24px;cursor:zoom-out;";
       lbEl.innerHTML =
-        '<div id="pd-lb-wrap" style="position:relative;cursor:default;display:flex;align-items:center;justify-content:center;">' +
-          '<div id="pd-lb-media" style="display:flex;align-items:center;justify-content:center;"></div>' +
-        '</div>' +
-        '<div id="pd-lb-dl" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);"></div>' +
-        '<button id="pd-lb-close" style="position:fixed;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" aria-label="Close">✕</button>' +
-        '<button id="pd-lb-prev" style="position:fixed;left:14px;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;">‹</button>' +
-        '<button id="pd-lb-next" style="position:fixed;right:14px;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;">›</button>';
+        '<div id="pd-lb-card" style="cursor:default;display:grid;width:100%;max-width:1100px;max-height:calc(100vh - 48px);overflow:hidden;border-radius:24px;background:var(--pd-raised);border:0.5px solid var(--pd-hairline2);grid-template-columns:minmax(0,1.4fr) minmax(280px,0.85fr);">' +
+          '<div style="position:relative;background:#0a0a0b;min-height:280px;display:flex;align-items:center;justify-content:center;">' +
+            '<div id="pd-lb-media" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"></div>' +
+            '<button id="pd-lb-prev" type="button" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(10,10,11,.55);border:0.5px solid rgba(255,255,255,.14);color:#fff;font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center;">‹</button>' +
+            '<button id="pd-lb-next" type="button" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(10,10,11,.55);border:0.5px solid rgba(255,255,255,.14);color:#fff;font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center;">›</button>' +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;min-height:0;overflow:hidden;background:var(--pd-raised);">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:0.5px solid var(--pd-hairline);">' +
+              '<div style="min-width:0;"><div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-lilac);letter-spacing:0.8px;text-transform:uppercase;">Result</div><div style="font-size:14px;font-weight:600;color:var(--pd-ink);letter-spacing:-0.2px;">Generation details</div></div>' +
+              '<button id="pd-lb-close" type="button" style="width:28px;height:28px;border-radius:50%;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);font-size:13px;cursor:pointer;flex-shrink:0;" aria-label="Close">✕</button>' +
+            '</div>' +
+            '<div id="pd-lb-body" style="padding:14px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;"></div>' +
+            '<div style="padding:12px 16px 16px;border-top:0.5px solid var(--pd-hairline);display:flex;flex-direction:column;gap:8px;">' +
+              '<button id="pd-lb-reuse" type="button" style="display:none;width:100%;padding:11px 14px;border-radius:12px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;font-weight:700;border:none;cursor:pointer;letter-spacing:-0.1px;">Reuse in new generation</button>' +
+              '<a id="pd-lb-dl" href="#" download style="display:flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:12.5px;font-weight:600;text-decoration:none;">↓ Download</a>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
       document.body.appendChild(lbEl);
 
-      document.getElementById("pd-lb-wrap")!.addEventListener("click", e => e.stopPropagation());
+      document.getElementById("pd-lb-card")!.addEventListener("click", e => e.stopPropagation());
       lbEl.addEventListener("click", closeLb);
       document.getElementById("pd-lb-close")!.addEventListener("click", closeLb);
       document.getElementById("pd-lb-prev")!.addEventListener("click", e => { e.stopPropagation(); lbGo(lbCur - 1); });
       document.getElementById("pd-lb-next")!.addEventListener("click", e => { e.stopPropagation(); lbGo(lbCur + 1); });
+      document.getElementById("pd-lb-reuse")!.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const snap = lbGenId ? jobSnapshots.get(lbGenId) : null;
+        if (snap) {
+          applyReuseSnapshot(snap);
+          closeLb();
+          return;
+        }
+        if (!lbGenId) return;
+        try {
+          const data = await (window as any).pdLoadReuseInputs?.(lbGenId, { fieldPanel, fileUrls });
+          if (data) {
+            refreshButton();
+            (window as any).pdToast?.("Prompt and references loaded — edit and generate when ready", { accent: "var(--pd-mint)" });
+            closeLb();
+          }
+        } catch { /* ignore */ }
+      });
       document.addEventListener("keydown", e => {
         if (!lbEl || lbEl.style.display !== "flex") return;
         if (e.key === "Escape") closeLb();
@@ -527,49 +596,114 @@ const config = {
       });
     }
 
-    function lbGo(idx: number) {
+    function renderLbDetails(inputs: Record<string, unknown> | undefined) {
+      const body = document.getElementById("pd-lb-body")!;
+      const reuseBtn = document.getElementById("pd-lb-reuse") as HTMLButtonElement;
+      const prompt = promptFromInputs(inputs);
+      const refs = refsFromInputs(inputs);
+      body.innerHTML = "";
+
+      if (refs.length) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = '<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;margin-bottom:8px;">References</div>';
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;";
+        refs.forEach((url) => {
+          const a = document.createElement("a");
+          a.href = url; a.target = "_blank"; a.rel = "noopener";
+          a.style.cssText = "display:block;width:64px;height:64px;border-radius:10px;overflow:hidden;border:0.5px solid var(--pd-hairline);background:var(--pd-bg2);flex-shrink:0;";
+          const img = document.createElement("img");
+          img.src = url; img.alt = "Reference"; img.loading = "lazy";
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+          a.appendChild(img);
+          row.appendChild(a);
+        });
+        wrap.appendChild(row);
+        body.appendChild(wrap);
+      }
+
+      if (prompt) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML =
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">' +
+            '<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;">Prompt</div>' +
+            '<button type="button" id="pd-lb-copy-p" style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.5px;background:none;border:none;cursor:pointer;text-transform:uppercase;">Copy</button>' +
+          '</div>';
+        const box = document.createElement("div");
+        box.textContent = prompt;
+        box.style.cssText = "padding:11px 12px;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:12.5px;line-height:1.5;color:var(--pd-ink2);white-space:pre-wrap;max-height:180px;overflow-y:auto;";
+        wrap.appendChild(box);
+        body.appendChild(wrap);
+        wrap.querySelector("#pd-lb-copy-p")?.addEventListener("click", () => {
+          navigator.clipboard?.writeText(prompt).catch(() => {});
+          (window as any).pdToast?.("Prompt copied", { accent: "var(--pd-mint)" });
+        });
+      }
+
+      if (!prompt && !refs.length) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "font-size:12px;line-height:1.45;color:var(--pd-ink4);";
+        empty.textContent = lbGenId ? "Loading inputs…" : "No prompt or references available for this result.";
+        body.appendChild(empty);
+      }
+
+      const canReuse = !!(lbGenId && (inputs || jobSnapshots.has(lbGenId)));
+      reuseBtn.style.display = canReuse || !!lbGenId ? "block" : "none";
+    }
+
+    async function lbGo(idx: number) {
       buildLb();
       lbCur = Math.max(0, Math.min(idx, lbList.length - 1));
       const url = lbList[lbCur];
       const mediaEl = document.getElementById("pd-lb-media")!;
-      const dlEl = document.getElementById("pd-lb-dl")!;
+      const dlEl = document.getElementById("pd-lb-dl") as HTMLAnchorElement;
       const prevBtn = document.getElementById("pd-lb-prev") as HTMLButtonElement;
       const nextBtn = document.getElementById("pd-lb-next") as HTMLButtonElement;
 
-      // Pause any previous video
       mediaEl.querySelector("video")?.pause();
       mediaEl.innerHTML = "";
 
       if (lbIsVideo) {
         const v = document.createElement("video");
         v.src = url; v.controls = true; v.autoplay = true; v.playsInline = true; v.loop = true;
-        v.style.cssText = "max-width:min(94vw,1080px);max-height:86vh;border-radius:14px;display:block;";
+        v.style.cssText = "max-width:100%;max-height:calc(100vh - 96px);border-radius:0;display:block;";
         mediaEl.appendChild(v);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.style.cssText = "max-width:min(94vw,1200px);max-height:86vh;border-radius:14px;display:block;object-fit:contain;";
+        img.style.cssText = "max-width:100%;max-height:calc(100vh - 96px);display:block;object-fit:contain;";
         mediaEl.appendChild(img);
       }
 
-      dlEl.innerHTML = "";
-      const a = document.createElement("a");
-      a.href = sourceUrl(url); a.download = "";
-      a.textContent = "↓ Download";
-      a.style.cssText = "padding:8px 18px;border-radius:10px;background:rgba(255,255,255,.13);backdrop-filter:blur(6px);border:0.5px solid rgba(255,255,255,.2);color:#fff;font-size:12.5px;text-decoration:none;display:inline-block;";
-      dlEl.appendChild(a);
+      dlEl.href = lbGenId ? `/api/download?id=${encodeURIComponent(lbGenId)}` : sourceUrl(url);
+      if (!lbGenId) dlEl.setAttribute("download", "");
+      else dlEl.removeAttribute("download");
 
       prevBtn.style.display = lbList.length > 1 ? "flex" : "none";
       nextBtn.style.display = lbList.length > 1 ? "flex" : "none";
-      (prevBtn as HTMLElement).style.opacity = lbCur > 0 ? "1" : "0.3";
-      (nextBtn as HTMLElement).style.opacity = lbCur < lbList.length - 1 ? "1" : "0.3";
+      prevBtn.style.opacity = lbCur > 0 ? "1" : "0.3";
+      nextBtn.style.opacity = lbCur < lbList.length - 1 ? "1" : "0.3";
+
+      const snap = lbGenId ? jobSnapshots.get(lbGenId) : null;
+      renderLbDetails(snap?.inputs);
+      if (lbGenId && !snap) {
+        fetch(`/api/generations/reuse?id=${encodeURIComponent(lbGenId)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (!data?.inputs || lbGenId !== (document.getElementById("pd-lb-reuse") as any)?._genId) return;
+            jobSnapshots.set(lbGenId!, { inputs: data.inputs, aspect: data.aspect, duration: data.duration, quality: data.quality });
+            renderLbDetails(data.inputs);
+          })
+          .catch(() => {});
+      }
+      (document.getElementById("pd-lb-reuse") as any)._genId = lbGenId;
 
       lbEl!.style.display = "flex";
       document.body.style.overflow = "hidden";
     }
 
-    function openLb(urls: string[], startIdx = 0, video = false) {
-      lbList = urls; lbIsVideo = video;
+    function openLb(urls: string[], startIdx = 0, video = false, genId?: string) {
+      lbList = urls; lbIsVideo = video; lbGenId = genId;
       lbGo(startIdx);
     }
 
@@ -604,14 +738,26 @@ const config = {
     }
 
     function tileFail(tile: HTMLElement, msg: string) {
+      tile.style.aspectRatio = "1/1.1";
       tile.innerHTML =
         '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;text-align:center;color:var(--pd-pink);font-size:11.5px;line-height:1.4;"></div>';
       (tile.firstElementChild as HTMLElement).textContent = msg;
     }
 
     function tileResult(tile: HTMLElement, outputs: string[], genId?: string) {
+      const snap = genId ? jobSnapshots.get(genId) : null;
+      const inputs = snap?.inputs;
+      const prompt = promptFromInputs(inputs);
+      const refs = refsFromInputs(inputs);
+
       tile.innerHTML = "";
-      tile.style.cursor = "zoom-in";
+      tile.style.cssText = "position:relative;border-radius:14px;overflow:hidden;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);display:flex;flex-direction:column;";
+      tile.style.cursor = "default";
+      tile.style.aspectRatio = "auto";
+
+      // Media area (keeps the old square preview)
+      const mediaBox = document.createElement("div");
+      mediaBox.style.cssText = "position:relative;width:100%;aspect-ratio:1/1.1;overflow:hidden;background:var(--pd-bg);flex:none;";
       const wrap = document.createElement("div");
       wrap.style.cssText = `display:grid;gap:4px;width:100%;height:100%;grid-template-columns:repeat(${outputs.length > 1 ? 2 : 1},1fr);`;
       outputs.forEach((url, i) => {
@@ -628,21 +774,19 @@ const config = {
         }
         el.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
         cell.appendChild(el);
-        cell.addEventListener("click", () => openLb(outputs, i, isVideo));
+        cell.addEventListener("click", () => openLb(outputs, i, isVideo, genId));
         wrap.appendChild(cell);
       });
-      tile.appendChild(wrap);
+      mediaBox.appendChild(wrap);
 
-      // Expand icon (top-right)
       const expandBtn = document.createElement("button");
       expandBtn.type = "button";
       expandBtn.title = "View fullscreen";
       expandBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 1h3v3M10 1 6.5 4.5M4 10H1V7M1 10l3.5-3.5"/></svg>`;
       expandBtn.style.cssText = "position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
-      expandBtn.addEventListener("click", e => { e.stopPropagation(); openLb(outputs, 0, isVideo); });
-      tile.appendChild(expandBtn);
+      expandBtn.addEventListener("click", e => { e.stopPropagation(); openLb(outputs, 0, isVideo, genId); });
+      mediaBox.appendChild(expandBtn);
 
-      // Download (uses protected endpoint when genId available, else direct CDN)
       if (outputs[0]) {
         const dl = document.createElement("a");
         dl.href = genId ? `/api/download?id=${encodeURIComponent(genId)}` : sourceUrl(outputs[0]);
@@ -650,8 +794,76 @@ const config = {
         dl.title = "Download";
         dl.textContent = "↓";
         dl.style.cssText = "position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center;z-index:1;";
-        tile.appendChild(dl);
+        mediaBox.appendChild(dl);
       }
+      tile.appendChild(mediaBox);
+
+      // Details under the media: references, prompt, reuse
+      const details = document.createElement("div");
+      details.style.cssText = "padding:10px 11px 11px;display:flex;flex-direction:column;gap:8px;background:var(--pd-bg2);border-top:0.5px solid var(--pd-hairline);";
+
+      if (refs.length) {
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;align-items:center;gap:6px;overflow-x:auto;";
+        const label = document.createElement("span");
+        label.className = "font-mono uppercase";
+        label.style.cssText = "font-size:9px;color:var(--pd-ink4);letter-spacing:0.5px;flex:none;";
+        label.textContent = "Refs";
+        row.appendChild(label);
+        refs.slice(0, 4).forEach((u) => {
+          const thumb = document.createElement("img");
+          thumb.src = u;
+          thumb.alt = "";
+          thumb.loading = "lazy";
+          thumb.style.cssText = "width:28px;height:28px;border-radius:6px;object-fit:cover;border:0.5px solid var(--pd-hairline);flex:none;cursor:zoom-in;";
+          thumb.addEventListener("click", (e) => { e.stopPropagation(); window.open(u, "_blank"); });
+          row.appendChild(thumb);
+        });
+        if (refs.length > 4) {
+          const more = document.createElement("span");
+          more.style.cssText = "font-size:10px;color:var(--pd-ink3);";
+          more.textContent = `+${refs.length - 4}`;
+          row.appendChild(more);
+        }
+        details.appendChild(row);
+      }
+
+      if (prompt) {
+        const p = document.createElement("div");
+        p.textContent = prompt;
+        p.title = prompt;
+        p.style.cssText = "font-size:11.5px;line-height:1.4;color:var(--pd-ink2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;";
+        details.appendChild(p);
+      } else if (!refs.length) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "font-size:11px;color:var(--pd-ink4);";
+        empty.textContent = "Inputs saved with this result";
+        details.appendChild(empty);
+      }
+
+      const actions = document.createElement("div");
+      actions.style.cssText = "display:flex;gap:6px;";
+      const reuseBtn = document.createElement("button");
+      reuseBtn.type = "button";
+      reuseBtn.textContent = "Reuse inputs";
+      reuseBtn.style.cssText = "flex:1;padding:8px 10px;border-radius:9px;background:var(--pd-lilac);color:#0A0A0B;font-size:12px;font-weight:700;border:none;cursor:pointer;letter-spacing:-0.1px;";
+      reuseBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (snap) {
+          applyReuseSnapshot(snap);
+          return;
+        }
+        if (!genId) return;
+        try {
+          await (window as any).pdLoadReuseInputs?.(genId, { fieldPanel, fileUrls });
+          refreshButton();
+          fieldPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          (window as any).pdToast?.("Prompt and references loaded — edit and generate when ready", { accent: "var(--pd-mint)" });
+        } catch { /* ignore */ }
+      });
+      actions.appendChild(reuseBtn);
+      details.appendChild(actions);
+      tile.appendChild(details);
     }
 
     async function poll(id: string, tile: HTMLElement): Promise<void> {
@@ -685,6 +897,12 @@ const config = {
     // template can produce several in parallel.
     async function launchJob(inputs: Record<string, unknown>, per: number) {
       const tile = createTile();
+      const snap = {
+        inputs: { ...inputs },
+        aspect: controlValue("aspect") || undefined,
+        duration: duration() || undefined,
+        quality: qualityTiers.length ? undefined : (controlValue("quality") || undefined),
+      };
       activeJobs++;
       credits -= per; // optimistic debit
       refreshButton();
@@ -721,6 +939,7 @@ const config = {
           tileFail(tile, friendlyError(data.error || "Could not start generation."));
           return;
         }
+        jobSnapshots.set(data.id, snap);
         await poll(data.id, tile);
       } catch (err) {
         credits += per;
@@ -830,6 +1049,20 @@ const config = {
 
     genBtn.addEventListener("click", generate);
     refreshButton();
+
+    // Gallery / deep-link: ?reuse=<generation id> prefills the form without generating.
+    const reuseId = new URLSearchParams(location.search).get("reuse");
+    if (reuseId) {
+      (window as any).pdLoadReuseInputs?.(reuseId, {
+        fieldPanel,
+        fileUrls,
+        onLoaded: () => {
+          refreshButton();
+          (window as any).pdToast?.("Prompt and references loaded — edit and generate when ready", { accent: "var(--pd-mint)" });
+          history.replaceState({}, "", location.pathname);
+        },
+      }).catch(() => {});
+    }
   </script>
 
   <script is:inline>
