@@ -179,7 +179,7 @@ export async function registerPortraitAsset(
   groupId: string,
   url: string,
   opts: { pollMs?: number; timeoutMs?: number } = {}
-): Promise<{ assetId: string; active: boolean; reason?: "rejected" | "timeout" | "pool_full" }> {
+): Promise<{ assetId: string; active: boolean; reason?: "rejected" | "copyright" | "timeout" | "pool_full" }> {
   const create = () =>
     byteplusAsset(apiKey, "CreateAsset", { GroupId: groupId, URL: url, AssetType: "Image", ProjectName: "default" });
 
@@ -223,9 +223,14 @@ export async function registerPortraitAsset(
         const status = got?.Result?.Status;
         if (status === "Active") return { assetId: String(assetId), active: true };
         if (status === "Failed") {
+          // BytePlus explains why in Result.Error — distinguish a copyright/
+          // sensitive-content block (watermarked, celebrity or downloaded web
+          // images) from a plain "not a usable portrait" so the UI can advise.
+          const code = String(got?.Result?.Error?.Code ?? "");
+          const copyright = /copyright|sensitive|policyviolation/i.test(code);
           // A failed asset can never be used but still eats a pool slot — drop it.
           await deletePortraitAsset(apiKey, String(assetId));
-          return { assetId: String(assetId), active: false, reason: "rejected" };
+          return { assetId: String(assetId), active: false, reason: copyright ? "copyright" : "rejected" };
         }
       }
       // non-ok (e.g. 429) → just poll again next tick

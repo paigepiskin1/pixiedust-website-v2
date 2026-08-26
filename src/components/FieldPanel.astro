@@ -358,9 +358,12 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           const busy = reason === "pool_full" || reason === "timeout" || reason === "error";
           const badge = document.createElement("div");
           badge.textContent = "!";
-          badge.title = busy
-            ? "Couldn't save this as a portrait right now — the portrait service was busy. Remove and re-upload it in a moment to try again."
-            : "Couldn't be saved as a portrait, so it'll be used as-is. That's fine for objects/scenes; if it's a real person, generation may block it — try re-uploading, or use a clearer, front-facing photo.";
+          badge.title =
+            reason === "copyright"
+              ? "This image looks like copyrighted or watermarked content (e.g. a downloaded/celebrity photo or one with a site watermark), so it can't be registered as a portrait. Use your own photo without watermarks."
+              : busy
+              ? "Couldn't save this as a portrait right now — the portrait service was busy. Remove and re-upload it in a moment to try again."
+              : "Couldn't be saved as a portrait, so it'll be used as-is. That's fine for objects/scenes; if it's a real person, generation may block it — try re-uploading, or use a clearer, front-facing photo.";
           badge.style.cssText = "position:absolute;bottom:3px;left:3px;width:15px;height:15px;border-radius:50%;background:var(--pd-amber);color:#0a0a0b;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:help;z-index:2;";
           thumb.appendChild(badge);
         }
