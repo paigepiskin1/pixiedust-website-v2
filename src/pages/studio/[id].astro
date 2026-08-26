@@ -766,6 +766,9 @@ const config = {
           credits += unitCost(); // refund this job's unit cost (not × quantity)
           refreshButton();
           tileFail(tile, friendlyError(data.error));
+          // Assets are freed on failure too — mark spent so a retry re-registers.
+          const st = (tile as any)._pdState;
+          if (st && st.displays) for (const k in st.displays) for (const u of st.displays[k]) spentRefs.add(u);
           return;
         }
       }
@@ -955,19 +958,16 @@ const config = {
         if ((el as HTMLInputElement).type === "hidden") { syncSelectHidden(el as HTMLInputElement); el.dispatchEvent(new Event("change", { bubbles: true })); }
         else el.dispatchEvent(new Event("input", { bubbles: true }));
       });
-      // File fields (references) — reload from the display (CDN) URLs and
-      // re-register (the original asset:// may have been freed after that job
-      // completed). Falls back to setting values directly if no display URLs.
+      // File fields (references) — reload from the display (CDN) URLs only.
+      // Registration is deferred to generate time; the original asset:// may have
+      // been freed, so we never carry it over here.
       fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]").forEach((w) => {
         const key = w.dataset.fieldkey!;
         const raw = inputs[key];
         const values: string[] = Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : [];
-        const disp: string[] = (state.displays && state.displays[key]) || [];
+        const disp: string[] = (state.displays && state.displays[key]) || values.filter((v) => /^https?:\/\//i.test(v));
         const loader = (w as any)._pdLoadReferences;
-        const setter = (w as any)._pdSetReferences;
-        if (typeof loader === "function" && disp.length) loader(disp);
-        else if (typeof setter === "function") setter(values.map((v: string) => ({ display: v, value: v })));
-        // These references are freshly (re)registered — clear any spent marks.
+        if (typeof loader === "function") loader(disp);
         for (const d of disp) spentRefs.delete(d);
       });
       setControl("aspect", state.aspect);
@@ -1053,9 +1053,9 @@ const config = {
         if (!ok) return;
       }
       errEl.classList.add("hidden");
-      // Re-register any references consumed by a previous generation (their assets
-      // were freed on completion) so this batch submits live asset:// ids.
-      await refreshSpentReferences();
+      // Register reused references + re-register any freed by a prior generation,
+      // so this batch always submits live asset:// ids.
+      await ensureReferencesRegistered();
       const n = quantity();
       const per = unitCost();
       const inputs = collectInputs(); // snapshot once for all parallel jobs
@@ -1064,13 +1064,13 @@ const config = {
       for (let i = 0; i < n; i++) launchJob(inputs, per, state, reuse);
     }
 
-    // Re-register the references whose portrait asset a finished generation freed,
-    // so a subsequent Generate uses a fresh, live asset:// instead of a deleted id.
-    async function refreshSpentReferences() {
-      if (!spentRefs.size) return;
+    // Before a Generate, make sure every reference has a live portrait asset://:
+    // register the ones loaded via Reuse (never registered) and re-register any
+    // whose asset a prior generation freed. Leaves already-live uploads alone.
+    async function ensureReferencesRegistered() {
       const arr = Array.from(spentRefs);
       for (const w of Array.from(fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]"))) {
-        const fn = (w as any)._pdReregister;
+        const fn = (w as any)._pdEnsureRegistered;
         if (typeof fn === "function") await fn(arr);
       }
       spentRefs.clear();

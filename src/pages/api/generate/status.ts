@@ -185,6 +185,11 @@ export async function GET({ url, locals }: APIContext) {
       .prepare("UPDATE generations SET status = 'failed', error = ?, credits_refunded = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(poll.error ?? "Generation failed", gen.credits_charged, id)
       .run();
+    // Free this job's portrait assets in the background (client re-registers on retry).
+    const cleanup = cleanupPortraitAssets(env, gen, dbUser.id);
+    const ctx = (locals.runtime as unknown as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } }).ctx;
+    if (ctx?.waitUntil) ctx.waitUntil(cleanup);
+    else await cleanup;
     return json({ id, status: "failed", error: poll.error, refunded: true });
   }
 
