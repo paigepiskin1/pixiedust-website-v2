@@ -442,6 +442,33 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         syncZone();
       };
 
+      // Replace the current uploads with a given set (used by "Reuse" on a past
+      // result): items carry a `display` URL (thumbnail) and the model `value`
+      // (asset:// id or raw URL) to submit with.
+      (wrap as any)._pdSetReferences = (items: { display: string; value?: string }[]) => {
+        urls = [];
+        valueByUrl.clear();
+        if (thumbsEl) thumbsEl.innerHTML = "";
+        for (const it of (Array.isArray(items) ? items : []).slice(0, maxFiles)) {
+          const disp = it && it.display;
+          if (!disp) continue;
+          const thumb = document.createElement("div");
+          thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
+          const img = document.createElement("img");
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          img.src = disp;
+          const x = document.createElement("button");
+          x.type = "button"; x.textContent = "✕";
+          x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
+          x.addEventListener("click", () => { urls = urls.filter((u) => u !== disp); valueByUrl.delete(disp); thumb.remove(); syncZone(); });
+          thumb.appendChild(img); thumb.appendChild(x);
+          thumbsEl?.appendChild(thumb);
+          urls.push(disp);
+          if (it.value && it.value !== disp) valueByUrl.set(disp, it.value);
+        }
+        syncZone();
+      };
+
       syncZone();
       return;
     }

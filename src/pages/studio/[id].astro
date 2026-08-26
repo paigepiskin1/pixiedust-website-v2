@@ -374,6 +374,9 @@ const config = {
     .pd-sw-card { transition: transform 0.12s, border-color 0.12s; }
     .pd-sw-card:hover { transform: translateY(-2px); border-color: var(--pd-hairline3); }
     .pd-sw-card[data-current="true"] { outline: 2px solid var(--pd-lilac); outline-offset: -1px; }
+    /* Reuse / Copy-prompt actions: subtle by default, full on hover. */
+    .pd-tile-action { opacity: 0.5; transition: opacity 0.12s; }
+    .pd-job:hover .pd-tile-action { opacity: 1; }
   </style>
 
   <script>
@@ -707,6 +710,31 @@ const config = {
         dl.style.cssText = "position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center;z-index:1;";
         tile.appendChild(dl);
       }
+
+      // Reuse + Copy prompt — load this generation's inputs (references, prompt,
+      // model, aspect/duration) back into the panel to edit or re-generate.
+      const st = (tile as any)._pdState;
+      if (st) {
+        const reuseBtn = document.createElement("button");
+        reuseBtn.type = "button";
+        reuseBtn.title = "Reuse — load these inputs to edit or re-generate";
+        reuseBtn.className = "pd-tile-action";
+        reuseBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.6 2.4V5H11"/></svg>`;
+        reuseBtn.style.cssText = "position:absolute;top:7px;left:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
+        reuseBtn.addEventListener("click", (e) => { e.stopPropagation(); reuseState(st); });
+        tile.appendChild(reuseBtn);
+
+        if (st.promptText || st.inputs?.prompt) {
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.title = "Copy prompt";
+          copyBtn.className = "pd-tile-action";
+          copyBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="8.5" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2H4a1.5 1.5 0 0 0-1.5 1.5V11"/></svg>`;
+          copyBtn.style.cssText = "position:absolute;left:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
+          copyBtn.addEventListener("click", (e) => { e.stopPropagation(); copyPrompt(st); });
+          tile.appendChild(copyBtn);
+        }
+      }
     }
 
     async function poll(id: string, tile: HTMLElement): Promise<void> {
@@ -738,8 +766,9 @@ const config = {
 
     // One independent job per output (each charged the unit cost), so any
     // template can produce several in parallel.
-    async function launchJob(inputs: Record<string, unknown>, per: number) {
+    async function launchJob(inputs: Record<string, unknown>, per: number, state?: any) {
       const tile = createTile();
+      (tile as any)._pdState = state;
       activeJobs++;
       credits -= per; // optimistic debit
       refreshButton();
@@ -855,6 +884,96 @@ const config = {
       });
     }
 
+    // ── Reuse / copy-prompt support ──
+    // Snapshot the exact inputs behind a generation so a result tile can reload
+    // them (references, prompt, model, aspect/duration/quality) for a remix.
+    function captureState(inputs: Record<string, unknown>) {
+      const displays: Record<string, string[]> = {};
+      fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]").forEach((w) => {
+        const key = w.dataset.fieldkey!;
+        const multi = Array.from(w.querySelectorAll<HTMLImageElement>(".pd-multi-previews img")).map((im) => im.src).filter(Boolean);
+        if (multi.length) { displays[key] = multi; return; }
+        const single = w.querySelector<HTMLImageElement>(".pd-file-preview .pd-preview-img");
+        if (single && single.src) displays[key] = [single.src];
+      });
+      let promptText = typeof inputs.prompt === "string" ? inputs.prompt : "";
+      if (!promptText) { const ta = fieldPanel.querySelector<HTMLTextAreaElement>("textarea[data-field]"); if (ta) promptText = ta.value; }
+      return {
+        inputs: JSON.parse(JSON.stringify(inputs ?? {})),
+        displays,
+        promptText,
+        aspect: controlValue("aspect"),
+        duration: controlValue("duration"),
+        quality: controlValue("quality"),
+      };
+    }
+
+    function syncSelectHidden(hidden: HTMLInputElement) {
+      const group = hidden.parentElement;
+      if (!group) return;
+      group.querySelectorAll<HTMLElement>(".pd-opt-seg, .pd-opt-card").forEach((b) => {
+        const on = b.dataset.val === hidden.value;
+        b.dataset.active = on ? "true" : "false";
+        if (b.classList.contains("pd-opt-seg")) {
+          b.style.background = on ? "var(--pd-ink)" : "var(--pd-bg)";
+          b.style.color = on ? "var(--pd-bg)" : "var(--pd-ink)";
+          b.style.borderColor = on ? "transparent" : "var(--pd-hairline2)";
+        } else {
+          b.style.borderColor = on ? "var(--pd-lilac)" : "var(--pd-hairline2)";
+          b.style.background = on ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)";
+        }
+      });
+    }
+
+    function setControl(group: string, val: string | null) {
+      if (val == null) return;
+      const wrap = root.querySelector(`[data-controls="${group}"]`);
+      if (!wrap) return;
+      wrap.querySelectorAll<HTMLElement>(".pd-seg").forEach((b) => {
+        b.setAttribute("data-active", String(b.dataset.val) === String(val) ? "true" : "false");
+      });
+    }
+
+    function reuseState(state: any) {
+      if (!state) return;
+      const inputs = state.inputs || {};
+      // Non-file fields first (so a model change reconfigures its limits before
+      // we restore aspect/duration below).
+      fieldPanel.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[data-field]").forEach((el) => {
+        const key = (el as HTMLInputElement).dataset.field!;
+        if ((el as HTMLInputElement).type === "file") return;
+        if (!(key in inputs)) return;
+        (el as HTMLInputElement).value = String(inputs[key] ?? "");
+        if ((el as HTMLInputElement).type === "hidden") { syncSelectHidden(el as HTMLInputElement); el.dispatchEvent(new Event("change", { bubbles: true })); }
+        else el.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      // File fields (references) — restore thumbnails + values.
+      fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]").forEach((w) => {
+        const key = w.dataset.fieldkey!;
+        const setter = (w as any)._pdSetReferences;
+        if (typeof setter !== "function") return;
+        const raw = inputs[key];
+        const values: string[] = Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : [];
+        const disp: string[] = (state.displays && state.displays[key]) || values;
+        setter(disp.map((d: string, i: number) => ({ display: d, value: values[i] ?? d })));
+      });
+      setControl("aspect", state.aspect);
+      setControl("duration", state.duration);
+      setControl("quality", state.quality);
+      refreshButton();
+      fieldPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      (window as any).pdToast?.("Loaded — edit or hit Generate", { accent: "var(--pd-mint)" });
+    }
+
+    function copyPrompt(state: any) {
+      const p = String(state?.promptText ?? state?.inputs?.prompt ?? "");
+      const done = () => (window as any).pdToast?.("Prompt copied", { accent: "var(--pd-mint)" });
+      const fallback = () => { const ta = document.createElement("textarea"); ta.value = p; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(); } catch {} ta.remove(); };
+      if (!p) { (window as any).pdToast?.("No prompt to copy", { accent: "var(--pd-amber)" }); return; }
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(p).then(done).catch(fallback);
+      else fallback();
+    }
+
     async function generate() {
       if (!cfg.signedIn) {
         showSignInModal();
@@ -880,7 +999,8 @@ const config = {
       const n = quantity();
       const per = unitCost();
       const inputs = collectInputs(); // snapshot once for all parallel jobs
-      for (let i = 0; i < n; i++) launchJob(inputs, per);
+      const state = captureState(inputs); // for the "Reuse"/"Copy prompt" actions
+      for (let i = 0; i < n; i++) launchJob(inputs, per, state);
     }
 
     genBtn.addEventListener("click", generate);
