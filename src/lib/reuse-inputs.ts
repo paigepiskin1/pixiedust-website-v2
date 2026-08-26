@@ -185,3 +185,71 @@ function legacyExtract(resolved: Record<string, unknown>): Record<string, unknow
   }
   return out;
 }
+
+/** Pull a display prompt string from any inputs-like object. */
+export function extractPromptFromInputs(inputs: Record<string, unknown> | null | undefined): string | null {
+  if (!inputs) return null;
+  for (const k of PROMPT_KEYS) {
+    const v = inputs[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+/** Collect unique http(s) image URLs used as references from inputs. */
+export function extractReferenceUrls(inputs: Record<string, unknown> | null | undefined): string[] {
+  if (!inputs) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (u: string) => {
+    if (!isUrl(u) || seen.has(u)) return;
+    // Skip obvious non-image video CDN outputs if needed; keep all http uploads for now.
+    seen.add(u);
+    out.push(u);
+  };
+  for (const k of IMAGE_KEYS) {
+    const v = inputs[k];
+    if (isUrl(v)) add(v);
+    else if (Array.isArray(v)) for (const item of v) if (isUrl(item)) add(item);
+  }
+  // Also scan any leftover string/array values that look like uploaded URLs.
+  for (const [k, v] of Object.entries(inputs)) {
+    if (IMAGE_KEYS.includes(k) || PROMPT_KEYS.includes(k)) continue;
+    if (isUrl(v)) add(v);
+    else if (Array.isArray(v)) for (const item of v) if (isUrl(item)) add(item);
+  }
+  return out;
+}
+
+/**
+ * Best-effort prompt + reference URLs for gallery/lightbox display.
+ * Prefers user_inputs_json, then chain userInputs, then resolved input_json.
+ */
+export function extractDisplayInputs(opts: {
+  user_inputs_json?: string | null;
+  chain_json?: string | null;
+  input_json?: string | null;
+}): { prompt: string | null; references: string[] } {
+  const stored = parseJson<StoredUserInputs | null>(opts.user_inputs_json, null);
+  if (stored?.inputs && Object.keys(stored.inputs).length) {
+    return {
+      prompt: extractPromptFromInputs(stored.inputs),
+      references: extractReferenceUrls(stored.inputs),
+    };
+  }
+
+  const chain = parseJson<{ userInputs?: Record<string, unknown> } | null>(opts.chain_json, null);
+  if (chain?.userInputs && Object.keys(chain.userInputs).length) {
+    const { aspect: _a, duration: _d, quantity: _q, ...inputs } = chain.userInputs;
+    return {
+      prompt: extractPromptFromInputs(inputs),
+      references: extractReferenceUrls(inputs),
+    };
+  }
+
+  const resolved = parseJson<Record<string, unknown>>(opts.input_json, {});
+  return {
+    prompt: extractPromptFromInputs(resolved),
+    references: extractReferenceUrls(resolved),
+  };
+}
