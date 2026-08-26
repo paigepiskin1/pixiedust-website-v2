@@ -103,7 +103,7 @@ function parse<T>(s: string | null, fallback: T): T {
 }
 
 export function rowToTemplate(r: TemplateRow): Template {
-  return {
+  const t: Template = {
     id: r.id,
     title: r.title,
     kind: r.kind,
@@ -136,6 +136,101 @@ export function rowToTemplate(r: TemplateRow): Template {
     isAdult: r.is_adult === 1,
     sortOrder: r.sort_order,
   };
+  return expandOmniReferenceAccept(t);
+}
+
+/** True for Seedance Omni / multimodal reference-to-video templates. */
+export function isOmniReferenceTemplate(t: Pick<Template, "id" | "title" | "model" | "input" | "meta" | "fields">): boolean {
+  const hay = `${t.id} ${t.title} ${t.model} ${t.meta ?? ""}`.toLowerCase();
+  if (/omni|seedance-?2|reference-?to-?video|reference_to_video/.test(hay)) return true;
+  const inputStr = JSON.stringify(t.input ?? {}).toLowerCase();
+  if (/audio_url|video_url|image_url|input_audios|input_videos|reference_audio|reference_video/.test(inputStr)) return true;
+  return (t.fields ?? []).some((f) => /omni|reference/i.test(`${f.key} ${f.label}`) && f.type === "file");
+}
+
+const OMNI_ACCEPT = "image/*,video/*,audio/*";
+
+/** Ensure Omni reference file fields accept image + video + audio. */
+export function expandOmniReferenceAccept(t: Template): Template {
+  if (!isOmniReferenceTemplate(t)) return t;
+  const fields = (t.fields ?? []).map((f) => {
+    if (f.type !== "file") return f;
+    const keyLabel = `${f.key} ${f.label}`.toLowerCase();
+    const isRef =
+      /omni|reference|refs?|files?|images?|videos?|audios?|media/.test(keyLabel) ||
+      !f.accept ||
+      f.accept === "image/*";
+    if (!isRef) return f;
+    const accept = f.accept && f.accept.includes("audio") && f.accept.includes("video")
+      ? f.accept
+      : OMNI_ACCEPT;
+    const help =
+      f.help ||
+      "Upload images, videos, or audio as Omni references (cite them in your prompt as @Image1, @Video1, @Audio1).";
+    return { ...f, accept, help, multiple: f.multiple ?? true, max: f.max ?? 9 };
+  });
+  return { ...t, fields };
+}
+
+export type MediaKind = "image" | "video" | "audio" | "unknown";
+
+export function classifyMediaUrl(url: string): MediaKind {
+  const path = String(url || "").toLowerCase().split("?")[0];
+  if (/\.(mp3|wav|m4a|aac|ogg|flac)$/.test(path)) return "audio";
+  if (/\.(mp4|mov|webm|m4v)$/.test(path)) return "video";
+  if (/\.(png|jpe?g|webp|gif|heic|avif)$/.test(path)) return "image";
+  return "unknown";
+}
+
+/**
+ * For Omni templates: split mixed reference uploads into image/video/audio
+ * URL lists so {{image_urls}} / {{video_urls}} / {{audio_urls}} (and common
+ * aliases) resolve correctly even when the user uploaded into one field.
+ */
+export function expandOmniMediaInputs(
+  t: Template,
+  inputs: Record<string, unknown>
+): Record<string, unknown> {
+  if (!isOmniReferenceTemplate(t)) return inputs;
+  const out: Record<string, unknown> = { ...inputs };
+  const collected: string[] = [];
+  const take = (v: unknown) => {
+    if (typeof v === "string" && /^https?:\/\//.test(v)) collected.push(v);
+    else if (Array.isArray(v)) for (const x of v) if (typeof x === "string" && /^https?:\/\//.test(x)) collected.push(x);
+  };
+  for (const f of allFields(t)) {
+    if (f.type === "file") take(out[f.key]);
+  }
+  // Also gather any already-split lists
+  for (const k of ["image_urls", "video_urls", "audio_urls", "images", "videos", "audios", "input_images", "input_videos", "input_audios", "files", "references", "reference"]) {
+    take(out[k]);
+  }
+  const uniq = [...new Set(collected)];
+  const images: string[] = [];
+  const videos: string[] = [];
+  const audios: string[] = [];
+  for (const u of uniq) {
+    const kind = classifyMediaUrl(u);
+    if (kind === "video") videos.push(u);
+    else if (kind === "audio") audios.push(u);
+    else images.push(u); // unknown → treat as image URL (most common)
+  }
+  if (images.length) {
+    out.image_urls = images;
+    out.images = images;
+    out.input_images = images;
+  }
+  if (videos.length) {
+    out.video_urls = videos;
+    out.videos = videos;
+    out.input_videos = videos;
+  }
+  if (audios.length) {
+    out.audio_urls = audios;
+    out.audios = audios;
+    out.input_audios = audios;
+  }
+  return out;
 }
 
 export interface ListOpts {

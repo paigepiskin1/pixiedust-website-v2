@@ -24,6 +24,7 @@ const IMAGE_KEYS = [
   "image_input",
   "images",
   "input_images",
+  "image_urls",
   "image",
   "photo",
   "person",
@@ -34,6 +35,13 @@ const IMAGE_KEYS = [
   "target_image",
   "character_image",
   "reference",
+  "references",
+  "video_urls",
+  "videos",
+  "input_videos",
+  "audio_urls",
+  "audios",
+  "input_audios",
 ];
 
 function parseJson<T>(s: string | null | undefined, fallback: T): T {

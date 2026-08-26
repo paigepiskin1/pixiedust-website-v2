@@ -23,7 +23,12 @@ interface Props {
 const { fields = [], id } = Astro.props;
 
 function formatAccept(accept: string) {
-  return accept.replace(/image\//g, "").replace(/video\//g, "").replace(/,\s*/g, ", ").toUpperCase();
+  const parts: string[] = [];
+  if (/image\//i.test(accept) || accept.includes("image/*")) parts.push("Images");
+  if (/video\//i.test(accept) || accept.includes("video/*")) parts.push("Video");
+  if (/audio\//i.test(accept) || accept.includes("audio/*")) parts.push("Audio");
+  if (parts.length) return parts.join(" · ");
+  return accept.replace(/image\//g, "").replace(/video\//g, "").replace(/audio\//g, "").replace(/,\s*/g, ", ").toUpperCase();
 }
 ---
 
@@ -141,7 +146,11 @@ function formatAccept(accept: string) {
       const isMulti = !!f.multiple;
       const maxFiles = Number(f.max ?? 4);
       const accept = String(f.accept ?? "");
-      const acceptLabel = accept ? accept.replace(/image\//g,"").replace(/video\//g,"").replace(/,\s*/g,", ").toUpperCase() : "";
+      const acceptLabel = accept
+        ? (/image|video|audio/i.test(accept)
+            ? [ /image/i.test(accept) && "Images", /video/i.test(accept) && "Video", /audio/i.test(accept) && "Audio" ].filter(Boolean).join(" · ")
+            : accept.replace(/image\//g,"").replace(/video\//g,"").replace(/audio\//g,"").replace(/,\s*/g,", ").toUpperCase())
+        : "";
       return `<div>
         <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
         <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
@@ -230,25 +239,39 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     errorEl: HTMLElement|null
   ) {
     const localUrl = URL.createObjectURL(file);
-    // Videos can't preview in an <img> — swap in a <video> for video uploads.
-    const isVideo = /^video\//.test(file.type);
-    let mediaEl: HTMLImageElement | HTMLVideoElement | null = previewImg;
+    // Videos / audio can't preview in an <img> — swap in the right media element.
+    const isVideo = /^video\//.test(file.type) || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+    const isAudio = /^audio\//.test(file.type) || /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(file.name);
+    let mediaEl: HTMLImageElement | HTMLVideoElement | HTMLAudioElement | null = previewImg;
+    if (preview) {
+      preview.querySelectorAll("video.pd-preview-vid, audio.pd-preview-aud").forEach((n) => n.remove());
+      if (previewImg) previewImg.style.display = isVideo || isAudio ? "none" : "block";
+    }
     if (isVideo && preview) {
-      let v = preview.querySelector<HTMLVideoElement>("video.pd-preview-vid");
-      if (!v) {
-        v = document.createElement("video");
-        v.className = "pd-preview-vid";
-        v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true;
-        v.setAttribute("style", "display:block;width:100%;max-height:220px;object-fit:cover;");
-        if (previewImg) { previewImg.style.display = "none"; previewImg.parentElement?.insertBefore(v, previewImg); }
-        else preview.insertBefore(v, preview.firstChild);
-      }
-      v.style.display = "block";
+      const v = document.createElement("video");
+      v.className = "pd-preview-vid";
+      v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.controls = true;
+      v.setAttribute("style", "display:block;width:100%;max-height:220px;object-fit:cover;background:#0a0a0b;");
+      if (previewImg) previewImg.parentElement?.insertBefore(v, previewImg);
+      else preview.insertBefore(v, preview.firstChild);
       mediaEl = v;
+    } else if (isAudio && preview) {
+      const wrap = document.createElement("div");
+      wrap.className = "pd-preview-aud";
+      wrap.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;background:var(--pd-bg3);";
+      wrap.innerHTML = `<div style="font-size:22px;line-height:1;">♪</div><div style="font-size:11.5px;color:var(--pd-ink3);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>`;
+      (wrap.lastElementChild as HTMLElement).textContent = file.name || "Audio file";
+      const a = document.createElement("audio");
+      a.controls = true;
+      a.style.cssText = "width:100%;max-width:280px;";
+      wrap.appendChild(a);
+      if (previewImg) previewImg.parentElement?.insertBefore(wrap, previewImg);
+      else preview.insertBefore(wrap, preview.firstChild);
+      mediaEl = a;
     } else if (previewImg) {
       previewImg.style.display = "block";
     }
-    if (mediaEl) mediaEl.src = localUrl;
+    if (mediaEl && "src" in mediaEl) mediaEl.src = localUrl;
     if (zone) zone.style.display = "none";
     if (preview) { preview.classList.remove("hidden"); preview.style.display = "block"; }
     if (status) { status.textContent = "Uploading…"; status.style.color = "var(--pd-ink3)"; }
@@ -279,23 +302,19 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         // immediately + revoking the blob made successful uploads look blank
         // when the CDN was slow or briefly unavailable.
         const hosted = String(d.url);
-        if (mediaEl) {
-          const swap = () => {
+        if (mediaEl && mediaEl instanceof HTMLImageElement) {
+          const probe = new Image();
+          probe.onload = () => {
             if (mediaEl) mediaEl.src = hosted;
             URL.revokeObjectURL(localUrl);
           };
-          if (mediaEl instanceof HTMLImageElement) {
-            const probe = new Image();
-            probe.onload = swap;
-            probe.onerror = () => {
-              // Hosted URL failed to load — keep the local preview so the photo
-              // doesn't disappear; generate still has the CDN url in fileUrls.
-              URL.revokeObjectURL(localUrl);
-            };
-            probe.src = hosted;
-          } else {
-            swap();
-          }
+          probe.onerror = () => {
+            URL.revokeObjectURL(localUrl);
+          };
+          probe.src = hosted;
+        } else if (mediaEl) {
+          mediaEl.src = hosted;
+          URL.revokeObjectURL(localUrl);
         } else {
           URL.revokeObjectURL(localUrl);
         }
@@ -333,15 +352,32 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
 
       async function addFile(file: File) {
         if (urls.length >= maxFiles) return;
+        const isVideo = /^video\//.test(file.type) || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+        const isAudio = /^audio\//.test(file.type) || /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(file.name);
         const thumb = document.createElement("div");
         thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
-        const img = document.createElement("img");
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
-        img.src = URL.createObjectURL(file);
+        let media: HTMLElement;
+        if (isVideo) {
+          const v = document.createElement("video");
+          v.muted = true; v.playsInline = true; v.preload = "metadata";
+          v.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          v.src = URL.createObjectURL(file);
+          media = v;
+        } else if (isAudio) {
+          const a = document.createElement("div");
+          a.style.cssText = "width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--pd-bg3);color:var(--pd-ink2);font-size:18px;";
+          a.innerHTML = `<span>♪</span><span style="font-size:8px;letter-spacing:0.3px;text-transform:uppercase;color:var(--pd-ink3);">Audio</span>`;
+          media = a;
+        } else {
+          const img = document.createElement("img");
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          img.src = URL.createObjectURL(file);
+          media = img;
+        }
         const spinner = document.createElement("div");
         spinner.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);font-size:9px;color:#fff;";
         spinner.textContent = "↑";
-        thumb.appendChild(img); thumb.appendChild(spinner);
+        thumb.appendChild(media); thumb.appendChild(spinner);
         thumbsEl?.appendChild(thumb);
         if (thumbsEl) thumbsEl.style.display = "flex";
 
@@ -351,10 +387,12 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           const r = await fetch("/api/upload", { method: "POST", body: fd });
           const d = await r.json();
           if (r.ok) {
-            const blobSrc = img.src;
+            if (media instanceof HTMLImageElement || media instanceof HTMLVideoElement) {
+              const blobSrc = media.src;
+              media.src = d.url;
+              URL.revokeObjectURL(blobSrc);
+            }
             urls.push(d.url);
-            img.src = d.url;
-            URL.revokeObjectURL(blobSrc);
             spinner.remove();
             const x = document.createElement("button");
             x.type = "button"; x.textContent = "✕";
@@ -376,19 +414,34 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       el.addEventListener("drop", async e => { e.preventDefault(); dc=0; uhl(); for(const f of Array.from((e as DragEvent).dataTransfer?.files??[]).slice(0,maxFiles-urls.length)) await addFile(f); });
       el.addEventListener("change", async () => { const files=Array.from(el.files??[]).slice(0,maxFiles-urls.length); el.value=""; for(const f of files) await addFile(f); });
 
-      // Render a thumb for an already-hosted URL (preloaded reference images).
+      // Render a thumb for an already-hosted URL (preloaded reference media).
       function addExisting(url: string) {
         if (!url || urls.length >= maxFiles) return;
+        const kind = /\.(mp3|wav|m4a|aac|ogg|flac)(\?|$)/i.test(url) ? "audio"
+          : /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url) ? "video" : "image";
         const thumb = document.createElement("div");
         thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
-        const img = document.createElement("img");
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
-        img.src = url;
+        if (kind === "video") {
+          const v = document.createElement("video");
+          v.src = url; v.muted = true; v.playsInline = true; v.preload = "metadata";
+          v.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          thumb.appendChild(v);
+        } else if (kind === "audio") {
+          const a = document.createElement("div");
+          a.style.cssText = "width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--pd-bg3);color:var(--pd-ink2);font-size:18px;";
+          a.innerHTML = `<span>♪</span><span style="font-size:8px;letter-spacing:0.3px;text-transform:uppercase;color:var(--pd-ink3);">Audio</span>`;
+          thumb.appendChild(a);
+        } else {
+          const img = document.createElement("img");
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          img.src = url;
+          thumb.appendChild(img);
+        }
         const x = document.createElement("button");
         x.type = "button"; x.textContent = "✕";
         x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
         x.addEventListener("click", () => { urls = urls.filter(u => u !== url); thumb.remove(); syncZone(); });
-        thumb.appendChild(img); thumb.appendChild(x);
+        thumb.appendChild(x);
         thumbsEl?.appendChild(thumb);
         urls.push(url);
       }
@@ -430,6 +483,8 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       delete fileUrls[key];
       el.value="";
       if(previewImg)previewImg.src="";
+      preview?.querySelectorAll("video.pd-preview-vid, .pd-preview-aud").forEach((n)=>n.remove());
+      if(previewImg)previewImg.style.display="block";
       if(preview)preview.style.display="none";
       if(zone)zone.style.display="";
       if(errorEl){errorEl.style.display="none";errorEl.textContent="";}
