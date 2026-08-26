@@ -362,6 +362,9 @@ const config = {
     .pd-sw-card { transition: transform 0.12s, border-color 0.12s; }
     .pd-sw-card:hover { transform: translateY(-2px); border-color: var(--pd-hairline3); }
     .pd-sw-card[data-current="true"] { outline: 2px solid var(--pd-lilac); outline-offset: -1px; }
+    @media (max-width: 800px) {
+      #pd-lb-card { grid-template-columns: 1fr !important; max-height: calc(100vh - 32px) !important; }
+    }
   </style>
 
   <script>
@@ -512,26 +515,79 @@ const config = {
     let lbList: string[] = [];
     let lbCur = 0;
     let lbIsVideo = false;
+    let lbGenId: string | undefined;
+
+    function promptFromInputs(inputs: Record<string, unknown> | undefined): string | null {
+      if (!inputs) return null;
+      for (const k of ["prompt", "caption", "text", "motion", "style"]) {
+        const v = inputs[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+      }
+      return null;
+    }
+    function refsFromInputs(inputs: Record<string, unknown> | undefined): string[] {
+      if (!inputs) return [];
+      const keys = ["image_input", "images", "input_images", "image", "photo", "person", "file", "files", "first_frame_image", "start_image", "target_image", "character_image", "reference"];
+      const out: string[] = [];
+      const seen = new Set<string>();
+      const add = (u: unknown) => {
+        if (typeof u === "string" && /^https?:\/\//.test(u) && !seen.has(u)) { seen.add(u); out.push(u); }
+      };
+      for (const k of keys) {
+        const v = inputs[k];
+        if (Array.isArray(v)) v.forEach(add); else add(v);
+      }
+      return out;
+    }
 
     function buildLb() {
       if (lbEl) return;
       lbEl = document.createElement("div");
-      lbEl.style.cssText = "display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);align-items:center;justify-content:center;cursor:zoom-out;";
+      lbEl.style.cssText = "display:none;position:fixed;inset:0;z-index:9999;background:rgba(5,5,8,.82);backdrop-filter:blur(14px);align-items:center;justify-content:center;padding:24px;cursor:zoom-out;";
       lbEl.innerHTML =
-        '<div id="pd-lb-wrap" style="position:relative;cursor:default;display:flex;align-items:center;justify-content:center;">' +
-          '<div id="pd-lb-media" style="display:flex;align-items:center;justify-content:center;"></div>' +
-        '</div>' +
-        '<div id="pd-lb-dl" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);"></div>' +
-        '<button id="pd-lb-close" style="position:fixed;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;" aria-label="Close">✕</button>' +
-        '<button id="pd-lb-prev" style="position:fixed;left:14px;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;">‹</button>' +
-        '<button id="pd-lb-next" style="position:fixed;right:14px;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:0.5px solid rgba(255,255,255,.18);color:#fff;font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;">›</button>';
+        '<div id="pd-lb-card" style="cursor:default;display:grid;width:100%;max-width:1100px;max-height:calc(100vh - 48px);overflow:hidden;border-radius:24px;background:var(--pd-raised);border:0.5px solid var(--pd-hairline2);grid-template-columns:minmax(0,1.4fr) minmax(280px,0.85fr);">' +
+          '<div style="position:relative;background:#0a0a0b;min-height:280px;display:flex;align-items:center;justify-content:center;">' +
+            '<div id="pd-lb-media" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"></div>' +
+            '<button id="pd-lb-prev" type="button" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(10,10,11,.55);border:0.5px solid rgba(255,255,255,.14);color:#fff;font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center;">‹</button>' +
+            '<button id="pd-lb-next" type="button" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(10,10,11,.55);border:0.5px solid rgba(255,255,255,.14);color:#fff;font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center;">›</button>' +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;min-height:0;overflow:hidden;background:var(--pd-raised);">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:0.5px solid var(--pd-hairline);">' +
+              '<div style="min-width:0;"><div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-lilac);letter-spacing:0.8px;text-transform:uppercase;">Result</div><div style="font-size:14px;font-weight:600;color:var(--pd-ink);letter-spacing:-0.2px;">Generation details</div></div>' +
+              '<button id="pd-lb-close" type="button" style="width:28px;height:28px;border-radius:50%;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);font-size:13px;cursor:pointer;flex-shrink:0;" aria-label="Close">✕</button>' +
+            '</div>' +
+            '<div id="pd-lb-body" style="padding:14px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;"></div>' +
+            '<div style="padding:12px 16px 16px;border-top:0.5px solid var(--pd-hairline);display:flex;flex-direction:column;gap:8px;">' +
+              '<button id="pd-lb-reuse" type="button" style="display:none;width:100%;padding:11px 14px;border-radius:12px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;font-weight:700;border:none;cursor:pointer;letter-spacing:-0.1px;">Reuse in new generation</button>' +
+              '<a id="pd-lb-dl" href="#" download style="display:flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:12.5px;font-weight:600;text-decoration:none;">↓ Download</a>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
       document.body.appendChild(lbEl);
 
-      document.getElementById("pd-lb-wrap")!.addEventListener("click", e => e.stopPropagation());
+      document.getElementById("pd-lb-card")!.addEventListener("click", e => e.stopPropagation());
       lbEl.addEventListener("click", closeLb);
       document.getElementById("pd-lb-close")!.addEventListener("click", closeLb);
       document.getElementById("pd-lb-prev")!.addEventListener("click", e => { e.stopPropagation(); lbGo(lbCur - 1); });
       document.getElementById("pd-lb-next")!.addEventListener("click", e => { e.stopPropagation(); lbGo(lbCur + 1); });
+      document.getElementById("pd-lb-reuse")!.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const snap = lbGenId ? jobSnapshots.get(lbGenId) : null;
+        if (snap) {
+          applyReuseSnapshot(snap);
+          closeLb();
+          return;
+        }
+        if (!lbGenId) return;
+        try {
+          const data = await (window as any).pdLoadReuseInputs?.(lbGenId, { fieldPanel, fileUrls });
+          if (data) {
+            refreshButton();
+            (window as any).pdToast?.("Prompt and references loaded — edit and generate when ready", { accent: "var(--pd-mint)" });
+            closeLb();
+          }
+        } catch { /* ignore */ }
+      });
       document.addEventListener("keydown", e => {
         if (!lbEl || lbEl.style.display !== "flex") return;
         if (e.key === "Escape") closeLb();
@@ -540,49 +596,114 @@ const config = {
       });
     }
 
-    function lbGo(idx: number) {
+    function renderLbDetails(inputs: Record<string, unknown> | undefined) {
+      const body = document.getElementById("pd-lb-body")!;
+      const reuseBtn = document.getElementById("pd-lb-reuse") as HTMLButtonElement;
+      const prompt = promptFromInputs(inputs);
+      const refs = refsFromInputs(inputs);
+      body.innerHTML = "";
+
+      if (refs.length) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = '<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;margin-bottom:8px;">References</div>';
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;";
+        refs.forEach((url) => {
+          const a = document.createElement("a");
+          a.href = url; a.target = "_blank"; a.rel = "noopener";
+          a.style.cssText = "display:block;width:64px;height:64px;border-radius:10px;overflow:hidden;border:0.5px solid var(--pd-hairline);background:var(--pd-bg2);flex-shrink:0;";
+          const img = document.createElement("img");
+          img.src = url; img.alt = "Reference"; img.loading = "lazy";
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+          a.appendChild(img);
+          row.appendChild(a);
+        });
+        wrap.appendChild(row);
+        body.appendChild(wrap);
+      }
+
+      if (prompt) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML =
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">' +
+            '<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;">Prompt</div>' +
+            '<button type="button" id="pd-lb-copy-p" style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.5px;background:none;border:none;cursor:pointer;text-transform:uppercase;">Copy</button>' +
+          '</div>';
+        const box = document.createElement("div");
+        box.textContent = prompt;
+        box.style.cssText = "padding:11px 12px;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:12.5px;line-height:1.5;color:var(--pd-ink2);white-space:pre-wrap;max-height:180px;overflow-y:auto;";
+        wrap.appendChild(box);
+        body.appendChild(wrap);
+        wrap.querySelector("#pd-lb-copy-p")?.addEventListener("click", () => {
+          navigator.clipboard?.writeText(prompt).catch(() => {});
+          (window as any).pdToast?.("Prompt copied", { accent: "var(--pd-mint)" });
+        });
+      }
+
+      if (!prompt && !refs.length) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "font-size:12px;line-height:1.45;color:var(--pd-ink4);";
+        empty.textContent = lbGenId ? "Loading inputs…" : "No prompt or references available for this result.";
+        body.appendChild(empty);
+      }
+
+      const canReuse = !!(lbGenId && (inputs || jobSnapshots.has(lbGenId)));
+      reuseBtn.style.display = canReuse || !!lbGenId ? "block" : "none";
+    }
+
+    async function lbGo(idx: number) {
       buildLb();
       lbCur = Math.max(0, Math.min(idx, lbList.length - 1));
       const url = lbList[lbCur];
       const mediaEl = document.getElementById("pd-lb-media")!;
-      const dlEl = document.getElementById("pd-lb-dl")!;
+      const dlEl = document.getElementById("pd-lb-dl") as HTMLAnchorElement;
       const prevBtn = document.getElementById("pd-lb-prev") as HTMLButtonElement;
       const nextBtn = document.getElementById("pd-lb-next") as HTMLButtonElement;
 
-      // Pause any previous video
       mediaEl.querySelector("video")?.pause();
       mediaEl.innerHTML = "";
 
       if (lbIsVideo) {
         const v = document.createElement("video");
         v.src = url; v.controls = true; v.autoplay = true; v.playsInline = true; v.loop = true;
-        v.style.cssText = "max-width:min(94vw,1080px);max-height:86vh;border-radius:14px;display:block;";
+        v.style.cssText = "max-width:100%;max-height:calc(100vh - 96px);border-radius:0;display:block;";
         mediaEl.appendChild(v);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.style.cssText = "max-width:min(94vw,1200px);max-height:86vh;border-radius:14px;display:block;object-fit:contain;";
+        img.style.cssText = "max-width:100%;max-height:calc(100vh - 96px);display:block;object-fit:contain;";
         mediaEl.appendChild(img);
       }
 
-      dlEl.innerHTML = "";
-      const a = document.createElement("a");
-      a.href = sourceUrl(url); a.download = "";
-      a.textContent = "↓ Download";
-      a.style.cssText = "padding:8px 18px;border-radius:10px;background:rgba(255,255,255,.13);backdrop-filter:blur(6px);border:0.5px solid rgba(255,255,255,.2);color:#fff;font-size:12.5px;text-decoration:none;display:inline-block;";
-      dlEl.appendChild(a);
+      dlEl.href = lbGenId ? `/api/download?id=${encodeURIComponent(lbGenId)}` : sourceUrl(url);
+      if (!lbGenId) dlEl.setAttribute("download", "");
+      else dlEl.removeAttribute("download");
 
       prevBtn.style.display = lbList.length > 1 ? "flex" : "none";
       nextBtn.style.display = lbList.length > 1 ? "flex" : "none";
-      (prevBtn as HTMLElement).style.opacity = lbCur > 0 ? "1" : "0.3";
-      (nextBtn as HTMLElement).style.opacity = lbCur < lbList.length - 1 ? "1" : "0.3";
+      prevBtn.style.opacity = lbCur > 0 ? "1" : "0.3";
+      nextBtn.style.opacity = lbCur < lbList.length - 1 ? "1" : "0.3";
+
+      const snap = lbGenId ? jobSnapshots.get(lbGenId) : null;
+      renderLbDetails(snap?.inputs);
+      if (lbGenId && !snap) {
+        fetch(`/api/generations/reuse?id=${encodeURIComponent(lbGenId)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (!data?.inputs || lbGenId !== (document.getElementById("pd-lb-reuse") as any)?._genId) return;
+            jobSnapshots.set(lbGenId!, { inputs: data.inputs, aspect: data.aspect, duration: data.duration, quality: data.quality });
+            renderLbDetails(data.inputs);
+          })
+          .catch(() => {});
+      }
+      (document.getElementById("pd-lb-reuse") as any)._genId = lbGenId;
 
       lbEl!.style.display = "flex";
       document.body.style.overflow = "hidden";
     }
 
-    function openLb(urls: string[], startIdx = 0, video = false) {
-      lbList = urls; lbIsVideo = video;
+    function openLb(urls: string[], startIdx = 0, video = false, genId?: string) {
+      lbList = urls; lbIsVideo = video; lbGenId = genId;
       lbGo(startIdx);
     }
 
@@ -641,7 +762,7 @@ const config = {
         }
         el.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
         cell.appendChild(el);
-        cell.addEventListener("click", () => openLb(outputs, i, isVideo));
+        cell.addEventListener("click", () => openLb(outputs, i, isVideo, genId));
         wrap.appendChild(cell);
       });
       tile.appendChild(wrap);
@@ -664,7 +785,7 @@ const config = {
       expandBtn.title = "View fullscreen";
       expandBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 1h3v3M10 1 6.5 4.5M4 10H1V7M1 10l3.5-3.5"/></svg>`;
       expandBtn.style.cssText = "position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:6px;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
-      expandBtn.addEventListener("click", e => { e.stopPropagation(); openLb(outputs, 0, isVideo); });
+      expandBtn.addEventListener("click", e => { e.stopPropagation(); openLb(outputs, 0, isVideo, genId); });
       tile.appendChild(expandBtn);
 
       // Download (uses protected endpoint when genId available, else direct CDN)

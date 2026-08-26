@@ -380,7 +380,7 @@ const config = {
       const img = document.createElement("img");
       img.src = url;
       img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;";
-      img.addEventListener("click", () => openLb(url));
+      img.addEventListener("click", () => openLb(url, genId));
       tile.appendChild(img);
       const snap = genId ? jobSnapshots.get(genId) : null;
       if (snap) {
@@ -400,14 +400,96 @@ const config = {
       tile.appendChild(dl);
     }
     let lbEl: HTMLElement | null = null;
-    function openLb(url: string) {
+    function openLb(url: string, genId?: string) {
       if (!lbEl) {
         lbEl = document.createElement("div");
-        lbEl.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:center;cursor:zoom-out;";
+        lbEl.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(5,5,8,.82);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;padding:24px;cursor:zoom-out;";
         lbEl.addEventListener("click", () => { lbEl!.style.display = "none"; document.body.style.overflow = ""; });
         document.body.appendChild(lbEl);
       }
-      lbEl.innerHTML = `<img src="${url}" style="max-width:94vw;max-height:90vh;border-radius:14px;object-fit:contain;" />`;
+      const snap = genId ? jobSnapshots.get(genId) : null;
+      const inputs = (snap?.inputs || {}) as Record<string, unknown>;
+      const prompt = typeof inputs.prompt === "string" ? inputs.prompt : "";
+      const refs: string[] = [];
+      const addRef = (u: unknown) => { if (typeof u === "string" && /^https?:\/\//.test(u) && !refs.includes(u)) refs.push(u); };
+      if (Array.isArray(inputs.images)) inputs.images.forEach(addRef);
+      addRef(inputs.person);
+
+      const card = document.createElement("div");
+      card.id = "pd-lb-card";
+      card.style.cssText = "cursor:default;display:grid;width:100%;max-width:980px;max-height:calc(100vh - 48px);overflow:hidden;border-radius:24px;background:var(--pd-raised);border:0.5px solid var(--pd-hairline2);grid-template-columns:minmax(0,1.3fr) minmax(260px,0.85fr);";
+      card.addEventListener("click", (e) => e.stopPropagation());
+
+      const media = document.createElement("div");
+      media.style.cssText = "background:#0a0a0b;display:flex;align-items:center;justify-content:center;min-height:240px;";
+      const img = document.createElement("img");
+      img.src = url;
+      img.style.cssText = "max-width:100%;max-height:calc(100vh - 96px);object-fit:contain;";
+      media.appendChild(img);
+
+      const side = document.createElement("div");
+      side.style.cssText = "display:flex;flex-direction:column;min-height:0;overflow:hidden;";
+      side.innerHTML = `<div style="padding:12px 16px;border-bottom:0.5px solid var(--pd-hairline);display:flex;justify-content:space-between;align-items:center;"><div style="font-size:14px;font-weight:600;color:var(--pd-ink);">Generation details</div><button type="button" data-lb-x style="width:28px;height:28px;border-radius:50%;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);color:var(--pd-ink2);cursor:pointer;">✕</button></div>`;
+      const body = document.createElement("div");
+      body.style.cssText = "padding:14px 16px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:14px;";
+      if (refs.length) {
+        const w = document.createElement("div");
+        w.innerHTML = `<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;margin-bottom:8px;">References</div>`;
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;";
+        refs.forEach((u) => {
+          const a = document.createElement("a");
+          a.href = u; a.target = "_blank"; a.rel = "noopener";
+          a.style.cssText = "display:block;width:64px;height:64px;border-radius:10px;overflow:hidden;border:0.5px solid var(--pd-hairline);";
+          a.innerHTML = `<img src="${u}" alt="" style="width:100%;height:100%;object-fit:cover;"/>`;
+          row.appendChild(a);
+        });
+        w.appendChild(row);
+        body.appendChild(w);
+      }
+      if (prompt) {
+        const w = document.createElement("div");
+        w.innerHTML = `<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;margin-bottom:8px;">Prompt</div>`;
+        const box = document.createElement("div");
+        box.textContent = prompt;
+        box.style.cssText = "padding:11px 12px;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:12.5px;line-height:1.5;color:var(--pd-ink2);white-space:pre-wrap;max-height:160px;overflow:auto;";
+        w.appendChild(box);
+        body.appendChild(w);
+      } else if (!refs.length) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "font-size:12px;color:var(--pd-ink4);";
+        empty.textContent = "No prompt or references saved for this result.";
+        body.appendChild(empty);
+      }
+      const foot = document.createElement("div");
+      foot.style.cssText = "padding:12px 16px 16px;border-top:0.5px solid var(--pd-hairline);display:flex;flex-direction:column;gap:8px;";
+      if (genId) {
+        const reuse = document.createElement("button");
+        reuse.type = "button";
+        reuse.textContent = "Reuse in new generation";
+        reuse.style.cssText = "width:100%;padding:11px 14px;border-radius:12px;background:var(--pd-mint);color:#0A0A0B;font-size:13px;font-weight:700;border:none;cursor:pointer;";
+        reuse.addEventListener("click", () => {
+          if (snap) applyStudioInputs(snap.inputs, snap.meta);
+          else (window as any).pdLoadReuseInputs?.(genId, { onLoaded: (d: any) => applyStudioInputs(d.inputs ?? {}) });
+          lbEl!.style.display = "none";
+          document.body.style.overflow = "";
+        });
+        foot.appendChild(reuse);
+      }
+      const dl = document.createElement("a");
+      dl.href = genId ? `/api/download?id=${encodeURIComponent(genId)}` : url;
+      if (!genId) dl.setAttribute("download", "");
+      dl.textContent = "↓ Download";
+      dl.style.cssText = "display:flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:12px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink);font-size:12.5px;font-weight:600;text-decoration:none;";
+      foot.appendChild(dl);
+
+      side.appendChild(body);
+      side.appendChild(foot);
+      card.appendChild(media);
+      card.appendChild(side);
+      lbEl.innerHTML = "";
+      lbEl.appendChild(card);
+      side.querySelector("[data-lb-x]")?.addEventListener("click", (e) => { e.stopPropagation(); lbEl!.style.display = "none"; document.body.style.overflow = ""; });
       lbEl.style.display = "flex";
       document.body.style.overflow = "hidden";
     }
