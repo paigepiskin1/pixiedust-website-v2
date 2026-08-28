@@ -40,6 +40,12 @@ export interface TemplateField {
   mentionFrom?: string;
   mentionLabel?: string;
   /**
+   * Multi-source variant of `mentionFrom`: lets one prompt pull `@`-mentions from
+   * several file fields at once, each with its own tag prefix and media kind
+   * (e.g. images → `@Image1`, videos → `@Video1`, audio → `@Audio1`).
+   */
+  mentionSources?: { key: string; label: string; kind?: "image" | "video" | "audio" }[];
+  /**
    * For multi-file fields: register each uploaded image to the BytePlus Portrait
    * Library at upload time and store the returned `asset://` id as the field
    * value (so real people are allowed and generation stays fast). Non-person

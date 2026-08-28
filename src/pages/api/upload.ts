@@ -7,10 +7,11 @@ function json(data: unknown, status = 200) {
 }
 
 const MAX_BYTES = 110 * 1024 * 1024; // 110MB (covers Kling's 100MB video limit)
-const ALLOWED = /^(image\/(png|jpe?g|webp|gif)|video\/(mp4|quicktime|webm))$/i;
+const ALLOWED = /^(image\/(png|jpe?g|webp|gif)|video\/(mp4|quicktime|webm)|audio\/(mpeg|mp3|wav|x-wav|wave))$/i;
 const EXT: Record<string, string> = {
   "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "image/webp": "webp", "image/gif": "gif",
   "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm",
+  "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav",
 };
 
 export async function POST({ request, locals }: APIContext) {
@@ -34,7 +35,8 @@ export async function POST({ request, locals }: APIContext) {
 
   try {
     const url = await uploadToBunny(env, path, await file.arrayBuffer(), file.type);
-    return json({ url, kind: file.type.startsWith("video") ? "video" : "image" });
+    const kind = file.type.startsWith("video") ? "video" : file.type.startsWith("audio") ? "audio" : "image";
+    return json({ url, kind });
   } catch {
     return json({ error: "Upload failed. Please try again." }, 502);
   }

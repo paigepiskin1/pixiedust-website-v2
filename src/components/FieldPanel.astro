@@ -58,7 +58,7 @@ function formatAccept(accept: string) {
       <label class="block">
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         {f.type === "textarea" ? (
-          <textarea data-field={f.key} data-mention-from={f.mentionFrom || undefined} data-mention-label={f.mentionLabel || undefined} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
+          <textarea data-field={f.key} data-mention-from={f.mentionFrom || undefined} data-mention-label={f.mentionLabel || undefined} data-mention-sources={f.mentionSources ? JSON.stringify(f.mentionSources) : undefined} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
         ) : f.type === "select" && (f.options ?? []).some((o) => (o as any).image) ? (
           <>
             <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
@@ -170,7 +170,8 @@ function formatAccept(accept: string) {
     let input = "";
     if (type === "textarea") {
       const mf = f.mentionFrom ? ` data-mention-from="${escAttr(String(f.mentionFrom))}"${f.mentionLabel ? ` data-mention-label="${escAttr(String(f.mentionLabel))}"` : ""}` : "";
-      input = `<textarea data-field="${key}"${mf} rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
+      const ms = f.mentionSources ? ` data-mention-sources="${escAttr(JSON.stringify(f.mentionSources))}"` : "";
+      input = `<textarea data-field="${key}"${mf}${ms} rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
     } else if (type === "select" && Array.isArray(f.options) && f.options.some((o: any) => o && o.image)) {
       const current = def || String(f.options[0]?.value ?? "");
       const cards = f.options.map((o: any) => {
@@ -371,15 +372,39 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
 
       async function addFile(file: File) {
         if (urls.length >= maxFiles) return;
+        // Preview by kind: image → <img>, video → <video> first frame + play
+        // badge, audio → a music-note icon (no visual media).
+        const kind = /^video\//.test(file.type) ? "video" : /^audio\//.test(file.type) ? "audio" : "image";
         const thumb = document.createElement("div");
         thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
-        const img = document.createElement("img");
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
-        img.src = URL.createObjectURL(file);
+        let media: HTMLImageElement | HTMLVideoElement | null = null;
+        let blobSrc = "";
+        if (kind === "audio") {
+          const icon = document.createElement("div");
+          icon.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--pd-ink2);";
+          icon.innerHTML = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>`;
+          thumb.appendChild(icon);
+        } else if (kind === "video") {
+          const v = document.createElement("video");
+          v.muted = true; v.playsInline = true; v.preload = "metadata";
+          v.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          blobSrc = URL.createObjectURL(file); v.src = blobSrc;
+          const play = document.createElement("div");
+          play.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:#fff;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.6));";
+          play.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+          thumb.appendChild(v); thumb.appendChild(play);
+          media = v;
+        } else {
+          const img = document.createElement("img");
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          blobSrc = URL.createObjectURL(file); img.src = blobSrc;
+          thumb.appendChild(img);
+          media = img;
+        }
         const spinner = document.createElement("div");
         spinner.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);font-size:9px;color:#fff;";
         spinner.textContent = "↑";
-        thumb.appendChild(img); thumb.appendChild(spinner);
+        thumb.appendChild(spinner);
         thumbsEl?.appendChild(thumb);
         if (thumbsEl) thumbsEl.style.display = "flex";
 
@@ -389,20 +414,17 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           const r = await fetch("/api/upload", { method: "POST", body: fd });
           const d = await r.json();
           if (r.ok) {
-            const blobSrc = img.src;
             urls.push(d.url);
-            img.src = d.url;
-            URL.revokeObjectURL(blobSrc);
+            if (media) media.src = d.url;
+            if (blobSrc) URL.revokeObjectURL(blobSrc);
             const x = document.createElement("button");
             x.type = "button"; x.textContent = "✕";
             x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
             x.addEventListener("click", () => { urls = urls.filter(u => u !== d.url); valueByUrl.delete(d.url); thumb.remove(); syncZone(); });
             thumb.appendChild(x);
             // Register real people to the Portrait Library now (spread out per
-            // upload) so generation can use them and stays fast. bump() keeps the
-            // Generate button waiting until this finishes.
-            // Register real people to the Portrait Library now (spread out per
-            // upload) so generation can use them and stays fast.
+            // upload) so generation can use them and stays fast. Only applies to
+            // image reference fields (registerPortrait); videos/audio pass through.
             if (registerPortrait) {
               spinner.textContent = "⋯";
               await registerPortraitFor(d.url, thumb);
@@ -598,9 +620,21 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
   // @Image1, @Image2, … for the images uploaded in that multi-file field (in
   // upload order). Lets users "call" a reference into the prompt by typing @.
   function setupMention(textarea: HTMLTextAreaElement) {
-    const fromKey = textarea.dataset.mentionFrom;
-    if (!fromKey) return;
-    const label = textarea.dataset.mentionLabel || "Image";
+    // A prompt can pull mentions from one field (data-mention-from + label) or
+    // several (data-mention-sources JSON: [{key,label,kind}]).
+    type Src = { key: string; label: string; kind: "image" | "video" | "audio" };
+    let sources: Src[] = [];
+    if (textarea.dataset.mentionSources) {
+      try {
+        sources = (JSON.parse(textarea.dataset.mentionSources) as any[])
+          .filter((s) => s && s.key)
+          .map((s) => ({ key: String(s.key), label: String(s.label || "Image"), kind: (s.kind || "image") as Src["kind"] }));
+      } catch { /* fall back below */ }
+    }
+    if (!sources.length && textarea.dataset.mentionFrom) {
+      sources = [{ key: textarea.dataset.mentionFrom, label: textarea.dataset.mentionLabel || "Image", kind: "image" }];
+    }
+    if (!sources.length) return;
     const wrap = textarea.parentElement as HTMLElement | null;
     if (!wrap) return;
     if (getComputedStyle(wrap).position === "static") wrap.style.position = "relative";
@@ -614,10 +648,17 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     let items: { el: HTMLElement; tag: string }[] = [];
     let active = -1;
 
-    const urls = (): string[] => {
-      const v = (fileUrls as Record<string, unknown>)[fromKey];
-      if (Array.isArray(v)) return v.filter((u): u is string => typeof u === "string" && u.length > 0);
-      return typeof v === "string" && v ? [v] : [];
+    // Flat list of every mentionable reference across sources, numbered per-source.
+    const options = (): { url: string; tag: string; kind: Src["kind"] }[] => {
+      const out: { url: string; tag: string; kind: Src["kind"] }[] = [];
+      for (const s of sources) {
+        const v = (fileUrls as Record<string, unknown>)[s.key];
+        const list = Array.isArray(v)
+          ? v.filter((u): u is string => typeof u === "string" && u.length > 0)
+          : typeof v === "string" && v ? [v] : [];
+        list.forEach((url, i) => out.push({ url, tag: `${s.label}${i + 1}`, kind: s.kind }));
+      }
+      return out;
     };
 
     // The active @-token immediately before the caret (if any).
@@ -654,14 +695,18 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       hide();
       textarea.focus();
     };
+    const thumbHtml = (o: { url: string; kind: "image" | "video" | "audio" }) => {
+      const box = `width:34px;height:34px;border-radius:7px;overflow:hidden;flex:none;background:var(--pd-bg3);display:flex;align-items:center;justify-content:center;color:var(--pd-ink2);`;
+      if (o.kind === "image") return `<span style="${box}"><img src="${o.url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" /></span>`;
+      if (o.kind === "video") return `<span style="${box}position:relative;"><video src="${o.url}#t=0.1" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video><svg width="12" height="12" viewBox="0 0 24 24" fill="#fff" style="position:absolute;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));"><path d="M8 5v14l11-7z"/></svg></span>`;
+      return `<span style="${box}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></span>`;
+    };
     const update = () => {
       const t = token();
-      const list = urls();
+      const list = options();
       if (!t || list.length === 0) { hide(); return; }
       const q = t.query.toLowerCase();
-      const opts = list
-        .map((url, i) => ({ url, tag: `${label}${i + 1}`, n: i + 1 }))
-        .filter((o) => !q || o.tag.toLowerCase().includes(q) || String(o.n) === q);
+      const opts = list.filter((o) => !q || o.tag.toLowerCase().includes(q));
       if (!opts.length) { hide(); return; }
       menu.innerHTML = "";
       items = opts.map((o) => {
@@ -669,10 +714,7 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         b.type = "button";
         b.style.cssText =
           "display:flex;align-items:center;gap:9px;width:100%;padding:6px 7px;border-radius:9px;cursor:pointer;background:transparent;border:none;text-align:left;color:var(--pd-ink);";
-        b.innerHTML =
-          `<span style="width:34px;height:34px;border-radius:7px;overflow:hidden;flex:none;background:var(--pd-bg3);display:block;">` +
-          `<img src="${o.url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" /></span>` +
-          `<span style="font-size:13px;font-weight:600;">@${o.tag}</span>`;
+        b.innerHTML = thumbHtml(o) + `<span style="font-size:13px;font-weight:600;">@${o.tag}</span>`;
         b.addEventListener("mousedown", (e) => { e.preventDefault(); choose(o.tag); });
         menu.appendChild(b);
         return { el: b, tag: o.tag };
@@ -697,7 +739,7 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     });
     textarea.addEventListener("blur", () => setTimeout(hide, 150));
   }
-  root.querySelectorAll<HTMLTextAreaElement>("textarea[data-field][data-mention-from]").forEach(setupMention);
+  root.querySelectorAll<HTMLTextAreaElement>("textarea[data-field][data-mention-from], textarea[data-field][data-mention-sources]").forEach(setupMention);
 };
 
 // ── Collect all field values ──────────────────────────────────────────────────

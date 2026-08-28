@@ -26,18 +26,24 @@ export function shapeByteplusInput(input: Record<string, unknown>): Record<strin
   // A template-authored `content` array is already in Ark form — don't touch it.
   if (Array.isArray(input.content)) return input;
   // Nothing to assemble unless the flat omni-reference shape is present.
-  if (!("prompt" in input) && !("reference_images" in input)) return input;
+  if (!("prompt" in input) && !("reference_images" in input) && !("reference_videos" in input) && !("reference_audios" in input))
+    return input;
 
-  const { prompt, reference_images, ...rest } = input as Record<string, unknown> & {
+  const { prompt, reference_images, reference_videos, reference_audios, ...rest } = input as Record<string, unknown> & {
     prompt?: unknown;
     reference_images?: unknown;
+    reference_videos?: unknown;
+    reference_audios?: unknown;
   };
-  const refs = Array.isArray(reference_images)
-    ? reference_images.filter((u): u is string => typeof u === "string" && u.length > 0)
-    : [];
+  const urls = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((u): u is string => typeof u === "string" && u.length > 0) : [];
 
+  // Multimodal references: images → @Image1…, videos → @Video1…, audio → @Audio1…
+  // (each numbered per-type, in upload order — matching the prompt's tags).
   const content: unknown[] = [{ type: "text", text: String(prompt ?? "") }];
-  for (const url of refs) content.push({ type: "image_url", image_url: { url }, role: "reference_image" });
+  for (const url of urls(reference_images)) content.push({ type: "image_url", image_url: { url }, role: "reference_image" });
+  for (const url of urls(reference_videos)) content.push({ type: "video_url", video_url: { url }, role: "reference_video" });
+  for (const url of urls(reference_audios)) content.push({ type: "audio_url", audio_url: { url }, role: "reference_audio" });
 
   return { ...rest, content };
 }
