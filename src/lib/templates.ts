@@ -31,6 +31,34 @@ export interface TemplateField {
   multiple?: boolean;
   /** For select fields: "buttons" (default) or "dropdown". */
   ui?: "buttons" | "dropdown";
+  /**
+   * For textarea fields: enable an `@`-mention autocomplete that inserts tags
+   * (`@Image1`, `@Image2`, …) for the images uploaded in the referenced
+   * multi-file field. `mentionFrom` is that field's key; `mentionLabel` is the
+   * tag prefix (defaults to "Image"). Used by reference-driven video templates.
+   */
+  mentionFrom?: string;
+  mentionLabel?: string;
+  /**
+   * Multi-source variant of `mentionFrom`: lets one prompt pull `@`-mentions from
+   * several file fields at once, each with its own tag prefix and media kind
+   * (e.g. images → `@Image1`, videos → `@Video1`, audio → `@Audio1`).
+   */
+  mentionSources?: { key: string; label: string; kind?: "image" | "video" | "audio" }[];
+  /**
+   * For multi-file fields: register each uploaded image to the BytePlus Portrait
+   * Library at upload time and store the returned `asset://` id as the field
+   * value (so real people are allowed and generation stays fast). Non-person
+   * images fall back to their raw URL.
+   */
+  registerPortrait?: boolean;
+  /**
+   * When true, this (select) field lets the user choose the generation model.
+   * Its option `value`s are model ids; the chosen value overrides the template's
+   * `model` at generation time (see `resolveModel`). The field is metadata only —
+   * it is not substituted into `input_json`.
+   */
+  asModel?: boolean;
 }
 
 export interface TemplateStep {
@@ -313,6 +341,20 @@ export function resolveChainStep(
     return v;
   };
   return sub(inputObj);
+}
+
+/**
+ * The model to generate with. If a field is flagged `asModel`, return the
+ * user-chosen model (validated against that field's option values); otherwise
+ * fall back to the template's default `model`. Guards against arbitrary model
+ * injection by only accepting values the template explicitly offers.
+ */
+export function resolveModel(t: Template, inputs: Record<string, unknown>): string {
+  const mf = allFields(t).find((f) => f.asModel && Array.isArray(f.options) && f.options.length > 0);
+  if (!mf) return t.model;
+  const chosen = String(inputs[mf.key] ?? mf.default ?? "");
+  const allowed = (mf.options ?? []).map((o) => o.value);
+  return chosen && allowed.includes(chosen) ? chosen : t.model;
 }
 
 /** Workspace URL for a template. */

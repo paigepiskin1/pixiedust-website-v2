@@ -1,13 +1,55 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults } from "../../../lib/templates";
+import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults, resolveModel } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
 
+// Per-model limits from the template meta ({ models: { <id>: { maxRefs, durations } } }).
+// Used to clamp duration + trim references to what the chosen model actually allows.
+function modelLimits(metaJson: string | null, model: string): { maxRefs?: number; durations?: number[] } {
+  if (!metaJson) return {};
+  try {
+    const cfg = (JSON.parse(metaJson) as { models?: Record<string, any> }).models?.[model];
+    if (!cfg) return {};
+    return {
+      maxRefs: typeof cfg.maxRefs === "number" ? cfg.maxRefs : undefined,
+      durations: Array.isArray(cfg.durations) ? cfg.durations.map(Number) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// Sanitize the client's reuse snapshot before persisting it (used by the gallery
+// to reload a creation into the studio). Keeps only durable https reference URLs
+// and bounds every field so a crafted payload can't bloat the row.
+function buildReuseJson(reuse: unknown, maxRefs?: number): string | null {
+  if (!reuse || typeof reuse !== "object") return null;
+  const r = reuse as Record<string, unknown>;
+  const refsRaw = Array.isArray(r.references) ? r.references : [];
+  const references = refsRaw
+    .filter((u): u is string => typeof u === "string" && /^https?:\/\//i.test(u) && u.length < 1024)
+    .slice(0, maxRefs && maxRefs > 0 ? maxRefs : 40);
+  const clip = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : null);
+  const payload = {
+    prompt: clip(r.prompt, 4000) ?? "",
+    references,
+    model: clip(r.model, 128),
+    aspect: clip(r.aspect, 32),
+    duration: r.duration == null ? null : String(r.duration).slice(0, 16),
+    quality: clip(r.quality, 32),
+  };
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return null;
+  }
 }
 
 export async function POST({ request, locals }: APIContext) {
@@ -20,7 +62,7 @@ export async function POST({ request, locals }: APIContext) {
   if (!dbUser) return json({ error: "Account not found." }, 401);
   const userId = dbUser.id;
 
-  let body: { templateId?: string; inputs?: Record<string, unknown>; quality?: string; quantity?: number; aspect?: string; duration?: number };
+  let body: { templateId?: string; inputs?: Record<string, unknown>; quality?: string; quantity?: number; aspect?: string; duration?: number; reuse?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -39,7 +81,16 @@ export async function POST({ request, locals }: APIContext) {
   if (missing.length) return json({ error: `${missing[0].label} is required`, errors: missing.map((f) => `${f.label} is required`) }, 400);
 
   const qty = Math.max(1, Math.min(Number(body.quantity) || 1, 4));
-  const duration = Number(body.duration) || undefined;
+  // Resolve the chosen model (e.g. Seedance 2.0 vs 2.5) and clamp the requested
+  // duration to what that model supports, so an out-of-range value can't slip
+  // through (the client already restricts, this is the server-side safety net).
+  const model = resolveModel(template, inputs);
+  const limits = modelLimits(template.meta, model);
+  let duration = Number(body.duration) || undefined;
+  if (duration && limits.durations && limits.durations.length) {
+    const maxD = Math.max(...limits.durations);
+    if (duration > maxD) duration = maxD;
+  }
   const cost = computeCost(template, { quality: body.quality, quantity: qty, duration });
 
   // Limits
@@ -63,8 +114,11 @@ export async function POST({ request, locals }: APIContext) {
       .bind(detail, cost, genId)
       .run();
     // Pass the provider message through so the studio can show a useful reason
-    // (e.g. BytePlus real-person blocks) instead of a generic network error.
-    return json({ error: detail + " — credits refunded." }, 502);
+    // (e.g. BytePlus real-person blocks / "activate this model"). Use 400, NOT a
+    // 5xx: Cloudflare's edge replaces gateway statuses (502/503/504) with its own
+    // "error code: 502" page, which strips our JSON body — so the real reason
+    // never reached the client and every dispatch failure looked like a bare 502.
+    return json({ error: detail + " — credits refunded." }, 400);
   };
 
   // ─── Multi-step chain ───
@@ -149,16 +203,33 @@ export async function POST({ request, locals }: APIContext) {
     input.resolution = body.quality;
   }
 
+  // BytePlus real-person support: Seedance rejects raw photos of real people, so
+  // register each reference to the Portrait Library and swap the raw URL for the
+  // returned asset:// id. Images that aren't valid portraits (products, scenes)
+  // fail registration and keep their raw URL, which Seedance accepts directly.
+  // Real-person references were already registered to the Portrait Library at
+  // upload time (POST /api/byteplus/portrait) and arrive here as `asset://` ids,
+  // so generation stays fast. Just trim to the chosen model's reference cap.
+  if (
+    template.provider === "byteplus" &&
+    Array.isArray(input.reference_images) &&
+    limits.maxRefs &&
+    (input.reference_images as unknown[]).length > limits.maxRefs
+  ) {
+    input.reference_images = (input.reference_images as unknown[]).slice(0, limits.maxRefs);
+  }
+
+  const reuseJson = buildReuseJson(body.reuse, limits.maxRefs);
   await db
     .prepare(
-      `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+      `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, reuse_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
     )
-    .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty)
-    .run();
+      .bind(genId, userId, template.id, template.kind, template.type, template.provider, model, JSON.stringify(input), cost, body.quality ?? null, qty, reuseJson)
+      .run();
 
   try {
-    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
+    const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model, input });
     await db
       .prepare("UPDATE generations SET status='processing', provider_job_id=?, updated_at=datetime('now') WHERE id=?")
       .bind(jobId, genId)

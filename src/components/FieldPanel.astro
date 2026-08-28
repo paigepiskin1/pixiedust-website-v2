@@ -32,11 +32,11 @@ function formatAccept(accept: string) {
     f.type === "file" ? (
       <div class="block">
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
-        <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
+        <div class="pd-file-wrap" data-fieldkey={f.key} data-multiple={f.multiple ? "true" : undefined} data-max={f.multiple ? String(f.max ?? 4) : undefined} data-register-portrait={f.registerPortrait ? "true" : undefined} data-default={f.default != null && f.default !== "" ? JSON.stringify(f.default) : undefined}>
           <div class="pd-upload-zone relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-xl text-center" style="padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);transition:border-color 0.15s,background 0.15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
-            {f.accept && <span style="font-size:10.5px;color:var(--pd-ink4);pointer-events:none;">{formatAccept(f.accept)} · {f.multiple ? `up to ${f.max ?? 4} files` : "1 file max"}</span>}
+            {f.accept && <span style="font-size:10.5px;color:var(--pd-ink4);pointer-events:none;">{formatAccept(f.accept)} · {f.multiple ? (<span class="pd-file-max">up to {f.max ?? 4} files</span>) : "1 file max"}</span>}
             <input data-field={f.key} type="file" accept={f.accept} multiple={f.multiple || undefined} class="absolute inset-0 cursor-pointer opacity-0" style="z-index:1;" />
           </div>
           {f.multiple ? (
@@ -58,7 +58,7 @@ function formatAccept(accept: string) {
       <label class="block">
         <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">{f.label}{f.required ? " *" : ""}</span>
         {f.type === "textarea" ? (
-          <textarea data-field={f.key} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
+          <textarea data-field={f.key} data-mention-from={f.mentionFrom || undefined} data-mention-label={f.mentionLabel || undefined} data-mention-sources={f.mentionSources ? JSON.stringify(f.mentionSources) : undefined} rows="3" placeholder={f.placeholder} class="w-full rounded-xl text-ink outline-none" style="padding:11px 13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);font-size:13.5px;line-height:1.5;resize:vertical;">{String(f.default ?? "")}</textarea>
         ) : f.type === "select" && (f.options ?? []).some((o) => (o as any).image) ? (
           <>
             <input type="hidden" data-field={f.key} value={String(f.default ?? f.options?.[0]?.value ?? "")} />
@@ -144,7 +144,7 @@ function formatAccept(accept: string) {
       const acceptLabel = accept ? accept.replace(/image\//g,"").replace(/video\//g,"").replace(/,\s*/g,", ").toUpperCase() : "";
       return `<div>
         <span style="display:block;margin-bottom:6px;font-size:12.5px;font-weight:500;color:var(--pd-ink);">${escHtml(label)}${f.required?" *":""}</span>
-        <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
+        <div class="pd-file-wrap" data-fieldkey="${key}"${isMulti?` data-multiple="true" data-max="${maxFiles}"`:""}${f.registerPortrait?` data-register-portrait="true"`:""}${f.default!=null&&f.default!==""?` data-default="${escAttr(JSON.stringify(f.default))}"`:""}>
           <div class="pd-upload-zone" style="position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;background:var(--pd-bg);border:1px dashed var(--pd-hairline2);border-radius:12px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pd-ink3)" stroke-width="1.4" stroke-linecap="round"><path d="M10 13V7M7 10l3-3 3 3"/><rect x="3" y="3" width="14" height="14" rx="3"/></svg>
             <span style="font-size:12px;color:var(--pd-ink3);pointer-events:none;">Click or drag to upload</span>
@@ -169,7 +169,9 @@ function formatAccept(accept: string) {
 
     let input = "";
     if (type === "textarea") {
-      input = `<textarea data-field="${key}" rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
+      const mf = f.mentionFrom ? ` data-mention-from="${escAttr(String(f.mentionFrom))}"${f.mentionLabel ? ` data-mention-label="${escAttr(String(f.mentionLabel))}"` : ""}` : "";
+      const ms = f.mentionSources ? ` data-mention-sources="${escAttr(JSON.stringify(f.mentionSources))}"` : "";
+      input = `<textarea data-field="${key}"${mf}${ms} rows="3" placeholder="${escAttr(ph)}" style="${S}line-height:1.5;resize:vertical;">${escHtml(def)}</textarea>`;
     } else if (type === "select" && Array.isArray(f.options) && f.options.some((o: any) => o && o.image)) {
       const current = def || String(f.options[0]?.value ?? "");
       const cards = f.options.map((o: any) => {
@@ -316,30 +318,93 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     const key = el.dataset.field!;
     const wrap = el.closest(".pd-file-wrap") as HTMLElement|null;
     const isMulti = wrap?.dataset.multiple === "true";
-    const maxFiles = Number(wrap?.dataset.max ?? 4);
+    // `maxFiles` is mutable so callers can raise/lower the cap at runtime (e.g. the
+    // studio switching between models with different reference limits).
+    let maxFiles = Number(wrap?.dataset.max ?? 4);
     const zone = wrap?.querySelector<HTMLElement>(".pd-upload-zone");
 
     if (isMulti) {
       const thumbsEl = wrap?.querySelector<HTMLElement>(".pd-multi-previews");
+      const registerPortrait = wrap?.dataset.registerPortrait === "true";
       let urls: string[] = [];
+      // Maps a displayed (CDN) URL → the value sent to the model. For portrait
+      // fields that's the `asset://` id from the Portrait Library; otherwise the
+      // URL itself. Lets thumbnails show the real image while generation uses the
+      // registered asset id.
+      const valueByUrl = new Map<string, string>();
 
       function syncZone() {
         if (zone) zone.style.display = urls.length >= maxFiles ? "none" : "";
         if (thumbsEl) thumbsEl.style.display = urls.length > 0 ? "flex" : "none";
-        fileUrls[key] = urls.length > 0 ? [...urls] : [];
+        fileUrls[key] = urls.length > 0 ? urls.map((u) => valueByUrl.get(u) ?? u) : [];
+      }
+
+      // Register one hosted CDN url to the Portrait Library, storing the returned
+      // asset:// id as the field value and badging the thumb if it couldn't be
+      // saved. Shared by fresh uploads and by "reuse" (which re-registers so a
+      // stale asset id from a past generation is never submitted).
+      async function registerPortraitFor(url: string, thumb: HTMLElement) {
+        bump(1);
+        let portrait = false;
+        let reason = "";
+        try {
+          const rr = await fetch("/api/byteplus/portrait", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+          const rd = await rr.json().catch(() => ({}));
+          if (rr.ok && rd && typeof rd.ref === "string") valueByUrl.set(url, rd.ref);
+          portrait = !!(rr.ok && rd && rd.active === true);
+          reason = rd && typeof rd.reason === "string" ? rd.reason : "";
+        } catch { /* keep the raw URL as the value */ }
+        finally { bump(-1); }
+        if (!portrait) {
+          const busy = reason === "pool_full" || reason === "timeout" || reason === "error";
+          const badge = document.createElement("div");
+          badge.textContent = "!";
+          badge.title =
+            reason === "copyright"
+              ? "This image looks like copyrighted or watermarked content (e.g. a downloaded/celebrity photo or one with a site watermark), so it can't be registered as a portrait. Use your own photo without watermarks."
+              : busy
+              ? "Couldn't save this as a portrait right now — the portrait service was busy. Remove and re-upload it in a moment to try again."
+              : "Couldn't be saved as a portrait, so it'll be used as-is. That's fine for objects/scenes; if it's a real person, generation may block it — try re-uploading, or use a clearer, front-facing photo.";
+          badge.style.cssText = "position:absolute;bottom:3px;left:3px;width:15px;height:15px;border-radius:50%;background:var(--pd-amber);color:#0a0a0b;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:help;z-index:2;";
+          thumb.appendChild(badge);
+        }
       }
 
       async function addFile(file: File) {
         if (urls.length >= maxFiles) return;
+        // Preview by kind: image → <img>, video → <video> first frame + play
+        // badge, audio → a music-note icon (no visual media).
+        const kind = /^video\//.test(file.type) ? "video" : /^audio\//.test(file.type) ? "audio" : "image";
         const thumb = document.createElement("div");
         thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
-        const img = document.createElement("img");
-        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
-        img.src = URL.createObjectURL(file);
+        let media: HTMLImageElement | HTMLVideoElement | null = null;
+        let blobSrc = "";
+        if (kind === "audio") {
+          const icon = document.createElement("div");
+          icon.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--pd-ink2);";
+          icon.innerHTML = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>`;
+          thumb.appendChild(icon);
+        } else if (kind === "video") {
+          const v = document.createElement("video");
+          v.muted = true; v.playsInline = true; v.preload = "metadata";
+          v.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          blobSrc = URL.createObjectURL(file); v.src = blobSrc;
+          const play = document.createElement("div");
+          play.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:#fff;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.6));";
+          play.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+          thumb.appendChild(v); thumb.appendChild(play);
+          media = v;
+        } else {
+          const img = document.createElement("img");
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          blobSrc = URL.createObjectURL(file); img.src = blobSrc;
+          thumb.appendChild(img);
+          media = img;
+        }
         const spinner = document.createElement("div");
         spinner.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);font-size:9px;color:#fff;";
         spinner.textContent = "↑";
-        thumb.appendChild(img); thumb.appendChild(spinner);
+        thumb.appendChild(spinner);
         thumbsEl?.appendChild(thumb);
         if (thumbsEl) thumbsEl.style.display = "flex";
 
@@ -349,16 +414,22 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
           const r = await fetch("/api/upload", { method: "POST", body: fd });
           const d = await r.json();
           if (r.ok) {
-            const blobSrc = img.src;
             urls.push(d.url);
-            img.src = d.url;
-            URL.revokeObjectURL(blobSrc);
-            spinner.remove();
+            if (media) media.src = d.url;
+            if (blobSrc) URL.revokeObjectURL(blobSrc);
             const x = document.createElement("button");
             x.type = "button"; x.textContent = "✕";
             x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
-            x.addEventListener("click", () => { urls = urls.filter(u => u !== d.url); thumb.remove(); syncZone(); });
+            x.addEventListener("click", () => { urls = urls.filter(u => u !== d.url); valueByUrl.delete(d.url); thumb.remove(); syncZone(); });
             thumb.appendChild(x);
+            // Register real people to the Portrait Library now (spread out per
+            // upload) so generation can use them and stays fast. Only applies to
+            // image reference fields (registerPortrait); videos/audio pass through.
+            if (registerPortrait) {
+              spinner.textContent = "⋯";
+              await registerPortraitFor(d.url, thumb);
+            }
+            spinner.remove();
           } else { thumb.remove(); }
         } catch { thumb.remove(); }
         finally { bump(-1); }
@@ -396,6 +467,72 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         const arr = Array.isArray(def) ? def : def ? [def] : [];
         for (const u of arr.slice(0, maxFiles)) addExisting(String(u));
       } catch { /* ignore bad default */ }
+
+      // Let external code (e.g. the studio model switcher) change the cap at
+      // runtime: relabel, trim any now-excess uploads, and re-sync the dropzone.
+      (wrap as any)._pdApplyMax = (n: number) => {
+        maxFiles = Number(n) || maxFiles;
+        if (wrap) wrap.dataset.max = String(maxFiles);
+        const lbl = wrap?.querySelector<HTMLElement>(".pd-file-max");
+        if (lbl) lbl.textContent = `up to ${maxFiles} files`;
+        while (urls.length > maxFiles) { urls.pop(); thumbsEl?.lastElementChild?.remove(); }
+        syncZone();
+      };
+
+      // Load a set of hosted CDN urls as references WITHOUT registering them —
+      // this powers "Reuse". Registration is deferred to generate time (see
+      // _pdEnsureRegistered) so reusing a creation without generating never
+      // leaves an orphaned portrait asset in the pool. The submitted value stays
+      // the CDN url until then.
+      (wrap as any)._pdLoadReferences = (list: string[]) => {
+        urls = [];
+        valueByUrl.clear();
+        if (thumbsEl) thumbsEl.innerHTML = "";
+        for (const raw of Array.isArray(list) ? list : []) {
+          if (urls.length >= maxFiles) break;
+          const url = String(raw || "");
+          if (!/^https?:\/\//i.test(url)) continue; // skip asset:// / non-displayable
+          const thumb = document.createElement("div");
+          thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
+          const img = document.createElement("img");
+          img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+          img.src = url;
+          const x = document.createElement("button");
+          x.type = "button"; x.textContent = "✕";
+          x.style.cssText = "position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;font-size:9px;border:none;cursor:pointer;line-height:1;";
+          x.addEventListener("click", () => { urls = urls.filter((u) => u !== url); valueByUrl.delete(url); thumb.remove(); syncZone(); });
+          thumb.appendChild(img); thumb.appendChild(x);
+          thumbsEl?.appendChild(thumb);
+          urls.push(url);
+        }
+        syncZone();
+      };
+
+      // Ensure every reference has a live portrait asset:// right before a
+      // Generate. Registers any reference that (a) was never registered (loaded
+      // via Reuse) or (b) is in `spentDisplays` — i.e. its asset was freed after
+      // a previous generation completed/failed. Already-live uploads are left as
+      // is, so we never double-register or orphan an asset.
+      (wrap as any)._pdEnsureRegistered = async (spentDisplays: string[]) => {
+        if (!registerPortrait || !thumbsEl) return;
+        const spent = new Set(Array.isArray(spentDisplays) ? spentDisplays : []);
+        for (const thumb of Array.from(thumbsEl.children) as HTMLElement[]) {
+          const img = thumb.querySelector("img");
+          const url = img?.src;
+          if (!url) continue;
+          const val = valueByUrl.get(url);
+          const live = !!(val && val.startsWith("asset://"));
+          if (live && !spent.has(url)) continue; // already registered & not spent
+          thumb.querySelectorAll("div").forEach((d) => { if (d.textContent === "!") d.remove(); });
+          const spinner = document.createElement("div");
+          spinner.style.cssText = "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);font-size:9px;color:#fff;";
+          spinner.textContent = "⋯";
+          thumb.appendChild(spinner);
+          await registerPortraitFor(url, thumb);
+          spinner.remove();
+          syncZone();
+        }
+      };
 
       syncZone();
       return;
@@ -463,7 +600,10 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
     const segs = Array.from(group.querySelectorAll<HTMLElement>(".pd-opt-seg"));
     segs.forEach((seg) => {
       seg.addEventListener("click", () => {
-        if (hidden) hidden.value = seg.dataset.val ?? "";
+        if (hidden) {
+          hidden.value = seg.dataset.val ?? "";
+          hidden.dispatchEvent(new Event("change", { bubbles: true }));
+        }
         segs.forEach((s) => {
           const on = s === seg;
           s.dataset.active = on ? "true" : "false";
@@ -474,6 +614,132 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       });
     });
   });
+
+  // ── @-mention autocomplete ────────────────────────────────────────────────
+  // A textarea with data-mention-from="<fileKey>" gets an @-picker that inserts
+  // @Image1, @Image2, … for the images uploaded in that multi-file field (in
+  // upload order). Lets users "call" a reference into the prompt by typing @.
+  function setupMention(textarea: HTMLTextAreaElement) {
+    // A prompt can pull mentions from one field (data-mention-from + label) or
+    // several (data-mention-sources JSON: [{key,label,kind}]).
+    type Src = { key: string; label: string; kind: "image" | "video" | "audio" };
+    let sources: Src[] = [];
+    if (textarea.dataset.mentionSources) {
+      try {
+        sources = (JSON.parse(textarea.dataset.mentionSources) as any[])
+          .filter((s) => s && s.key)
+          .map((s) => ({ key: String(s.key), label: String(s.label || "Image"), kind: (s.kind || "image") as Src["kind"] }));
+      } catch { /* fall back below */ }
+    }
+    if (!sources.length && textarea.dataset.mentionFrom) {
+      sources = [{ key: textarea.dataset.mentionFrom, label: textarea.dataset.mentionLabel || "Image", kind: "image" }];
+    }
+    if (!sources.length) return;
+    const wrap = textarea.parentElement as HTMLElement | null;
+    if (!wrap) return;
+    if (getComputedStyle(wrap).position === "static") wrap.style.position = "relative";
+
+    const menu = document.createElement("div");
+    menu.className = "pd-mention-menu";
+    menu.style.cssText =
+      "display:none;position:absolute;z-index:60;max-height:220px;overflow-y:auto;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,0.45);padding:5px;";
+    wrap.appendChild(menu);
+
+    let items: { el: HTMLElement; tag: string }[] = [];
+    let active = -1;
+
+    // Flat list of every mentionable reference across sources, numbered per-source.
+    const options = (): { url: string; tag: string; kind: Src["kind"] }[] => {
+      const out: { url: string; tag: string; kind: Src["kind"] }[] = [];
+      for (const s of sources) {
+        const v = (fileUrls as Record<string, unknown>)[s.key];
+        const list = Array.isArray(v)
+          ? v.filter((u): u is string => typeof u === "string" && u.length > 0)
+          : typeof v === "string" && v ? [v] : [];
+        list.forEach((url, i) => out.push({ url, tag: `${s.label}${i + 1}`, kind: s.kind }));
+      }
+      return out;
+    };
+
+    // The active @-token immediately before the caret (if any).
+    const token = (): { at: number; end: number; query: string } | null => {
+      const pos = textarea.selectionStart ?? 0;
+      const pre = textarea.value.slice(0, pos);
+      const m = /(^|[^\w@])@(\w*)$/.exec(pre);
+      if (!m) return null;
+      return { at: pos - m[2].length - 1, end: pos, query: m[2] };
+    };
+
+    const place = () => {
+      menu.style.top = textarea.offsetTop + textarea.offsetHeight + 4 + "px";
+      menu.style.left = textarea.offsetLeft + "px";
+      menu.style.width = textarea.offsetWidth + "px";
+    };
+    const hide = () => { menu.style.display = "none"; active = -1; };
+    const setActive = (i: number) => {
+      active = i;
+      items.forEach((it, j) => {
+        it.el.style.background = j === i ? "color-mix(in srgb,var(--pd-lilac) 16%,transparent)" : "transparent";
+      });
+    };
+    const choose = (tag: string) => {
+      const t = token();
+      if (!t) { hide(); return; }
+      const before = textarea.value.slice(0, t.at);
+      const after = textarea.value.slice(t.end);
+      const ins = "@" + tag + " ";
+      textarea.value = before + ins + after;
+      const caret = (before + ins).length;
+      textarea.setSelectionRange(caret, caret);
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      hide();
+      textarea.focus();
+    };
+    const thumbHtml = (o: { url: string; kind: "image" | "video" | "audio" }) => {
+      const box = `width:34px;height:34px;border-radius:7px;overflow:hidden;flex:none;background:var(--pd-bg3);display:flex;align-items:center;justify-content:center;color:var(--pd-ink2);`;
+      if (o.kind === "image") return `<span style="${box}"><img src="${o.url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" /></span>`;
+      if (o.kind === "video") return `<span style="${box}position:relative;"><video src="${o.url}#t=0.1" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video><svg width="12" height="12" viewBox="0 0 24 24" fill="#fff" style="position:absolute;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));"><path d="M8 5v14l11-7z"/></svg></span>`;
+      return `<span style="${box}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></span>`;
+    };
+    const update = () => {
+      const t = token();
+      const list = options();
+      if (!t || list.length === 0) { hide(); return; }
+      const q = t.query.toLowerCase();
+      const opts = list.filter((o) => !q || o.tag.toLowerCase().includes(q));
+      if (!opts.length) { hide(); return; }
+      menu.innerHTML = "";
+      items = opts.map((o) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.style.cssText =
+          "display:flex;align-items:center;gap:9px;width:100%;padding:6px 7px;border-radius:9px;cursor:pointer;background:transparent;border:none;text-align:left;color:var(--pd-ink);";
+        b.innerHTML = thumbHtml(o) + `<span style="font-size:13px;font-weight:600;">@${o.tag}</span>`;
+        b.addEventListener("mousedown", (e) => { e.preventDefault(); choose(o.tag); });
+        menu.appendChild(b);
+        return { el: b, tag: o.tag };
+      });
+      items.forEach((it, i) => it.el.addEventListener("mouseenter", () => setActive(i)));
+      place();
+      menu.style.display = "block";
+      setActive(0);
+    };
+
+    textarea.addEventListener("input", update);
+    textarea.addEventListener("click", update);
+    textarea.addEventListener("keyup", (e) => {
+      if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) update();
+    });
+    textarea.addEventListener("keydown", (e) => {
+      if (menu.style.display === "none") return;
+      if (e.key === "ArrowDown") { e.preventDefault(); if (items.length) setActive((active + 1) % items.length); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); if (items.length) setActive((active - 1 + items.length) % items.length); }
+      else if (e.key === "Enter" || e.key === "Tab") { if (items.length && active >= 0) { e.preventDefault(); choose(items[active].tag); } }
+      else if (e.key === "Escape") { e.preventDefault(); hide(); }
+    });
+    textarea.addEventListener("blur", () => setTimeout(hide, 150));
+  }
+  root.querySelectorAll<HTMLTextAreaElement>("textarea[data-field][data-mention-from], textarea[data-field][data-mention-sources]").forEach(setupMention);
 };
 
 // ── Collect all field values ──────────────────────────────────────────────────

@@ -14,6 +14,7 @@ export type IconName =
   | "sparkle"
   | "ad"
   | "scissors"
+  | "clapper"
   | "gift";
 
 export interface NavItem {
@@ -42,6 +43,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Tools",
     items: [
+      { href: "/studio/movie-studio", name: "Movie Studio", icon: "clapper", accent: "--pd-pink" },
       { href: "/presets", name: "Presets", icon: "wand", accent: "--pd-amber" },
       { href: "/shoots", name: "Photoshoots", icon: "camera", accent: "--pd-teal" },
       { href: "/video", name: "Video", icon: "film", accent: "--pd-pink" },

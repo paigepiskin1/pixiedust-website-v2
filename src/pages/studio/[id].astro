@@ -29,11 +29,15 @@ let studioKicker = "";
 let hideSwitch = false;
 let qualityTiers: QualityTier[] = [];
 let defaultTierId = "";
+// Per-model limits (e.g. { <modelId>: { maxRefs, durations } }) so the studio can
+// adjust the reference cap + duration options when the user switches models.
+let modelConfigs: Record<string, { maxRefs?: number; durations?: number[] }> = {};
 try {
   const m = template.meta ? JSON.parse(template.meta) : null;
   if (m && Array.isArray(m.howItWorks)) howItWorks = m.howItWorks.filter((s: unknown) => typeof s === "string").slice(0, 6);
   if (m && typeof m.kicker === "string") studioKicker = m.kicker.trim();
   if (m && m.hideSwitch === true) hideSwitch = true;
+  if (m && m.models && typeof m.models === "object") modelConfigs = m.models;
   if (m && Array.isArray(m.qualityTiers)) {
     qualityTiers = m.qualityTiers
       .filter((t: any) => t && typeof t.id === "string" && typeof t.templateId === "string")
@@ -106,6 +110,7 @@ const config = {
   quality: template.quality,
   qualityTiers,
   defaultTier: defaultTierId || null,
+  models: modelConfigs,
   credits,
   signedIn,
 };
@@ -205,6 +210,13 @@ const config = {
             <div class="mb-3.5 flex items-start gap-2 rounded-lg" style="padding:9px 11px;background:color-mix(in srgb, var(--pd-amber) 11%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-amber) 34%, transparent);">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--pd-amber)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px;"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4"/><circle cx="8" cy="11" r="0.4" fill="var(--pd-amber)"/></svg>
               <span class="text-ink-2" style="font-size:11.5px;line-height:1.45;">Heads up — this template runs on a higher-quality model that takes a little longer than usual. Hang tight after you hit Generate.</span>
+            </div>
+          )}
+
+          {template.id === "movie-studio" && (
+            <div class="mb-3.5 flex items-start gap-2 rounded-lg" style="padding:9px 11px;background:color-mix(in srgb, var(--pd-pink) 11%, transparent);border:0.5px solid color-mix(in srgb, var(--pd-pink) 34%, transparent);">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--pd-pink)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px;"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4"/><circle cx="8" cy="11" r="0.4" fill="var(--pd-pink)"/></svg>
+              <span class="text-ink-2" style="font-size:11.5px;line-height:1.45;">Omni reference: upload <b>images</b>, and optionally <b>video</b> and <b>audio</b> clips, then tag them in your prompt as <b>@Image1</b>, <b>@Video1</b>, <b>@Audio1</b>… (numbered per type, in upload order). Say what each controls — e.g. “@Image1 for the character, @Video1 for the motion, @Audio1 for the music”. Real people are supported — reference faces are registered to BytePlus’s portrait library automatically (only use media you have consent for).</span>
             </div>
           )}
 
@@ -362,6 +374,9 @@ const config = {
     .pd-sw-card { transition: transform 0.12s, border-color 0.12s; }
     .pd-sw-card:hover { transform: translateY(-2px); border-color: var(--pd-hairline3); }
     .pd-sw-card[data-current="true"] { outline: 2px solid var(--pd-lilac); outline-offset: -1px; }
+    /* Reuse / Copy-prompt actions: subtle by default, full on hover. */
+    .pd-tile-action { opacity: 0.5; transition: opacity 0.12s; }
+    .pd-job:hover .pd-tile-action { opacity: 1; }
   </style>
 
   <script>
@@ -373,6 +388,9 @@ const config = {
     // How many jobs are currently in flight (submitted + still polling). Drives
     // the "you already have N running — queue more?" confirm before re-charging.
     let activeJobs = 0;
+    // Reference display URLs whose portrait asset was freed after a completed
+    // generation; re-registered on the next Generate so we never submit a dead id.
+    const spentRefs = new Set<string>();
     const qualityTiers: any[] = Array.isArray(cfg.qualityTiers) ? cfg.qualityTiers : [];
     let activeTier: any = qualityTiers.find((t: any) => t.id === cfg.defaultTier) || qualityTiers[0] || null;
 
@@ -456,6 +474,43 @@ const config = {
       });
     });
 
+    // ── Per-model limits ──
+    // When a "Model" picker exists (e.g. Seedance 2.0 vs 2.5), each model can allow
+    // different durations + a different reference cap. Reconfigure the controls when
+    // the model changes so users can't pick an out-of-range value.
+    function applyModelLimits(model: string) {
+      const mc = cfg.models && cfg.models[model];
+      if (!mc) return;
+      const durWrap = root.querySelector('[data-controls="duration"]');
+      if (durWrap && Array.isArray(mc.durations) && mc.durations.length) {
+        const allowed = mc.durations.map(Number);
+        let activeOk = false;
+        let firstVisible: HTMLElement | null = null;
+        durWrap.querySelectorAll<HTMLElement>(".pd-seg").forEach((btn) => {
+          const ok = allowed.includes(Number(btn.dataset.val));
+          btn.style.display = ok ? "" : "none";
+          if (ok && !firstVisible) firstVisible = btn;
+          if (btn.getAttribute("data-active") === "true") {
+            if (ok) activeOk = true;
+            else btn.setAttribute("data-active", "false");
+          }
+        });
+        if (!activeOk && firstVisible) (firstVisible as HTMLElement).setAttribute("data-active", "true");
+      }
+      const refWrap = root.querySelector<HTMLElement>('.pd-file-wrap[data-fieldkey="references"]');
+      if (refWrap && typeof (refWrap as any)._pdApplyMax === "function" && typeof mc.maxRefs === "number") {
+        (refWrap as any)._pdApplyMax(mc.maxRefs);
+      }
+      refreshButton();
+    }
+
+    const modelInput = root.querySelector<HTMLInputElement>('[data-field="model_version"]');
+    if (modelInput && cfg.models && Object.keys(cfg.models).length) {
+      modelInput.addEventListener("change", () => applyModelLimits(modelInput.value));
+      // Defer the initial pass so FieldPanel has wired the reference field first.
+      setTimeout(() => applyModelLimits(modelInput.value), 0);
+    }
+
     // File URLs populated by FieldPanel's shared upload logic (pdInitFieldPanel).
     // Wait for FieldPanel to auto-init (it runs on DOMContentLoaded via its own script).
     const fieldPanel = document.getElementById("pd-field-panel") as HTMLElement;
@@ -479,13 +534,19 @@ const config = {
     // failures (e.g. the model's safety filter) aren't the user's fault.
     function friendlyError(raw: unknown): string {
       const e = String(raw ?? "").replace(/\s*\(refunded\)\s*$/i, "");
+      // Model chooser picked a model the account hasn't turned on yet (e.g. Seedance 2.5).
+      if (/not activated|modelnotopen|activate the model/i.test(e))
+        return "That model isn't activated on this account yet — enable it in the BytePlus Ark Console, then try again. You weren't charged.";
       // GPT Image E005 / "flagged as sensitive" — check first so image presets
       // like Tumblr Aesthetic never get the Seedance video copy.
       if (/e005|flagged as sensitive|safety|moderation|content policy|nsfw|sensitive/i.test(e))
         return "The model's safety filter blocked this — it often triggers on real faces or sensitive content. You weren't charged; try a different photo or prompt.";
+      // A registered portrait reference is missing (e.g. cleared/stale) — ask to re-upload.
+      if (/asset\s.*\bis not found\b|specified asset\s.*not found/i.test(e))
+        return "One of your reference photos is no longer available — remove and re-upload it, then try again. You weren't charged.";
       // BytePlus Seedance: "input image may contain real person" — only that phrasing.
       if (/contain real person/i.test(e))
-        return "BytePlus blocked this photo — Seedance can't animate real people. You weren't charged; try an illustration, AI portrait, or a different model.";
+        return "One of your reference photos of a real person couldn't be registered to the portrait library (look for the amber ! on a thumbnail), so BytePlus blocked the raw photo. This is usually temporary — remove and re-upload that photo, then try again. You weren't charged.";
       if (/rate limit|slow down/i.test(e)) return "Too many requests right now. You weren't charged — try again in a minute.";
       if (/timeout|timed out/i.test(e)) return "This took too long and timed out. You weren't charged — try again.";
       if (/not enough credits/i.test(e)) return "Not enough credits.";
@@ -652,6 +713,31 @@ const config = {
         dl.style.cssText = "position:absolute;right:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);color:#fff;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center;z-index:1;";
         tile.appendChild(dl);
       }
+
+      // Reuse + Copy prompt — load this generation's inputs (references, prompt,
+      // model, aspect/duration) back into the panel to edit or re-generate.
+      const st = (tile as any)._pdState;
+      if (st) {
+        const reuseBtn = document.createElement("button");
+        reuseBtn.type = "button";
+        reuseBtn.title = "Reuse — load these inputs to edit or re-generate";
+        reuseBtn.className = "pd-tile-action";
+        reuseBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.6 2.4V5H11"/></svg>`;
+        reuseBtn.style.cssText = "position:absolute;top:7px;left:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
+        reuseBtn.addEventListener("click", (e) => { e.stopPropagation(); reuseState(st); });
+        tile.appendChild(reuseBtn);
+
+        if (st.promptText || st.inputs?.prompt) {
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.title = "Copy prompt";
+          copyBtn.className = "pd-tile-action";
+          copyBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="8.5" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2H4a1.5 1.5 0 0 0-1.5 1.5V11"/></svg>`;
+          copyBtn.style.cssText = "position:absolute;left:7px;bottom:7px;width:24px;height:24px;border-radius:6px;background:rgba(10,10,11,.7);backdrop-filter:blur(6px);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;";
+          copyBtn.addEventListener("click", (e) => { e.stopPropagation(); copyPrompt(st); });
+          tile.appendChild(copyBtn);
+        }
+      }
     }
 
     async function poll(id: string, tile: HTMLElement): Promise<void> {
@@ -670,12 +756,19 @@ const config = {
         else tileStage(tile, stages[Math.min(tick, stages.length - 1)] + "…", Math.min(12 + tick * 14, 92));
         if (data.status === "completed") {
           tileResult(tile, data.outputs || [], id);
+          // The server frees this job's portrait assets on completion, so mark
+          // its references "spent" — a later Generate re-registers them fresh.
+          const st = (tile as any)._pdState;
+          if (st && st.displays) for (const k in st.displays) for (const u of st.displays[k]) spentRefs.add(u);
           return;
         }
         if (data.status === "failed") {
           credits += unitCost(); // refund this job's unit cost (not × quantity)
           refreshButton();
           tileFail(tile, friendlyError(data.error));
+          // Assets are freed on failure too — mark spent so a retry re-registers.
+          const st = (tile as any)._pdState;
+          if (st && st.displays) for (const k in st.displays) for (const u of st.displays[k]) spentRefs.add(u);
           return;
         }
       }
@@ -683,8 +776,9 @@ const config = {
 
     // One independent job per output (each charged the unit cost), so any
     // template can produce several in parallel.
-    async function launchJob(inputs: Record<string, unknown>, per: number) {
+    async function launchJob(inputs: Record<string, unknown>, per: number, state?: any, reuse?: any) {
       const tile = createTile();
+      (tile as any)._pdState = state;
       activeJobs++;
       credits -= per; // optimistic debit
       refreshButton();
@@ -699,6 +793,7 @@ const config = {
             quantity: 1,
             aspect: controlValue("aspect") || undefined,
             duration: duration() || undefined,
+            reuse,
           }),
         });
         let data: any = {};
@@ -800,6 +895,142 @@ const config = {
       });
     }
 
+    // ── Reuse / copy-prompt support ──
+    // Snapshot the exact inputs behind a generation so a result tile can reload
+    // them (references, prompt, model, aspect/duration/quality) for a remix.
+    function captureState(inputs: Record<string, unknown>) {
+      const displays: Record<string, string[]> = {};
+      fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]").forEach((w) => {
+        const key = w.dataset.fieldkey!;
+        const multi = Array.from(w.querySelectorAll<HTMLImageElement>(".pd-multi-previews img")).map((im) => im.src).filter(Boolean);
+        if (multi.length) { displays[key] = multi; return; }
+        const single = w.querySelector<HTMLImageElement>(".pd-file-preview .pd-preview-img");
+        if (single && single.src) displays[key] = [single.src];
+      });
+      let promptText = typeof inputs.prompt === "string" ? inputs.prompt : "";
+      if (!promptText) { const ta = fieldPanel.querySelector<HTMLTextAreaElement>("textarea[data-field]"); if (ta) promptText = ta.value; }
+      return {
+        inputs: JSON.parse(JSON.stringify(inputs ?? {})),
+        displays,
+        promptText,
+        aspect: controlValue("aspect"),
+        duration: controlValue("duration"),
+        quality: controlValue("quality"),
+      };
+    }
+
+    function syncSelectHidden(hidden: HTMLInputElement) {
+      const group = hidden.parentElement;
+      if (!group) return;
+      group.querySelectorAll<HTMLElement>(".pd-opt-seg, .pd-opt-card").forEach((b) => {
+        const on = b.dataset.val === hidden.value;
+        b.dataset.active = on ? "true" : "false";
+        if (b.classList.contains("pd-opt-seg")) {
+          b.style.background = on ? "var(--pd-ink)" : "var(--pd-bg)";
+          b.style.color = on ? "var(--pd-bg)" : "var(--pd-ink)";
+          b.style.borderColor = on ? "transparent" : "var(--pd-hairline2)";
+        } else {
+          b.style.borderColor = on ? "var(--pd-lilac)" : "var(--pd-hairline2)";
+          b.style.background = on ? "color-mix(in srgb,var(--pd-lilac) 8%,var(--pd-bg))" : "var(--pd-bg)";
+        }
+      });
+    }
+
+    function setControl(group: string, val: string | null) {
+      if (val == null) return;
+      const wrap = root.querySelector(`[data-controls="${group}"]`);
+      if (!wrap) return;
+      wrap.querySelectorAll<HTMLElement>(".pd-seg").forEach((b) => {
+        b.setAttribute("data-active", String(b.dataset.val) === String(val) ? "true" : "false");
+      });
+    }
+
+    function reuseState(state: any) {
+      if (!state) return;
+      const inputs = state.inputs || {};
+      // Non-file fields first (so a model change reconfigures its limits before
+      // we restore aspect/duration below).
+      fieldPanel.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[data-field]").forEach((el) => {
+        const key = (el as HTMLInputElement).dataset.field!;
+        if ((el as HTMLInputElement).type === "file") return;
+        if (!(key in inputs)) return;
+        (el as HTMLInputElement).value = String(inputs[key] ?? "");
+        if ((el as HTMLInputElement).type === "hidden") { syncSelectHidden(el as HTMLInputElement); el.dispatchEvent(new Event("change", { bubbles: true })); }
+        else el.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      // File fields (references) — reload from the display (CDN) URLs only.
+      // Registration is deferred to generate time; the original asset:// may have
+      // been freed, so we never carry it over here.
+      fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]").forEach((w) => {
+        const key = w.dataset.fieldkey!;
+        const raw = inputs[key];
+        const values: string[] = Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : [];
+        const disp: string[] = (state.displays && state.displays[key]) || values.filter((v) => /^https?:\/\//i.test(v));
+        const loader = (w as any)._pdLoadReferences;
+        if (typeof loader === "function") loader(disp);
+        for (const d of disp) spentRefs.delete(d);
+      });
+      setControl("aspect", state.aspect);
+      setControl("duration", state.duration);
+      setControl("quality", state.quality);
+      refreshButton();
+      fieldPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      (window as any).pdToast?.("Loaded — edit or hit Generate", { accent: "var(--pd-mint)" });
+    }
+
+    // Reload a creation from the gallery: restore prompt, model, aspect/duration/
+    // quality and the reference images (re-registering portraits so a stale
+    // asset:// id from the original generation is never reused).
+    async function applyGalleryReuse(p: any) {
+      if (!p) return;
+      const promptEl =
+        fieldPanel.querySelector<HTMLTextAreaElement | HTMLInputElement>('[data-field="prompt"]') ||
+        fieldPanel.querySelector<HTMLTextAreaElement>("textarea[data-field]");
+      if (promptEl && typeof p.prompt === "string") {
+        promptEl.value = p.prompt;
+        promptEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      const modelEl = fieldPanel.querySelector<HTMLInputElement>('[data-field="model_version"]');
+      if (modelEl && p.model) {
+        modelEl.value = String(p.model);
+        if (modelEl.type === "hidden") syncSelectHidden(modelEl);
+        modelEl.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      setControl("aspect", p.aspect != null ? String(p.aspect) : null);
+      setControl("duration", p.duration != null ? String(p.duration) : null);
+      setControl("quality", p.quality != null ? String(p.quality) : null);
+      refreshButton();
+      fieldPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      const refWrap = fieldPanel.querySelector<HTMLElement>(".pd-file-wrap[data-fieldkey]");
+      const loader = refWrap && (refWrap as any)._pdLoadReferences;
+      if (typeof loader === "function" && Array.isArray(p.references) && p.references.length) {
+        (window as any).pdToast?.("Loading your creation…", { accent: "var(--pd-mint)" });
+        try { await loader(p.references); } catch { /* keep whatever loaded */ }
+      }
+      refreshButton();
+      (window as any).pdToast?.("Loaded — edit or hit Generate", { accent: "var(--pd-mint)" });
+    }
+
+    // On load, apply a gallery "Reuse" payload handed off via sessionStorage.
+    (function initGalleryReuse() {
+      let raw: string | null = null;
+      try { raw = sessionStorage.getItem("pd-reuse"); } catch { return; }
+      if (!raw) return;
+      let parsed: any = null;
+      try { parsed = JSON.parse(raw); } catch { parsed = null; }
+      try { sessionStorage.removeItem("pd-reuse"); } catch { /* ignore */ }
+      if (parsed && parsed.templateId === cfg.id) setTimeout(() => applyGalleryReuse(parsed), 80);
+    })();
+
+    function copyPrompt(state: any) {
+      const p = String(state?.promptText ?? state?.inputs?.prompt ?? "");
+      const done = () => (window as any).pdToast?.("Prompt copied", { accent: "var(--pd-mint)" });
+      const fallback = () => { const ta = document.createElement("textarea"); ta.value = p; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(); } catch {} ta.remove(); };
+      if (!p) { (window as any).pdToast?.("No prompt to copy", { accent: "var(--pd-amber)" }); return; }
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(p).then(done).catch(fallback);
+      else fallback();
+    }
+
     async function generate() {
       if (!cfg.signedIn) {
         showSignInModal();
@@ -822,10 +1053,44 @@ const config = {
         if (!ok) return;
       }
       errEl.classList.add("hidden");
+      // Register reused references + re-register any freed by a prior generation,
+      // so this batch always submits live asset:// ids.
+      await ensureReferencesRegistered();
       const n = quantity();
       const per = unitCost();
       const inputs = collectInputs(); // snapshot once for all parallel jobs
-      for (let i = 0; i < n; i++) launchJob(inputs, per);
+      const state = captureState(inputs); // for the "Reuse"/"Copy prompt" actions
+      const reuse = buildReusePayload(inputs, state); // persisted so the gallery can reload it later
+      for (let i = 0; i < n; i++) launchJob(inputs, per, state, reuse);
+    }
+
+    // Before a Generate, make sure every reference has a live portrait asset://:
+    // register the ones loaded via Reuse (never registered) and re-register any
+    // whose asset a prior generation freed. Leaves already-live uploads alone.
+    async function ensureReferencesRegistered() {
+      const arr = Array.from(spentRefs);
+      for (const w of Array.from(fieldPanel.querySelectorAll<HTMLElement>(".pd-file-wrap[data-fieldkey]"))) {
+        const fn = (w as any)._pdEnsureRegistered;
+        if (typeof fn === "function") await fn(arr);
+      }
+      spentRefs.clear();
+    }
+
+    // Compact, durable snapshot stored with the generation so "Reuse" from the
+    // gallery can reload it: the reference CDN (display) URLs — not the volatile
+    // asset:// ids — plus prompt, model and the aspect/duration/quality controls.
+    function buildReusePayload(inputs: Record<string, unknown>, state: any) {
+      const dispKeys = Object.keys(state?.displays || {});
+      const references = dispKeys.length ? (state.displays[dispKeys[0]] || []) : [];
+      const modelEl = root.querySelector<HTMLInputElement>('[data-field="model_version"]');
+      return {
+        prompt: state?.promptText || (typeof inputs.prompt === "string" ? inputs.prompt : ""),
+        references,
+        model: modelEl ? modelEl.value : null,
+        aspect: state?.aspect ?? null,
+        duration: state?.duration ?? null,
+        quality: state?.quality ?? null,
+      };
     }
 
     genBtn.addEventListener("click", generate);

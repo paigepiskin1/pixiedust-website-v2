@@ -2,8 +2,49 @@ export const prerender = false;
 import type { APIContext } from "astro";
 import { getUserByUid } from "../../../lib/users";
 import { adjustBalance } from "../../../lib/credits";
-import { pollStatus, submitGeneration } from "../../../lib/syncnode";
+import { pollStatus, submitGeneration, deletePortraitAsset } from "../../../lib/syncnode";
 import { resolveChainStep } from "../../../lib/templates";
+
+// When a generation completes we free its Portrait Library assets so the small
+// shared pool doesn't fill up. Guards against the "asset not found" problems that
+// made us disable this before:
+//   • an asset still referenced by another IN-FLIGHT generation (e.g. quantity>1)
+//     is kept until that job finishes too;
+//   • the studio re-registers references (fresh asset://) whenever they're reused
+//     for another generation, so a deleted id is never resubmitted.
+// Runs in the background (waitUntil) so it never slows the status response.
+async function cleanupPortraitAssets(
+  env: { SYNCNODE_API_KEY: string; DB: import("@cloudflare/workers-types").D1Database },
+  gen: { id: string; provider: string; input_json: string | null },
+  userId: number
+): Promise<void> {
+  if (gen.provider !== "byteplus" || !gen.input_json) return;
+  let assetIds: string[] = [];
+  try {
+    const refs = (JSON.parse(gen.input_json) as { reference_images?: unknown }).reference_images;
+    assetIds = (Array.isArray(refs) ? refs : [])
+      .filter((u): u is string => typeof u === "string" && u.startsWith("asset://"))
+      .map((u) => u.slice("asset://".length));
+  } catch {
+    return;
+  }
+  if (!assetIds.length) return;
+  // Keep any asset another active job of this user still points at.
+  try {
+    const others = await env.DB
+      .prepare("SELECT input_json FROM generations WHERE user_id=? AND id!=? AND status IN ('pending','processing')")
+      .bind(userId, gen.id)
+      .all<{ input_json: string | null }>();
+    const stillUsed = new Set<string>();
+    for (const row of others.results ?? []) {
+      const ij = row.input_json ?? "";
+      for (const aid of assetIds) if (ij.includes(aid)) stillUsed.add(aid);
+    }
+    for (const aid of assetIds) if (!stillUsed.has(aid)) await deletePortraitAsset(env.SYNCNODE_API_KEY, aid);
+  } catch {
+    /* best effort — age-based eviction is the safety net */
+  }
+}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -23,6 +64,7 @@ interface GenRow {
   credits_charged: number;
   credits_refunded: number;
   chain_json: string | null;
+  input_json: string | null;
 }
 
 interface ChainStep {
@@ -122,6 +164,11 @@ export async function GET({ url, locals }: APIContext) {
       .prepare("UPDATE generations SET status = 'completed', output_url = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(poll.outputs[0] ?? null, id)
       .run();
+    // Free this job's portrait assets in the background (see cleanupPortraitAssets).
+    const cleanup = cleanupPortraitAssets(env, gen, dbUser.id);
+    const ctx = (locals.runtime as unknown as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } }).ctx;
+    if (ctx?.waitUntil) ctx.waitUntil(cleanup);
+    else await cleanup;
     return json({ id, status: "completed", outputs: poll.outputs });
   }
 
@@ -138,6 +185,11 @@ export async function GET({ url, locals }: APIContext) {
       .prepare("UPDATE generations SET status = 'failed', error = ?, credits_refunded = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(poll.error ?? "Generation failed", gen.credits_charged, id)
       .run();
+    // Free this job's portrait assets in the background (client re-registers on retry).
+    const cleanup = cleanupPortraitAssets(env, gen, dbUser.id);
+    const ctx = (locals.runtime as unknown as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } }).ctx;
+    if (ctx?.waitUntil) ctx.waitUntil(cleanup);
+    else await cleanup;
     return json({ id, status: "failed", error: poll.error, refunded: true });
   }
 

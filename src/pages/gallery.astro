@@ -13,12 +13,13 @@ const dbUser = await getUserByUid(db, user.uid);
 interface Row {
   id: string; type: string; kind: string; output_url: string;
   template_id: string | null; created: string; template_title: string | null;
-  input_json: string | null;
+  input_json: string | null; reuse_json: string | null; model: string | null;
 }
 const { results } = await db
   .prepare(
     `SELECT g.id, g.type, g.kind, g.output_url, g.template_id,
-            datetime(g.created_at) AS created, t.title AS template_title, g.input_json
+            datetime(g.created_at) AS created, t.title AS template_title,
+            g.input_json, g.reuse_json, g.model
      FROM generations g LEFT JOIN templates t ON t.id = g.template_id
      WHERE g.user_id = ? AND g.status = 'completed' AND g.output_url IS NOT NULL
      ORDER BY g.created_at DESC`
@@ -26,21 +27,68 @@ const { results } = await db
   .bind(dbUser!.id)
   .all<Row>();
 
-function extractPrompt(j: string | null): string | null {
-  if (!j) return null;
-  try { const o = JSON.parse(j); return o.prompt ?? o.caption ?? o.text ?? null; } catch { return null; }
+interface Reuse {
+  prompt: string;
+  references: string[];
+  model: string | null;
+  aspect: string | null;
+  duration: string | null;
+  quality: string | null;
+}
+
+// The reuse payload the studio needs. Prefer the stored snapshot (has the durable
+// CDN reference URLs); fall back to the resolved provider payload for older rows
+// (keeps prompt + any raw http references; asset:// ids are skipped as unusable).
+function buildReuse(r: Row): Reuse | null {
+  if (r.reuse_json) {
+    try {
+      const o = JSON.parse(r.reuse_json);
+      if (o && typeof o === "object") {
+        return {
+          prompt: typeof o.prompt === "string" ? o.prompt : "",
+          references: Array.isArray(o.references) ? o.references.filter((u: unknown) => typeof u === "string") : [],
+          model: o.model ?? null,
+          aspect: o.aspect ?? null,
+          duration: o.duration == null ? null : String(o.duration),
+          quality: o.quality ?? null,
+        };
+      }
+    } catch { /* fall through */ }
+  }
+  if (!r.input_json) return null;
+  try {
+    const o = JSON.parse(r.input_json);
+    const refsRaw = o.reference_images ?? o.image ?? o.images ?? o.input_images;
+    const references = (Array.isArray(refsRaw) ? refsRaw : refsRaw ? [refsRaw] : []).filter(
+      (u: unknown): u is string => typeof u === "string" && /^https?:\/\//i.test(u)
+    );
+    return {
+      prompt: o.prompt ?? o.caption ?? o.text ?? "",
+      references,
+      model: r.model ?? null,
+      aspect: o.ratio ?? o.aspect_ratio ?? null,
+      duration: o.duration == null ? null : String(o.duration),
+      quality: o.resolution ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 interface Item {
   id: string; idx: number; type: string; kind: string; output_url: string;
   template_id: string | null; created: string; template_title: string | null;
-  prompt: string | null;
+  prompt: string | null; reuse: Reuse | null;
 }
-const items: Item[] = (results ?? []).map((r, i) => ({
-  id: r.id, idx: i, type: r.type, kind: r.kind, output_url: r.output_url,
-  template_id: r.template_id, created: r.created, template_title: r.template_title,
-  prompt: extractPrompt(r.input_json),
-}));
+const items: Item[] = (results ?? []).map((r, i) => {
+  const reuse = buildReuse(r);
+  return {
+    id: r.id, idx: i, type: r.type, kind: r.kind, output_url: r.output_url,
+    template_id: r.template_id, created: r.created, template_title: r.template_title,
+    prompt: reuse?.prompt || null,
+    reuse,
+  };
+});
 
 const todayStr = new Date().toISOString().slice(0, 10);
 const yestStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -185,13 +233,24 @@ const tabs = ["All", "Images", "Video"];
           <button type="button" id="pd-lb-copy-prompt" title="Copy prompt" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="display:none;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);cursor:pointer;">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3.5" y="3.5" width="6" height="6" rx="1.2"/><path d="M1.5 8.5V2h6.5"/></svg>
           </button>
-          <a id="pd-lb-remix" href="#" title="Remix" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline2);color:var(--pd-ink2);">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11l9-9M8 2h3v3M5 11H2V8"/></svg>
-          </a>
           <div style="flex:1;"></div>
           <button type="button" id="pd-lb-delete" title="Delete" class="flex size-8 shrink-0 items-center justify-center rounded-full" style="background:transparent;border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);cursor:pointer;">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3h9M4 3V2h4v1M4.5 5v4.5M7.5 5v4.5M2.5 3l.5 7.5h6l.5-7.5"/></svg>
           </button>
+        </div>
+        <!-- Prompt + Reuse -->
+        <div id="pd-lb-prompt-wrap" style="display:none;padding:0 16px 14px;">
+          <div class="flex items-center justify-between" style="margin-bottom:6px;">
+            <span class="font-mono uppercase" style="font-size:9px;color:var(--pd-ink3);letter-spacing:0.8px;">Prompt</span>
+            <button type="button" id="pd-lb-copy-prompt-inline" style="font-size:10px;color:var(--pd-ink3);background:transparent;border:none;cursor:pointer;padding:2px 4px;">Copy</button>
+          </div>
+          <p id="pd-lb-prompt" class="text-ink-2" style="font-size:12.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;margin:0;"></p>
+        </div>
+        <div style="padding:0 16px 16px;margin-top:auto;">
+          <a id="pd-lb-remix" href="#" class="flex w-full items-center justify-center gap-2 rounded-xl font-semibold" style="padding:11px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;text-decoration:none;letter-spacing:-0.1px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.6 2.4V5H11"/></svg>
+            <span id="pd-lb-remix-label">Reuse this prompt</span>
+          </a>
         </div>
       </div>
     </div>
@@ -222,7 +281,8 @@ const tabs = ["All", "Images", "Video"];
   </style>
 
   <script>
-    interface Item { id: string; idx: number; type: string; kind: string; output_url: string; template_id: string | null; created: string; template_title: string | null; prompt: string | null; }
+    interface Reuse { prompt: string; references: string[]; model: string | null; aspect: string | null; duration: string | null; quality: string | null; }
+    interface Item { id: string; idx: number; type: string; kind: string; output_url: string; template_id: string | null; created: string; template_title: string | null; prompt: string | null; reuse: Reuse | null; }
 
     const all: Item[] = JSON.parse(document.getElementById("pd-gallery-data")?.textContent || "[]");
     if (!all.length) { /* empty state, nothing to wire */ } else {
@@ -235,7 +295,11 @@ const tabs = ["All", "Images", "Video"];
     const metaEl = document.getElementById("pd-lb-meta")!;
     const dlLink = document.getElementById("pd-lb-download") as HTMLAnchorElement;
     const remixLink = document.getElementById("pd-lb-remix") as HTMLAnchorElement;
+    const remixLabel = document.getElementById("pd-lb-remix-label")!;
     const copyPromptBtn = document.getElementById("pd-lb-copy-prompt") as HTMLButtonElement;
+    const promptWrap = document.getElementById("pd-lb-prompt-wrap")!;
+    const promptTextEl = document.getElementById("pd-lb-prompt")!;
+    const copyInlineBtn = document.getElementById("pd-lb-copy-prompt-inline") as HTMLButtonElement;
     const toolbarNormal = document.getElementById("pd-toolbar-normal")!;
     const toolbarSelect = document.getElementById("pd-toolbar-select")!;
     const selCountEl = document.getElementById("pd-sel-count")!;
@@ -296,6 +360,13 @@ const tabs = ["All", "Images", "Video"];
       remixLink.href = it.template_id ? `/studio/${it.template_id}` : "/";
       const hasPrompt = !!it.prompt;
       copyPromptBtn.style.display = hasPrompt ? "flex" : "none";
+      // Prompt block
+      promptWrap.style.display = hasPrompt ? "block" : "none";
+      promptTextEl.textContent = it.prompt || "";
+      // Reuse button: only meaningful when we can open the original template.
+      const hasRefs = !!(it.reuse && it.reuse.references && it.reuse.references.length);
+      remixLabel.textContent = hasRefs ? "Reuse prompt & references" : "Reuse this prompt";
+      remixLink.style.display = it.template_id ? "flex" : "none";
     }
 
     function openLb(id: string) {
@@ -328,11 +399,31 @@ const tabs = ["All", "Images", "Video"];
       navigator.clipboard?.writeText(visible[cur]?.output_url ?? "").catch(() => {});
       (window as any).pdToast?.("Link copied", { accent: "var(--pd-mint)" });
     });
-    copyPromptBtn.addEventListener("click", () => {
+    function copyCurrentPrompt() {
       const p = visible[cur]?.prompt;
       if (!p) return;
       navigator.clipboard?.writeText(p).catch(() => {});
       (window as any).pdToast?.("Prompt copied", { accent: "var(--pd-mint)" });
+    }
+    copyPromptBtn.addEventListener("click", copyCurrentPrompt);
+    copyInlineBtn.addEventListener("click", copyCurrentPrompt);
+
+    // Reuse: hand the creation's inputs to the studio via sessionStorage, then let
+    // the anchor navigate to the original template (studio applies it on load).
+    remixLink.addEventListener("click", (e) => {
+      const it = visible[cur];
+      if (!it || !it.template_id) { e.preventDefault(); return; }
+      const r = it.reuse;
+      const payload = {
+        templateId: it.template_id,
+        prompt: r?.prompt ?? it.prompt ?? "",
+        references: r?.references ?? [],
+        model: r?.model ?? null,
+        aspect: r?.aspect ?? null,
+        duration: r?.duration ?? null,
+        quality: r?.quality ?? null,
+      };
+      try { sessionStorage.setItem("pd-reuse", JSON.stringify(payload)); } catch { /* navigate anyway */ }
     });
 
     // ── Delete ────────────────────────────────────────────────
