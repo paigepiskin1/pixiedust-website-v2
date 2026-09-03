@@ -2,6 +2,23 @@ import type { MiddlewareHandler } from "astro";
 import { readSession, SESSION_COOKIE } from "./lib/session";
 import { getUserByUid, toPublicUser } from "./lib/users";
 
+// Migration flag, cached ~30s per isolate so old-domain requests don't read D1
+// every time (and new-domain traffic never checks it at all). Activate with the
+// MIGRATE_PIXYDUST env var OR: app_settings key `migrate_pixydust` = "1".
+let _mig = { on: false, at: 0 };
+async function migrateOn(env: any): Promise<boolean> {
+  if (env?.MIGRATE_PIXYDUST === "1") return true;
+  const now = Date.now();
+  if (now - _mig.at < 30000) return _mig.on;
+  let on = _mig.on;
+  try {
+    const row = await env?.DB?.prepare("SELECT value FROM app_settings WHERE key='migrate_pixydust'").first();
+    on = row?.value === "1";
+  } catch { /* keep last known on transient error */ }
+  _mig = { on, at: now };
+  return on;
+}
+
 // Populates locals.user from the session cookie for SSR routes. Static
 // (prerendered) routes run this at build time only and hydrate auth client-side.
 export const onRequest: MiddlewareHandler = async (context, next) => {
@@ -11,15 +28,16 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   // web.pixiedustapp.com and auth.pixiedustapp.com are different hosts that never
   // hit this worker, so they are untouched.
   //
-  // GATED behind env MIGRATE_PIXYDUST="1" so this is a no-op until pixydust.com
-  // actually resolves + serves — otherwise we'd 301 the whole live site to a
-  // dead domain. Flip the flag (Pages env var) only after pixydust.com is live;
-  // reversible instantly with no code change.
-  if (context.locals.runtime?.env?.MIGRATE_PIXYDUST === "1") {
+  // GATED (see migrateOn) so this is a no-op until the flag is flipped —
+  // otherwise we'd 301 the whole live site to a dead domain. Only old-domain
+  // hosts consult the flag; reversible instantly with no code deploy.
+  {
     const u = new URL(context.request.url);
     const h = u.hostname;
     if (h === "pixiedustapp.com" || h === "www.pixiedustapp.com" || h === "www.pixydust.com") {
-      return Response.redirect(`https://pixydust.com${u.pathname}${u.search}`, 301);
+      if (await migrateOn(context.locals.runtime?.env)) {
+        return Response.redirect(`https://pixydust.com${u.pathname}${u.search}`, 301);
+      }
     }
   }
 
