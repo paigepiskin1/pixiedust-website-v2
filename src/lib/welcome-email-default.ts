@@ -57,7 +57,7 @@ export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 40px;">
         <tr>
           <td style="background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:12px;">
-            <a href="https://pixiedustapp.com" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;letter-spacing:-0.2px;">Start creating →</a>
+            <a href="https://pixydust.com" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;letter-spacing:-0.2px;">Start creating →</a>
           </td>
         </tr>
       </table>
@@ -118,7 +118,7 @@ export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
     <td style="padding:24px 40px 32px;border-top:1px solid rgba(255,255,255,0.07);">
       <p style="margin:0 0 8px;color:rgba(255,255,255,0.25);font-size:12px;line-height:1.6;text-align:center;">
         You're receiving this because you created an account at
-        <a href="https://pixiedustapp.com" style="color:rgba(168,85,247,0.8);text-decoration:none;">pixiedustapp.com</a>
+        <a href="https://pixydust.com" style="color:rgba(168,85,247,0.8);text-decoration:none;">pixydust.com</a>
         with {{email}}.
       </p>
       <p style="margin:0;color:rgba(255,255,255,0.15);font-size:11px;text-align:center;">

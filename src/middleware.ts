@@ -5,6 +5,24 @@ import { getUserByUid, toPublicUser } from "./lib/users";
 // Populates locals.user from the session cookie for SSR routes. Static
 // (prerendered) routes run this at build time only and hydrate auth client-side.
 export const onRequest: MiddlewareHandler = async (context, next) => {
+  // ── Domain migration → pixydust.com ──────────────────────────────────────
+  // Permanently forward the old domain (and the www of both) to the new apex,
+  // preserving path + query, so e.g. pixiedustapp.com/login → pixydust.com/login.
+  // web.pixiedustapp.com and auth.pixiedustapp.com are different hosts that never
+  // hit this worker, so they are untouched.
+  //
+  // GATED behind env MIGRATE_PIXYDUST="1" so this is a no-op until pixydust.com
+  // actually resolves + serves — otherwise we'd 301 the whole live site to a
+  // dead domain. Flip the flag (Pages env var) only after pixydust.com is live;
+  // reversible instantly with no code change.
+  if (context.locals.runtime?.env?.MIGRATE_PIXYDUST === "1") {
+    const u = new URL(context.request.url);
+    const h = u.hostname;
+    if (h === "pixiedustapp.com" || h === "www.pixiedustapp.com" || h === "www.pixydust.com") {
+      return Response.redirect(`https://pixydust.com${u.pathname}${u.search}`, 301);
+    }
+  }
+
   // Same-origin Firebase auth: proxy the reserved /__/* paths (auth handler,
   // iframe, init.json) to the project's Firebase Hosting so OAuth redirects
   // complete on OUR origin. Mobile browsers partition third-party storage,
@@ -40,7 +58,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   // the production apex. Canonical tags already point to the apex; this header
   // is the reliable belt (survives Cloudflare's managed robots.txt).
   const host = context.url.hostname;
-  if (host !== "pixiedustapp.com" && host !== "www.pixiedustapp.com") {
+  if (host !== "pixydust.com") {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   response.headers.set("X-Frame-Options", "DENY");
