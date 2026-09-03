@@ -1,5 +1,5 @@
 // Fetches a Replicate model's OpenAPI input schema and converts it into a
-// PixieDust template scaffold (input_json with {{placeholders}} + typed fields).
+// PixyDust template scaffold (input_json with {{placeholders}} + typed fields).
 // This is the "no manual mapping" import for the admin editor.
 
 function humanize(key: string): string {

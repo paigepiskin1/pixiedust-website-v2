@@ -18,7 +18,7 @@ export interface LegalDoc {
 
 export const TERMS: LegalDoc = {
   current: "terms",
-  kicker: "Legal · governing your use of PixieDust",
+  kicker: "Legal · governing your use of PixyDust",
   title: "Terms of Service",
   subtitle:
     "These terms cover what we promise, what we expect, and what happens when something goes wrong. Plain-English summaries are highlighted throughout.",
@@ -28,7 +28,7 @@ export const TERMS: LegalDoc = {
       id: "accept",
       title: "Accepting these terms",
       body: [
-        'By creating an account or using PixieDust (the "Service"), you agree to these Terms of Service and the policies they reference, including our Privacy Policy and Acceptable Use Policy.',
+        'By creating an account or using PixyDust (the "Service"), you agree to these Terms of Service and the policies they reference, including our Privacy Policy and Acceptable Use Policy.',
         { note: "If you don't agree, don't use the Service — and ask us for a refund within 14 days if you've already purchased credits." },
         "You confirm you are at least 13 years old, or the age of digital consent in your country, whichever is higher. Some features require you to be 18+.",
       ],
@@ -92,7 +92,7 @@ export const TERMS: LegalDoc = {
       title: "Liability & disclaimers",
       body: [
         'The Service is provided "as is." AI generations are probabilistic; outputs may be imperfect, inaccurate, or unsuitable for a given purpose, and we don\'t guarantee any specific result.',
-        "To the maximum extent permitted by law, PixieDust's total liability for any claim arising out of the Service is capped at the amount you paid us in the preceding 12 months.",
+        "To the maximum extent permitted by law, PixyDust's total liability for any claim arising out of the Service is capped at the amount you paid us in the preceding 12 months.",
       ],
     },
     {
@@ -202,7 +202,7 @@ export const ACCEPTABLE_USE: LegalDoc = {
       id: "principle",
       title: "The principle",
       body: [
-        "PixieDust exists to help creators make beautiful, original work. We block uses that cause real-world harm to real-world people, that infringe other creators' rights, or that put us legally at risk.",
+        "PixyDust exists to help creators make beautiful, original work. We block uses that cause real-world harm to real-world people, that infringe other creators' rights, or that put us legally at risk.",
         { note: "Rule of thumb: if you wouldn't be comfortable explaining what you made to a friend over coffee, don't make it here." },
       ],
     },

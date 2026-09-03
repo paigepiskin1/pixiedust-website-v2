@@ -2,7 +2,7 @@
  * Branded email-verification template, sent from our own Mailgun domain.
  * Variable: {{link}} (the verification URL), {{email}}.
  */
-export const VERIFY_EMAIL_SUBJECT = "Verify your email for PixieDust ✨";
+export const VERIFY_EMAIL_SUBJECT = "Verify your email for PixyDust ✨";
 
 export const VERIFY_EMAIL_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -25,7 +25,7 @@ export const VERIFY_EMAIL_HTML = `<!DOCTYPE html>
             <img src="https://pixiecdn.b-cdn.net/brand/logo-icon-256.png" alt="" width="40" height="40" style="display:block;width:40px;height:40px;border-radius:11px;" />
           </td>
           <td style="vertical-align:middle;">
-            <span style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">PixieDust</span>
+            <span style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">PixyDust</span>
           </td>
         </tr>
       </table>
@@ -57,7 +57,7 @@ export const VERIFY_EMAIL_HTML = `<!DOCTYPE html>
         <a href="{{link}}" style="color:rgba(168,85,247,0.9);font-size:12px;text-decoration:none;">{{link}}</a>
       </p>
       <p style="margin:24px 0 0;color:rgba(255,255,255,0.35);font-size:12px;line-height:1.6;">
-        This link expires in 24 hours. If you didn't create a PixieDust account, you can safely ignore this email.
+        This link expires in 24 hours. If you didn't create a PixyDust account, you can safely ignore this email.
       </p>
     </td>
   </tr>
@@ -68,7 +68,7 @@ export const VERIFY_EMAIL_HTML = `<!DOCTYPE html>
         Sent to {{email}} from
         <a href="https://pixydust.com" style="color:rgba(168,85,247,0.8);text-decoration:none;">pixydust.com</a>.
       </p>
-      <p style="margin:0;color:rgba(255,255,255,0.15);font-size:11px;text-align:center;">© PixieDust. All rights reserved.</p>
+      <p style="margin:0;color:rgba(255,255,255,0.15);font-size:11px;text-align:center;">© PixyDust. All rights reserved.</p>
     </td>
   </tr>
 

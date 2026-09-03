@@ -124,7 +124,7 @@ export async function POST({ request, locals, url }: APIContext) {
               currency: "usd",
               unit_amount: tier.price_cents,
               recurring: { interval: "month" },
-              product_data: { name: `PixieDust ${tier.name}` },
+              product_data: { name: `PixyDust ${tier.name}` },
             },
           },
         ],

@@ -7,7 +7,7 @@ interface Props {
   title?: string;
   tab?: string;
 }
-const { title = "Admin — PixieDust", tab } = Astro.props;
+const { title = "Admin — PixyDust", tab } = Astro.props;
 const user = Astro.locals.user;
 ---
 
@@ -19,7 +19,7 @@ const user = Astro.locals.user;
     >
       <a href="/admin" class="flex items-center gap-2.5">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" stroke="var(--pd-lilac)" stroke-width="1.4"></circle><circle cx="12" cy="12" r="5.5" fill="var(--pd-lilac)"></circle><circle cx="12" cy="12" r="2" fill="var(--pd-bg)"></circle></svg>
-        <span class="font-display font-semibold text-ink" style="font-size:16px;letter-spacing:-0.4px;">PixieDust</span>
+        <span class="font-display font-semibold text-ink" style="font-size:16px;letter-spacing:-0.4px;">PixyDust</span>
         <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-lilac);letter-spacing:1px;border:0.5px solid color-mix(in srgb, var(--pd-lilac) 40%, transparent);border-radius:999px;padding:2px 8px;">Admin</span>
       </a>
 
