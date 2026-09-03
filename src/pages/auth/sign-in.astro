@@ -122,6 +122,15 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
     <section class="relative flex flex-col justify-center" style="padding:64px 72px;">
       <a href="/" class="absolute right-9 top-7 font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.6px;">← back</a>
 
+      <!-- Shown the instant we detect a returning OAuth round-trip (or on click,
+           before we navigate away) so the page never looks idle while the
+           credential is exchanged for a session. -->
+      <div id="pd-auth-busy" style="display:none;position:absolute;inset:0;z-index:10;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:color-mix(in srgb, var(--pd-bg) 92%, transparent);backdrop-filter:blur(3px);">
+        <div style="width:28px;height:28px;border-radius:50%;border:2.5px solid var(--pd-hairline2);border-top-color:var(--pd-lilac);animation:pd-auth-spin .8s linear infinite;"></div>
+        <div id="pd-auth-busy-msg" class="font-display font-medium text-ink" style="font-size:15px;letter-spacing:-0.2px;">Signing you in…</div>
+        <div class="text-ink-3" style="font-size:12px;">Just a moment</div>
+      </div>
+
       <div id="pd-auth-form" data-mode={initialMode} class="mx-auto w-full" style="max-width:380px;">
         <div class="mb-2.5 font-mono font-semibold uppercase" style="font-size:10.5px;color:var(--pd-lilac);letter-spacing:1.2px;">
           <span data-when="signup">Sign up · 5 free credits</span>
@@ -154,7 +163,7 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
 
         <div class="my-[22px] flex items-center gap-2.5">
           <div class="h-px flex-1" style="background:var(--pd-hairline);"></div>
-          <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:1px;">or with email</span>
+          <span id="pd-email-divider" class="flex items-center gap-1.5 font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:1px;">or with email</span>
           <div class="h-px flex-1" style="background:var(--pd-hairline);"></div>
         </div>
 
@@ -215,6 +224,21 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
   </div>
 
   <style>
+    @keyframes pd-auth-spin { to { transform: rotate(360deg); } }
+    /* Subtle ring on whichever method the user signed in with last. */
+    .pd-oauth[data-last="true"] {
+      border-color: color-mix(in srgb, var(--pd-lilac) 55%, transparent);
+      background: color-mix(in srgb, var(--pd-lilac) 7%, var(--pd-bg2));
+    }
+    .pd-last-pill {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--pd-lilac) 20%, transparent);
+      color: var(--pd-lilac);
+      font-size: 8.5px;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
     .pd-oauth {
       background: var(--pd-bg2);
       color: var(--pd-ink);
@@ -331,6 +355,9 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
         showError(authErrorMessage(err));
         submitBtn.style.opacity = "1";
         submitBtn.style.cursor = "pointer";
+        // A failed OAuth attempt must not leave the overlay covering the form.
+        try { sessionStorage.removeItem("pd_oauth_pending"); } catch { /* ignore */ }
+        hideBusy();
       } finally {
         busy = false;
       }
@@ -339,66 +366,125 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
       window.location.href = redirect;
     }
 
-    // Finish the direct Google round-trip (credential arrives in the URL
-    // fragment, forwarded here from the site root by Base.astro).
-    (async () => {
-      let done;
-      try {
-        done = await completeGoogleRedirect();
-      } catch (err) {
-        showError((err as Error)?.message || authErrorMessage(err));
-        return;
-      }
-      if (!done) return;
-      busy = true; // block manual actions while we finish
-      const dest = done.dest.startsWith("/") && !done.dest.startsWith("//") ? done.dest : "/";
-      try {
-        await establishSession(done.user);
-        window.location.href = dest;
-      } catch (err) {
-        busy = false;
-        showError(authErrorMessage(err));
-      }
-    })();
+    // ── "Signing you in…" overlay ──
+    const busyEl = document.getElementById("pd-auth-busy")!;
+    const busyMsgEl = document.getElementById("pd-auth-busy-msg")!;
+    function showBusy(msg = "Signing you in…") {
+      busyMsgEl.textContent = msg;
+      busyEl.style.display = "flex";
+    }
+    function hideBusy() {
+      busyEl.style.display = "none";
+    }
 
-    // Finish a Firebase redirect-based OAuth sign-in (Apple fallback path).
+    // ── Last-used sign-in method (per browser) ──
+    const LAST_KEY = "pd_last_login";
+    const PENDING_KEY = "pd_oauth_pending";
+    function rememberMethod(m: "google" | "apple" | "email") {
+      try { localStorage.setItem(LAST_KEY, m); } catch { /* private mode */ }
+    }
+    function lastPill() {
+      const s = document.createElement("span");
+      s.className = "pd-last-pill font-mono uppercase";
+      s.textContent = "Last used";
+      return s;
+    }
+    function renderLastUsed() {
+      let last: string | null = null;
+      try { last = localStorage.getItem(LAST_KEY); } catch { /* private mode */ }
+      if (!last) return;
+      if (last === "google" || last === "apple") {
+        const btn = document.getElementById(last === "google" ? "pd-google" : "pd-apple");
+        // Skip a provider that's currently hidden (e.g. Apple not enabled).
+        if (btn && btn.style.display !== "none") {
+          btn.setAttribute("data-last", "true");
+          btn.appendChild(lastPill());
+        }
+      } else if (last === "email") {
+        document.getElementById("pd-email-divider")?.appendChild(lastPill());
+      }
+    }
+    renderLastUsed();
+
+    // A returning OAuth round-trip has to show feedback immediately — detect it
+    // synchronously, before completeGoogleRedirect() scrubs the credential from
+    // the URL, so there's never an idle-looking gap after the popup/redirect.
+    if (/[#&]id_token=/.test(location.hash) && location.hash.includes("state=pdg1.")) showBusy();
+    else if (sessionStorage.getItem(PENDING_KEY)) showBusy();
+
+    function oauthFailed(msg: string) {
+      busy = false;
+      sessionStorage.removeItem(PENDING_KEY);
+      hideBusy();
+      showError(msg);
+    }
+    const safePath = (p: string | null) => (p && p.startsWith("/") && !p.startsWith("//") ? p : null);
+
+    // Finish a returning OAuth sign-in: first the direct Google round-trip
+    // (credential in the URL fragment, forwarded here by Base.astro), then the
+    // Firebase redirect result (Apple fallback). If neither is pending, clear
+    // any stale overlay so the form stays usable.
     (async () => {
-      let user;
       try {
-        user = await completeRedirectSignIn();
+        const done = await completeGoogleRedirect();
+        if (done) {
+          busy = true;
+          showBusy();
+          await establishSession(done.user);
+          rememberMethod("google");
+          sessionStorage.removeItem(PENDING_KEY);
+          window.location.href = safePath(done.dest) ?? redirect;
+          return;
+        }
       } catch (err) {
-        showError(authErrorMessage(err));
-        return;
+        return oauthFailed((err as Error)?.message || authErrorMessage(err));
       }
-      if (!user) return;
-      busy = true; // block manual actions while we finish
-      const stored = sessionStorage.getItem(OAUTH_DEST_KEY);
-      const dest = stored && stored.startsWith("/") && !stored.startsWith("//") ? stored : redirect;
-      sessionStorage.removeItem(OAUTH_DEST_KEY);
+
       try {
-        await establishSession(user);
-        window.location.href = dest;
+        const user = await completeRedirectSignIn();
+        if (user) {
+          busy = true;
+          showBusy();
+          const dest = safePath(sessionStorage.getItem(OAUTH_DEST_KEY)) ?? redirect;
+          sessionStorage.removeItem(OAUTH_DEST_KEY);
+          await establishSession(user);
+          rememberMethod(sessionStorage.getItem(PENDING_KEY) === "apple" ? "apple" : "google");
+          sessionStorage.removeItem(PENDING_KEY);
+          window.location.href = dest;
+          return;
+        }
       } catch (err) {
-        busy = false;
-        showError(authErrorMessage(err));
+        return oauthFailed(authErrorMessage(err));
       }
+
+      // Nothing was pending — never leave a stale overlay covering the form.
+      sessionStorage.removeItem(PENDING_KEY);
+      hideBusy();
     })();
 
     // ── handlers ──
     document.getElementById("pd-google")!.addEventListener("click", () =>
       withBusy(async () => {
+        sessionStorage.setItem(PENDING_KEY, "google");
+        showBusy("Continuing with Google…");
         const user = await signInWithGoogle(redirect);
         if (!user) return; // navigating to Google — finished on return
         await establishSession(user);
+        rememberMethod("google");
+        sessionStorage.removeItem(PENDING_KEY);
         go();
       })
     );
     document.getElementById("pd-apple")!.addEventListener("click", () =>
       withBusy(async () => {
         sessionStorage.setItem(OAUTH_DEST_KEY, redirect);
+        sessionStorage.setItem(PENDING_KEY, "apple");
+        showBusy("Continuing with Apple…");
         const user = await signInWithApple();
         if (!user) return; // mobile: redirecting away — finished on return
         await establishSession(user);
+        rememberMethod("apple");
+        sessionStorage.removeItem(PENDING_KEY);
         go();
       })
     );
@@ -422,6 +508,7 @@ const initialMode = Astro.url.searchParams.get("mode") === "login" ? "login" : "
           }
           throw err;
         }
+        rememberMethod("email");
         go();
       })
     );
