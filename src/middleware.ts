@@ -39,8 +39,12 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   // Staging hosts (sys.*, *.pages.dev, localhost) must never be indexed — only
   // the production apex. Canonical tags already point to the apex; this header
   // is the reliable belt (survives Cloudflare's managed robots.txt).
+  // Production apexes are indexable; everything else (staging, previews, local)
+  // is noindexed. pixydust.com is the new primary; the old pixiedustapp.com hosts
+  // stay indexable during the transition.
   const host = context.url.hostname;
-  if (host !== "pixiedustapp.com" && host !== "www.pixiedustapp.com") {
+  const PROD_APEX = new Set(["pixydust.com", "www.pixydust.com", "pixiedustapp.com", "www.pixiedustapp.com"]);
+  if (!PROD_APEX.has(host)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   response.headers.set("X-Frame-Options", "DENY");

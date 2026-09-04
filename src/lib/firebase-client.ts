@@ -102,10 +102,18 @@ export function startGoogleSignIn(dest: string): void {
   sessionStorage.setItem(G_STATE_KEY, state);
   sessionStorage.setItem(G_NONCE_KEY, nonce);
   sessionStorage.setItem(G_DEST_KEY, dest);
-  // The registered redirect URI is the bare production origin. On any other
+  // The registered redirect URI is the bare production origin. pixydust.com is
+  // the new primary; pixiedustapp.com is kept for the transition. On any other
   // host (previews, local) fall back to that host's origin — OAuth there is
   // unregistered anyway, and prod is what matters.
-  const redirectUri = location.hostname.endsWith("pixiedustapp.com") ? "https://pixiedustapp.com" : location.origin;
+  // NOTE: https://pixydust.com must be an authorized redirect URI on the Google
+  // OAuth client (and pixydust.com an authorized domain in Firebase) for sign-in
+  // to work on the new domain.
+  const redirectUri = location.hostname.endsWith("pixydust.com")
+    ? "https://pixydust.com"
+    : location.hostname.endsWith("pixiedustapp.com")
+      ? "https://pixiedustapp.com"
+      : location.origin;
   const q = new URLSearchParams({
     client_id: GOOGLE_WEB_CLIENT_ID,
     redirect_uri: redirectUri,

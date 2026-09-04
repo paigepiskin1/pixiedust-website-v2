@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIContext } from "astro";
 
-const DOMAIN = "https://pixiedustapp.com";
+const DOMAIN = "https://pixydust.com";
 
 const STATIC_PAGES = [
   { loc: "/", priority: "1.0", changefreq: "daily" },

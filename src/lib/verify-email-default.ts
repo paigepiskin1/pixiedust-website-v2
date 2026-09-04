@@ -66,7 +66,7 @@ export const VERIFY_EMAIL_HTML = `<!DOCTYPE html>
     <td style="padding:24px 40px 32px;border-top:1px solid rgba(255,255,255,0.07);">
       <p style="margin:0 0 8px;color:rgba(255,255,255,0.25);font-size:12px;line-height:1.6;text-align:center;">
         Sent to {{email}} from
-        <a href="https://pixiedustapp.com" style="color:rgba(168,85,247,0.8);text-decoration:none;">pixiedustapp.com</a>.
+        <a href="https://pixydust.com" style="color:rgba(168,85,247,0.8);text-decoration:none;">pixydust.com</a>.
       </p>
       <p style="margin:0;color:rgba(255,255,255,0.15);font-size:11px;text-align:center;">© PixieDust. All rights reserved.</p>
     </td>
