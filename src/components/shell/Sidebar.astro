@@ -68,8 +68,21 @@ const toggleBtn =
             {s.label}
           </div>
           <div class="pd-only-collapsed" style="height:0.5px;background:var(--pd-hairline);margin:8px 6px;" />
-          {s.items.map((it) => (
+          {s.items?.map((it) => (
             <NavItem item={it} active={isActive(it.href, pathname)} />
+          ))}
+          {s.groups?.map((g) => (
+            <div style="margin-top:4px;">
+              <div
+                class="pd-hide-collapsed font-mono uppercase"
+                style="padding:6px 10px 3px 14px;font-size:8.5px;color:var(--pd-ink4);letter-spacing:0.8px;opacity:0.8;"
+              >
+                {g.label}
+              </div>
+              {g.items.map((it) => (
+                <NavItem item={it} active={isActive(it.href, pathname)} />
+              ))}
+            </div>
           ))}
         </div>
       ))
