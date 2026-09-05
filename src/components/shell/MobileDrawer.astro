@@ -48,8 +48,18 @@ const pathname = Astro.url.pathname;
             <div class="font-mono uppercase" style="padding:8px 10px 6px;font-size:9.5px;color:var(--pd-ink4);letter-spacing:1px;">
               {s.label}
             </div>
-            {s.items.map((it) => (
+            {s.items?.map((it) => (
               <NavItem item={it} active={isActive(it.href, pathname)} />
+            ))}
+            {s.groups?.map((g) => (
+              <div style="margin-top:4px;">
+                <div class="font-mono uppercase" style="padding:6px 10px 3px 14px;font-size:8.5px;color:var(--pd-ink4);letter-spacing:0.8px;opacity:0.8;">
+                  {g.label}
+                </div>
+                {g.items.map((it) => (
+                  <NavItem item={it} active={isActive(it.href, pathname)} />
+                ))}
+              </div>
             ))}
           </div>
         ))

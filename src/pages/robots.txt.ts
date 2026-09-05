@@ -1,10 +1,12 @@
 // Host-aware robots.txt: the production apex is indexable; every other host
 // (sys.* staging, *.pages.dev, localhost) is fully disallowed so staging never
-// competes with pixiedustapp.com in search.
+// competes with pixydust.com in search.
 export const prerender = false;
 import type { APIContext } from "astro";
 
-const PROD_HOSTS = new Set(["pixiedustapp.com", "www.pixiedustapp.com"]);
+// New primary domain is pixydust.com. The old pixiedustapp.com hosts are kept
+// indexable during the transition (they may still serve/redirect).
+const PROD_HOSTS = new Set(["pixydust.com", "www.pixydust.com", "pixiedustapp.com", "www.pixiedustapp.com"]);
 
 export function GET({ url }: APIContext) {
   const isProd = PROD_HOSTS.has(url.hostname);
@@ -17,7 +19,7 @@ Disallow: /studio/
 Disallow: /account/
 Disallow: /auth/
 
-Sitemap: https://pixiedustapp.com/sitemap.xml
+Sitemap: https://pixydust.com/sitemap.xml
 `
     : `User-agent: *
 Disallow: /
