@@ -16,7 +16,7 @@ const BUNNY_ZONE = "pixiecdn";
 const BUNNY_KEY = "3a6d5162-f894-43bb-a826ff078ea6-d1fc-44d5";
 const CDN_BASE = "https://pixiecdn.b-cdn.net";
 
-// Space Grotesk Bold is required to render the "PixieDust" wordmark — resvg has
+// Space Grotesk Bold is required to render the "PixyDust" wordmark — resvg has
 // no system fonts loaded, so without this the text rendered blank.
 const FONT_PATH = path.join(__dirname, ".fonts", "SpaceGrotesk-700.ttf");
 const FONT_FILES = fs.existsSync(FONT_PATH) ? [FONT_PATH] : [];
