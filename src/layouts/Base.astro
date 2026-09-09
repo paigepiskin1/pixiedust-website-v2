@@ -59,6 +59,7 @@ const baseJsonLd = {
       "@id": `${SITE}/#website`,
       url: SITE,
       name: "PixyDust",
+      alternateName: "PixyDust AI",
       description: "AI-powered creative studio — generate images and videos in seconds.",
       publisher: { "@id": `${SITE}/#organization` },
       potentialAction: {
@@ -113,6 +114,10 @@ const baseJsonLd = {
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={resolvedOgImage} />
+
+    <!-- Site name signals: Google picks the SERP site name from WebSite.name,
+         og:site_name and application-name, so all three must agree. -->
+    <meta name="application-name" content="PixyDust" />
 
     <!-- Icons + theme -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
