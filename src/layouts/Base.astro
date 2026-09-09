@@ -12,6 +12,8 @@ interface Props {
   noindex?: boolean;
   /** Optional extra JSON-LD object (stringified) to inject alongside the base schema */
   jsonLd?: string;
+  /** Comma-separated meta keywords. Defaults to the brand set. */
+  keywords?: string;
 }
 
 const {
@@ -21,6 +23,7 @@ const {
   ogType = "website",
   noindex = false,
   jsonLd,
+  keywords = "PixyDust, Pixy Dust, PixieDust, Pixie Dust, AI Creative Suite, AI Creative Tools, AI Creative Platform, AR Filters, AR Lenses, AI Image Generator, Image Generator, AI Video Generator, Video Generator, AI Image Editor, Image Editor, AI Video Editor, Video Editor, AI Content Creation, Generative AI Tools",
 } = Astro.props;
 
 const SITE = "https://pixydust.com";
@@ -60,7 +63,8 @@ const baseJsonLd = {
       url: SITE,
       name: "PixyDust",
       alternateName: "PixyDust AI",
-      description: "AI-powered creative studio — generate images and videos in seconds.",
+      description:
+        "Create, edit and transform images, videos and whatever you imagine with PixyDust. Explore AI image and video generation tools, templates, AR filters and more.",
       publisher: { "@id": `${SITE}/#organization` },
       potentialAction: {
         "@type": "SearchAction",
@@ -94,6 +98,9 @@ const baseJsonLd = {
     <!-- Primary meta -->
     <title>{title}</title>
     <meta name="description" content={description} />
+    {/* Google and Bing have ignored meta keywords for years; kept because some
+        smaller engines and internal tools still read it, and it costs nothing. */}
+    <meta name="keywords" content={keywords} />
     <link rel="canonical" href={canonicalURL} />
     {noindex && <meta name="robots" content="noindex,nofollow" />}
 
