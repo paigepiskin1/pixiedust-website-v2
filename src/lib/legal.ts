@@ -165,7 +165,7 @@ export const ACCEPTABLE_USE: LegalDoc = {
       id: "security",
       title: "Security & abuse",
       body: [
-        "No probing, scraping, or attempts to circumvent rate limits or safety filters. No reverse-engineering the AI pipeline. No automated account creation. Bug reports welcome at legal@pixydust.com under our responsible-disclosure policy.",
+        "No probing, scraping, or attempts to circumvent rate limits or safety filters. No reverse-engineering the AI pipeline. No automated account creation. Bug reports welcome at support@pixydust.com under our responsible-disclosure policy.",
       ],
     },
     {
