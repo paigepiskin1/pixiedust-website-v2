@@ -1,4 +1,8 @@
 ---
+// Server-rendered, not prerendered: a static 404 asset is served by Pages
+// *before* the worker runs, which meant unmatched legacy URLs on the old
+// domain (e.g. /index.php) 404'd there instead of 301'ing to pixydust.com.
+export const prerender = false;
 import AppShell from "../layouts/AppShell.astro";
 import Dot from "../components/ui/Dot.astro";
 import Media from "../components/ui/Media.astro";

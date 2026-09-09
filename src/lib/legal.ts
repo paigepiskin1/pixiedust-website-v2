@@ -86,7 +86,7 @@ export const PRIVACY: LegalDoc = {
       id: "cookies",
       title: "Cookies & similar tech",
       body: [
-        "We use exactly three cookies: session, theme preference, and feature-flag identifier. We do not use ad-targeting cookies. No third-party trackers run on pixiedust.app.",
+        "We use exactly three cookies: session, theme preference, and feature-flag identifier. We do not use ad-targeting cookies. No third-party trackers run on pixydust.com.",
       ],
     },
     {
@@ -99,7 +99,7 @@ export const PRIVACY: LegalDoc = {
     {
       id: "contact-p",
       title: "Contact our DPO",
-      body: ["For anything privacy-related: privacy@pixiedust.app. Our DPO responds within 14 business days."],
+      body: ["For anything privacy-related: legal@pixydust.com. Our DPO responds within 14 business days."],
     },
   ],
 };
@@ -158,14 +158,14 @@ export const ACCEPTABLE_USE: LegalDoc = {
       title: "Copyright & trademarks",
       body: [
         "You're responsible for the rights to anything you upload. Don't upload other artists' work as input, don't prompt for a living artist's \"in the style of\" output and pass it off commercially, don't generate brand logos or trademarked characters for use you don't have a license for.",
-        'We respond to DMCA notices at copyright@pixiedust.app. We honor "do not train on my work" requests for any work whose rightsholder writes to us.',
+        'We respond to DMCA notices at dmca@pixydust.com. We honor "do not train on my work" requests for any work whose rightsholder writes to us.',
       ],
     },
     {
       id: "security",
       title: "Security & abuse",
       body: [
-        "No probing, scraping, or attempts to circumvent rate limits or safety filters. No reverse-engineering the AI pipeline. No automated account creation. Bug reports welcome at security@pixiedust.app under our responsible-disclosure policy.",
+        "No probing, scraping, or attempts to circumvent rate limits or safety filters. No reverse-engineering the AI pipeline. No automated account creation. Bug reports welcome at legal@pixydust.com under our responsible-disclosure policy.",
       ],
     },
     {
@@ -173,7 +173,7 @@ export const ACCEPTABLE_USE: LegalDoc = {
       title: "Enforcement",
       body: [
         "Violations are caught by a mix of automated classifiers and human review. Consequences scale: warning → temporary suspension → permanent ban. Severe violations are immediate permanent bans with no refund and, where applicable, law-enforcement referral.",
-        "Disputes: write to appeals@pixiedust.app within 30 days of a suspension. A human will review.",
+        "Disputes: write to support@pixydust.com within 30 days of a suspension. A human will review.",
       ],
     },
   ],

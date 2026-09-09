@@ -24,20 +24,18 @@ export default defineConfig({
   output: 'static',
   adapter: cloudflare({
     platformProxy: /** @type {any} */ ({ enabled: true, remote: true }),
-    // Paths the worker must see even though they'd otherwise be served straight
-    // from static assets:
+    // Every page is server-rendered (`prerender = false`), so Astro emits a
+    // single `include: ["/*"]` here and the worker sees all non-asset requests.
+    // That matters for two things:
     //  • /__/*  — Firebase's reserved auth paths, proxied same-origin so mobile
     //    OAuth redirects complete (see middleware).
-    //  • the prerendered pages below — they're excluded from the worker by
-    //    default, which meant the old-domain 301 never ran for them and
-    //    pixiedustapp.com kept serving live duplicates of the legal pages.
-    routes: {
-      extend: {
-        include: [
-          { pattern: '/__/*' },
-        ],
-      },
-    },
+    //  • unmatched legacy URLs (/index.php, deleted pages) — they reach the
+    //    server-rendered 404 route, so middleware runs and the old-domain 301
+    //    to pixydust.com fires instead of Pages serving a static 404.
+    // If a page is ever switched back to prerendered, Astro enumerates explicit
+    // paths instead of "/*" and both of those silently break. Cloudflare rejects
+    // overlapping rules, so they can't just be listed alongside "/*" — the page
+    // has to stay on-demand, or the catch-all has to be reinstated another way.
   }),
   integrations: [react(), firebaseAuthProxy],
   vite: {
