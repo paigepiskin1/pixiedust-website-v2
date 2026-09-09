@@ -40,6 +40,19 @@ const baseJsonLd = {
         "@type": "ImageObject",
         url: `${SITE}/favicon.svg`,
       },
+      // Verified brand profiles. `sameAs` is how search engines tie this site to
+      // the accounts, so these must stay canonical (x.com, not www.x.com) and
+      // exact — a wrong or dead handle here weakens the entity rather than
+      // helping it.
+      sameAs: [
+        "https://www.instagram.com/PixyDustAI",
+        "https://www.facebook.com/PixyDustAI",
+        "https://x.com/PixyDustAI",
+        "https://www.youtube.com/@PixyDustAI",
+        "https://www.tiktok.com/@PixyDustAI",
+        "https://www.linkedin.com/company/PixyDustAI",
+        "https://www.pinterest.com/PixyDustAI",
+      ],
     },
     {
       "@type": "WebSite",
@@ -50,7 +63,7 @@ const baseJsonLd = {
       publisher: { "@id": `${SITE}/#organization` },
       potentialAction: {
         "@type": "SearchAction",
-        target: { "@type": "EntryPoint", urlTemplate: `${SITE}/explore?q={search_term_string}` },
+        target: { "@type": "EntryPoint", urlTemplate: `${SITE}/search?q={search_term_string}` },
         "query-input": "required name=search_term_string",
       },
     },
@@ -96,7 +109,7 @@ const baseJsonLd = {
 
     <!-- Twitter / X Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@pixiedustapp" />
+    <meta name="twitter:site" content="@PixyDustAI" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={resolvedOgImage} />
