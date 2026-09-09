@@ -24,9 +24,20 @@ export default defineConfig({
   output: 'static',
   adapter: cloudflare({
     platformProxy: /** @type {any} */ ({ enabled: true, remote: true }),
-    // Route Firebase's reserved /__/* auth paths to the worker so the
-    // middleware can proxy them same-origin (mobile OAuth redirect fix).
-    routes: { extend: { include: [{ pattern: '/__/*' }] } },
+    // Paths the worker must see even though they'd otherwise be served straight
+    // from static assets:
+    //  • /__/*  — Firebase's reserved auth paths, proxied same-origin so mobile
+    //    OAuth redirects complete (see middleware).
+    //  • the prerendered pages below — they're excluded from the worker by
+    //    default, which meant the old-domain 301 never ran for them and
+    //    pixiedustapp.com kept serving live duplicates of the legal pages.
+    routes: {
+      extend: {
+        include: [
+          { pattern: '/__/*' },
+        ],
+      },
+    },
   }),
   integrations: [react(), firebaseAuthProxy],
   vite: {

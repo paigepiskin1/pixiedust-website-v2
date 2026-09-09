@@ -1,4 +1,7 @@
 ---
+// SSR (not prerendered) so this path routes through the worker — prerendered
+// pages land in _routes.json "exclude", which bypassed the old-domain 301.
+export const prerender = false;
 import AppShell from "../../layouts/AppShell.astro";
 import LegalLayout from "../../components/legal/LegalLayout.astro";
 import { TERMS } from "../../lib/legal-terms";
