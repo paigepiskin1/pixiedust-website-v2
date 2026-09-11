@@ -62,7 +62,10 @@ const baseJsonLd = {
       "@id": `${SITE}/#website`,
       url: SITE,
       name: "PixyDust",
-      alternateName: "PixyDust AI",
+      // Brand variants, including the pre-rebrand spelling. This is the
+      // structured-data way to tell search engines that people searching
+      // "PixieDust" are looking for this site.
+      alternateName: ["Pixy Dust", "PixieDust", "Pixie Dust", "PixyDust AI"],
       description:
         "Create, edit and transform images, videos and whatever you imagine with PixyDust. Explore AI image and video generation tools, templates, AR filters and more.",
       publisher: { "@id": `${SITE}/#organization` },
