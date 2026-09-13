@@ -27,9 +27,11 @@ const {
 } = Astro.props;
 
 const SITE = "https://pixydust.com";
-// Strip any trailing slash so the canonical matches the URL middleware
-// redirects to — one page, one canonical.
-const canonicalPath = Astro.url.pathname.replace(/(?!^)\/+$/, "") || "/";
+// Normalize to exactly one leading slash and no repeats, matching the URL
+// middleware redirects to. The leading-slash guarantee matters: a path starting
+// "//" is protocol-relative, so new URL("//trending", SITE) yields
+// "https://trending/" — a canonical pointing at someone else's domain.
+const canonicalPath = "/" + Astro.url.pathname.split("/").filter(Boolean).join("/");
 const canonicalURL = new URL(canonicalPath, SITE).href;
 const resolvedOgImage = ogImage ?? `${SITE}/og-default.png`;
 

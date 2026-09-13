@@ -31,12 +31,14 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   // would loop. /__/* is Firebase's proxied auth namespace and is passed through
   // byte-for-byte, since the upstream decides those shapes, not us.
   const reqUrl = new URL(context.request.url);
-  const cleanPath =
-    reqUrl.pathname.length > 1 &&
-    reqUrl.pathname.endsWith("/") &&
-    !reqUrl.pathname.startsWith("/__/")
-      ? reqUrl.pathname.replace(/\/+$/, "") || "/"
-      : reqUrl.pathname;
+  // Splitting on "/" and dropping empties collapses repeated separators and the
+  // trailing slash in one pass: "/a//b/" and "//a/b" both become "/a/b", and "/"
+  // stays "/". Repeated slashes matter beyond tidiness — "//trending" served a
+  // 200 whose canonical resolved to the host "trending", because new URL() reads
+  // a leading "//" as protocol-relative.
+  const cleanPath = reqUrl.pathname.startsWith("/__/")
+    ? reqUrl.pathname
+    : "/" + reqUrl.pathname.split("/").filter(Boolean).join("/");
 
   // ── Domain migration → pixydust.com ──────────────────────────────────────
   // Permanently forward the old domain (and the www of both) to the new apex,
