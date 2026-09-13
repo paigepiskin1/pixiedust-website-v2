@@ -22,6 +22,22 @@ async function migrateOn(env: any): Promise<boolean> {
 // Populates locals.user from the session cookie for SSR routes. Static
 // (prerendered) routes run this at build time only and hydrate auth client-side.
 export const onRequest: MiddlewareHandler = async (context, next) => {
+  // ── Canonical path: no trailing slash ────────────────────────────────────
+  // Astro's default is `trailingSlash: "ignore"`, which served /legal/terms and
+  // /legal/terms/ as two 200s that each declared THEMSELVES canonical — so every
+  // page was indexable twice and split its own ranking signals.
+  //
+  // "/" keeps its slash: a URL always has at least a root path, and stripping it
+  // would loop. /__/* is Firebase's proxied auth namespace and is passed through
+  // byte-for-byte, since the upstream decides those shapes, not us.
+  const reqUrl = new URL(context.request.url);
+  const cleanPath =
+    reqUrl.pathname.length > 1 &&
+    reqUrl.pathname.endsWith("/") &&
+    !reqUrl.pathname.startsWith("/__/")
+      ? reqUrl.pathname.replace(/\/+$/, "") || "/"
+      : reqUrl.pathname;
+
   // ── Domain migration → pixydust.com ──────────────────────────────────────
   // Permanently forward the old domain (and the www of both) to the new apex,
   // preserving path + query, so e.g. pixiedustapp.com/login → pixydust.com/login.
@@ -32,13 +48,23 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   // otherwise we'd 301 the whole live site to a dead domain. Only old-domain
   // hosts consult the flag; reversible instantly with no code deploy.
   {
-    const u = new URL(context.request.url);
-    const h = u.hostname;
+    const h = reqUrl.hostname;
     if (h === "pixiedustapp.com" || h === "www.pixiedustapp.com" || h === "www.pixydust.com") {
       if (await migrateOn(context.locals.runtime?.env)) {
-        return Response.redirect(`https://pixydust.com${u.pathname}${u.search}`, 301);
+        // cleanPath, not pathname: one hop from old-domain-with-slash to the
+        // final URL rather than a 301 into a second 301.
+        return Response.redirect(`https://pixydust.com${cleanPath}${reqUrl.search}`, 301);
       }
     }
+  }
+
+  // Same-origin trailing-slash redirect. 308 for anything that isn't GET/HEAD:
+  // a 301 makes clients re-issue a POST as a GET and drop the body, which would
+  // quietly break form and webhook posts to a slashed URL. 308 preserves both.
+  if (cleanPath !== reqUrl.pathname) {
+    const method = context.request.method;
+    const code = method === "GET" || method === "HEAD" ? 301 : 308;
+    return Response.redirect(`${reqUrl.origin}${cleanPath}${reqUrl.search}`, code);
   }
 
   // Same-origin Firebase auth: proxy the reserved /__/* paths (auth handler,

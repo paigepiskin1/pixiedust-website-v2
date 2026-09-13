@@ -27,7 +27,10 @@ const {
 } = Astro.props;
 
 const SITE = "https://pixydust.com";
-const canonicalURL = new URL(Astro.url.pathname, SITE).href;
+// Strip any trailing slash so the canonical matches the URL middleware
+// redirects to — one page, one canonical.
+const canonicalPath = Astro.url.pathname.replace(/(?!^)\/+$/, "") || "/";
+const canonicalURL = new URL(canonicalPath, SITE).href;
 const resolvedOgImage = ogImage ?? `${SITE}/og-default.png`;
 
 // Base WebSite + WebApplication JSON-LD — always present on every page

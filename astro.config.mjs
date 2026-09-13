@@ -22,6 +22,11 @@ const firebaseAuthProxy = {
 // `export const prerender = false`. platformProxy exposes D1/KV/R2 bindings in `astro dev`.
 export default defineConfig({
   output: 'static',
+  // NOTE: deliberately NOT `trailingSlash: 'never'`. Astro implements that with
+  // its own 308 issued *before* middleware runs, which on the old domain meant
+  // a same-host slash-strip followed by the migration 301 — two hops for every
+  // indexed legacy URL. Middleware does it instead, in a single 301 that strips
+  // the slash and changes host at the same time. See src/middleware.ts.
   adapter: cloudflare({
     platformProxy: /** @type {any} */ ({ enabled: true, remote: true }),
     // Every page is server-rendered (`prerender = false`), so Astro emits a
