@@ -5,6 +5,7 @@ import {
   getPublishedBySlug,
   relatedPosts,
   thumbnailFor,
+  firstImageIn,
   excerptFor,
   displayDate,
   isoDate,
@@ -37,6 +38,16 @@ const author = post.author || BLOG_AUTHOR_FALLBACK;
 const tags = tagsOf(post);
 const minutes = readingMinutes(post.content_html);
 const url = `${SITE}/blog/${post.slug}`;
+
+// Don't print the same picture twice. The editor's "From body" button sets the
+// thumbnail to the first image in the article, so thumbnail === first body
+// image is the normal outcome of the normal workflow, not an edge case. When
+// they match, the body keeps its copy — it sits where the author put it and may
+// carry a caption — and the header image is dropped. A thumbnail that doesn't
+// appear in the body still renders as a lead image.
+const sameImage = (a: string | null, b: string | null) =>
+  !!a && !!b && a.split(/[?#]/)[0] === b.split(/[?#]/)[0];
+const heroImage = sameImage(image, firstImageIn(post.content_html)) ? null : image;
 
 const jsonLd = JSON.stringify([
   {
@@ -115,9 +126,9 @@ const jsonLd = JSON.stringify([
         </div>
       </header>
 
-      {image && (
+      {heroImage && (
         <img
-          src={image}
+          src={heroImage}
           alt={post.thumbnail_alt || post.title}
           width="1200"
           height="675"
