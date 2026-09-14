@@ -189,9 +189,18 @@ const creditBoost = packDiscountPct > 0 ? 100 / (100 - packDiscountPct) : 1;
         try {
           data = JSON.parse(raw);
         } catch {
+          // A non-JSON body here is Cloudflare's error page, served when the
+          // worker fails before our handler can answer. Its diagnostic code and
+          // the ray id are the only actionable parts — a slice of boilerplate
+          // HTML tells nobody anything.
           btn.disabled = false;
           btn.textContent = orig;
-          (window as any).pdToast?.(`Server error ${res.status}. ${raw.slice(0, 140)}`);
+          const cfCode = raw.match(/Error\s*(\d{3,4})/)?.[1];
+          const ray = res.headers.get("cf-ray") || raw.match(/Ray ID:[^0-9a-f]*([0-9a-f]{16})/i)?.[1];
+          console.error("[checkout] non-JSON response", res.status, { cfCode, ray, body: raw });
+          (window as any).pdToast?.(
+            `Checkout failed (HTTP ${res.status}${cfCode ? ` · Cloudflare ${cfCode}` : ""}${ray ? ` · ray ${ray}` : ""}). Details in browser console.`
+          );
           return;
         }
         if (res.status === 401) { window.location.href = "/auth/sign-in?redirect=/credits"; return; }

@@ -99,7 +99,26 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   } catch {
     // never block a request on auth resolution
   }
-  const response = await next();
+  // Anything that escapes a route lands on Cloudflare's generic error page,
+  // which carries no diagnostics — and for an API route the client then fails
+  // parsing HTML as JSON, so a server fault reads as a client-side network
+  // problem. Catch it here: /api/* gets the real message as JSON, everything
+  // else re-throws so page rendering behaves as before.
+  let response: Response;
+  try {
+    response = await next();
+  } catch (err) {
+    const msg = (err as Error)?.message || String(err);
+    const stack = (err as Error)?.stack || "";
+    console.error("[unhandled]", context.request.method, reqUrl.pathname, msg, stack);
+    if (reqUrl.pathname.startsWith("/api/")) {
+      return new Response(JSON.stringify({ error: `Server error: ${msg}` }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    throw err;
+  }
   // Staging hosts (sys.*, *.pages.dev, localhost) must never be indexed — only
   // the production apex. Canonical tags already point to the apex; this header
   // is the reliable belt (survives Cloudflare's managed robots.txt).
