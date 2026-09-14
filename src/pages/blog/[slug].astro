@@ -1,0 +1,198 @@
+---
+export const prerender = false;
+import AppShell from "../../layouts/AppShell.astro";
+import {
+  getPublishedBySlug,
+  relatedPosts,
+  thumbnailFor,
+  excerptFor,
+  displayDate,
+  isoDate,
+  readingMinutes,
+  tagsOf,
+  BLOG_AUTHOR_FALLBACK,
+} from "../../lib/blog";
+
+const SITE = "https://pixydust.com";
+const { slug } = Astro.params;
+const db = Astro.locals.runtime.env.DB;
+
+let post = null;
+try {
+  post = slug ? await getPublishedBySlug(db, slug) : null;
+} catch {
+  post = null;
+}
+
+// A draft or unknown slug must 404 rather than render an empty shell — a soft
+// 404 gets indexed as a real page and dilutes the site.
+if (!post) return Astro.redirect("/blog", 302);
+
+const related = await relatedPosts(db, post, 3).catch(() => []);
+const image = thumbnailFor(post);
+const description = excerptFor(post);
+const published = isoDate(post.published_at);
+const modified = isoDate(post.updated_at) || published;
+const author = post.author || BLOG_AUTHOR_FALLBACK;
+const tags = tagsOf(post);
+const minutes = readingMinutes(post.content_html);
+const url = `${SITE}/blog/${post.slug}`;
+
+const jsonLd = JSON.stringify([
+  {
+    "@type": "BlogPosting",
+    "@id": `${url}#article`,
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    headline: post.title.slice(0, 110), // Google truncates headline beyond ~110
+    description,
+    ...(image ? { image: [image] } : {}),
+    datePublished: published,
+    dateModified: modified,
+    author: { "@type": "Organization", name: author, url: SITE },
+    publisher: { "@id": `${SITE}/#organization` },
+    isPartOf: { "@id": `${SITE}/blog#blog` },
+    ...(tags.length ? { keywords: tags.join(", ") } : {}),
+    wordCount: post.content_html ? post.content_html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length : 0,
+  },
+  {
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE },
+      { "@type": "ListItem", position: 2, name: "Blog", item: `${SITE}/blog` },
+      { "@type": "ListItem", position: 3, name: post.title, item: url },
+    ],
+  },
+]);
+---
+
+<AppShell
+  title={`${post.title} — PixyDust`}
+  description={description}
+  ogImage={image ?? undefined}
+  ogType="article"
+  jsonLd={jsonLd}
+  credits={Astro.locals.user?.credits ?? 47}
+>
+  {/* Article-specific OG tags Base doesn't emit for generic pages. */}
+  <Fragment slot="head">
+    {published && <meta property="article:published_time" content={published} />}
+    {modified && <meta property="article:modified_time" content={modified} />}
+    {tags.map((t) => <meta property="article:tag" content={t} />)}
+  </Fragment>
+
+  <div class="mx-auto w-full" style="max-width:760px;padding:28px 24px 64px;">
+    <nav aria-label="Breadcrumb" class="mb-5 flex items-center gap-1.5 text-ink-4" style="font-size:11.5px;">
+      <a href="/" style="color:inherit;text-decoration:none;">Home</a>
+      <span>/</span>
+      <a href="/blog" style="color:inherit;text-decoration:none;">Blog</a>
+    </nav>
+
+    <article>
+      <header>
+        {tags.length > 0 && (
+          <div class="mb-3 flex flex-wrap gap-1.5">
+            {tags.map((t) => (
+              <span
+                class="font-mono uppercase"
+                style="font-size:9.5px;letter-spacing:1px;color:var(--pd-lilac);border:0.5px solid color-mix(in srgb,var(--pd-lilac) 38%,transparent);border-radius:999px;padding:3px 9px;"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <h1 class="font-display font-semibold text-ink" style="font-size:clamp(28px,5vw,42px);letter-spacing:-1px;line-height:1.12;">
+          {post.title}
+        </h1>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2 text-ink-3" style="font-size:12.5px;">
+          <span>{author}</span>
+          <span>·</span>
+          {published && <time datetime={published}>{displayDate(post.published_at)}</time>}
+          <span>·</span>
+          <span>{minutes} min read</span>
+        </div>
+      </header>
+
+      {image && (
+        <img
+          src={image}
+          alt={post.thumbnail_alt || post.title}
+          width="1200"
+          height="675"
+          decoding="async"
+          class="mt-7 rounded-2xl"
+          style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline);"
+        />
+      )}
+
+      <div class="pd-prose mt-8" set:html={post.content_html} />
+    </article>
+
+    {related.length > 0 && (
+      <section class="mt-14">
+        <h2 class="mb-4 font-display font-semibold text-ink" style="font-size:18px;letter-spacing:-0.3px;">Keep reading</h2>
+        <div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+          {related.map((r) => {
+            const rImg = thumbnailFor(r);
+            return (
+              <a
+                href={`/blog/${r.slug}`}
+                class="overflow-hidden rounded-xl"
+                style="display:block;text-decoration:none;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+              >
+                {rImg ? (
+                  <img src={rImg} alt={r.title} width="400" height="225" loading="lazy" decoding="async"
+                    style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--pd-bg3);" />
+                ) : (
+                  <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,color-mix(in srgb,var(--pd-lilac) 26%,transparent),var(--pd-bg3));" />
+                )}
+                <div style="padding:12px 13px 14px;">
+                  <div class="font-semibold text-ink" style="font-size:13px;line-height:1.3;">{r.title}</div>
+                  <div class="mt-1 text-ink-4" style="font-size:11px;">{displayDate(r.published_at)}</div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </section>
+    )}
+  </div>
+</AppShell>
+
+<style is:global>
+  /* Article body. The editor emits plain semantic HTML, so style it here rather
+     than having the editor write inline styles into stored content. */
+  .pd-prose { font-size: 15.5px; line-height: 1.72; color: var(--pd-ink2); }
+  .pd-prose > * + * { margin-top: 1.15em; }
+  .pd-prose h2 { font-family: var(--pd-font-display, inherit); font-size: 24px; font-weight: 600; letter-spacing: -0.5px; color: var(--pd-ink); margin-top: 1.9em; line-height: 1.25; }
+  .pd-prose h3 { font-size: 18.5px; font-weight: 600; letter-spacing: -0.3px; color: var(--pd-ink); margin-top: 1.6em; line-height: 1.3; }
+  .pd-prose a { color: var(--pd-lilac); text-underline-offset: 2px; }
+  .pd-prose strong { color: var(--pd-ink); font-weight: 600; }
+  .pd-prose ul, .pd-prose ol { padding-left: 1.3em; }
+  .pd-prose ul { list-style: disc; }
+  .pd-prose ol { list-style: decimal; }
+  .pd-prose li + li { margin-top: 0.4em; }
+  .pd-prose img, .pd-prose video {
+    display: block; width: 100%; height: auto; border-radius: 14px;
+    border: 0.5px solid var(--pd-hairline); margin: 1.8em 0;
+  }
+  .pd-prose figure { margin: 1.8em 0; }
+  .pd-prose figcaption { font-size: 12px; color: var(--pd-ink-4, var(--pd-ink3)); text-align: center; margin-top: 0.6em; }
+  .pd-prose blockquote {
+    border-left: 2px solid var(--pd-lilac); padding-left: 1em; color: var(--pd-ink2); font-style: italic;
+  }
+  .pd-prose code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em;
+    background: var(--pd-bg2); border: 0.5px solid var(--pd-hairline); border-radius: 5px; padding: 1px 5px;
+  }
+  .pd-prose pre {
+    background: var(--pd-bg2); border: 0.5px solid var(--pd-hairline); border-radius: 12px;
+    padding: 14px 16px; overflow-x: auto;
+  }
+  .pd-prose pre code { background: none; border: 0; padding: 0; }
+  .pd-prose hr { border: 0; border-top: 0.5px solid var(--pd-hairline); margin: 2.4em 0; }
+  .pd-prose table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .pd-prose th, .pd-prose td { border: 0.5px solid var(--pd-hairline); padding: 8px 10px; text-align: left; }
+</style>

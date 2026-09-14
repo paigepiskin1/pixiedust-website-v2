@@ -1,0 +1,124 @@
+---
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+import { listAll, thumbnailFor, displayDate, excerptFor } from "../../../lib/blog";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+let posts: Awaited<ReturnType<typeof listAll>> = [];
+let missingTable = false;
+try {
+  posts = await listAll(db);
+} catch {
+  missingTable = true;
+}
+
+const rows = posts.map((p) => ({
+  id: p.id,
+  slug: p.slug,
+  title: p.title,
+  status: p.status,
+  image: thumbnailFor(p),
+  excerpt: excerptFor(p, 90),
+  date: p.published_at ? displayDate(p.published_at) : `Updated ${displayDate(p.updated_at)}`,
+}));
+const publishedCount = rows.filter((r) => r.status === "published").length;
+---
+
+<AdminShell title="Blog — PixyDust Admin" tab="blog">
+  <div class="mx-auto w-full" style="max-width:1180px;padding:28px;">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 class="font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.6px;">Blog</h1>
+        <p class="mt-1 text-ink-3" style="font-size:13px;">
+          {rows.length} post{rows.length === 1 ? "" : "s"} · {publishedCount} live on <a href="/blog" style="color:var(--pd-lilac);">/blog</a>
+        </p>
+      </div>
+      <button
+        type="button"
+        id="pd-new-post"
+        class="rounded-xl font-bold"
+        style="padding:11px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;border:none;cursor:pointer;"
+      >
+        New post
+      </button>
+    </div>
+
+    {missingTable && (
+      <div
+        class="mt-5 rounded-xl"
+        style="padding:14px 16px;background:color-mix(in srgb,var(--pd-amber) 12%,transparent);color:var(--pd-amber);font-size:12.5px;"
+      >
+        The <code>blog_posts</code> table doesn't exist yet — run <code>scripts/migration-blog.sql</code> against D1.
+      </div>
+    )}
+
+    {rows.length === 0 && !missingTable && (
+      <div
+        class="mt-6 rounded-2xl text-center text-ink-3"
+        style="padding:56px 24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:13.5px;"
+      >
+        No posts yet. Hit <strong class="text-ink">New post</strong> to write the first one.
+      </div>
+    )}
+
+    <div class="mt-6 flex flex-col gap-2">
+      {rows.map((r) => (
+        <a
+          href={`/admin/blog/edit/${r.id}`}
+          class="flex items-center gap-4 rounded-xl"
+          style="padding:12px 14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);text-decoration:none;"
+        >
+          {r.image ? (
+            <img src={r.image} alt="" width="88" height="50" loading="lazy"
+              style="width:88px;height:50px;object-fit:cover;border-radius:8px;background:var(--pd-bg3);flex:none;" />
+          ) : (
+            <div style="width:88px;height:50px;border-radius:8px;flex:none;background:linear-gradient(135deg,color-mix(in srgb,var(--pd-lilac) 26%,transparent),var(--pd-bg3));" />
+          )}
+          <div style="min-width:0;flex:1;">
+            <div class="font-semibold text-ink" style="font-size:14px;letter-spacing:-0.2px;">{r.title}</div>
+            <div class="mt-0.5 truncate text-ink-4" style="font-size:11.5px;">/blog/{r.slug} · {r.date}</div>
+          </div>
+          <span
+            class="font-mono uppercase"
+            style={`flex:none;font-size:9.5px;letter-spacing:1px;border-radius:999px;padding:3px 9px;${
+              r.status === "published"
+                ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
+                : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);"
+            }`}
+          >
+            {r.status}
+          </span>
+        </a>
+      ))}
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("pd-new-post")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = "Creating…";
+      try {
+        const res = await fetch("/api/admin/blog", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "create", title: "Untitled post" }),
+        });
+        const data = await res.json();
+        if (data.id) window.location.href = `/admin/blog/edit/${data.id}`;
+        else {
+          btn.disabled = false;
+          btn.textContent = "New post";
+          (window as any).pdToast?.(data.error || "Could not create post.");
+        }
+      } catch {
+        btn.disabled = false;
+        btn.textContent = "New post";
+        (window as any).pdToast?.("Network error.");
+      }
+    });
+  </script>
+</AdminShell>

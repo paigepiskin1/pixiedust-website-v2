@@ -69,6 +69,7 @@ if (!user) {
 ---
 
 <Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd}>
+  <Fragment slot="head"><slot name="head" /></Fragment>
   <script is:inline set:html={`document.documentElement.setAttribute('data-auth','${user ? "in" : "out"}');${user ? "document.documentElement.setAttribute('data-plan','free');" : ""}`}></script>
   <div class="flex min-h-screen">
     <Sidebar credits={credits} user={user} />

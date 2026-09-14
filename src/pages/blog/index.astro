@@ -1,0 +1,121 @@
+---
+export const prerender = false;
+import AppShell from "../../layouts/AppShell.astro";
+import PageHeader from "../../components/ui/PageHeader.astro";
+import { listPublished, thumbnailFor, excerptFor, displayDate, isoDate, readingMinutes, tagsOf, BLOG_AUTHOR_FALLBACK } from "../../lib/blog";
+
+const SITE = "https://pixydust.com";
+const db = Astro.locals.runtime.env.DB;
+
+let posts: Awaited<ReturnType<typeof listPublished>> = [];
+try {
+  posts = await listPublished(db, 60);
+} catch {
+  // Blog table missing (pre-migration) must not take the page down.
+}
+
+const cards = posts.map((p) => ({
+  slug: p.slug,
+  title: p.title,
+  excerpt: excerptFor(p),
+  image: thumbnailFor(p),
+  date: displayDate(p.published_at),
+  iso: isoDate(p.published_at),
+  minutes: readingMinutes(p.content_html),
+  tags: tagsOf(p).slice(0, 2),
+  author: p.author || BLOG_AUTHOR_FALLBACK,
+}));
+
+// Blog + ItemList: tells search engines this is a blog and gives it the post
+// list in order, so articles can be discovered without crawling every card.
+const jsonLd = JSON.stringify({
+  "@type": "Blog",
+  "@id": `${SITE}/blog#blog`,
+  url: `${SITE}/blog`,
+  name: "PixyDust Blog",
+  description: "Guides, feature news and creative walkthroughs for AI image and video generation.",
+  publisher: { "@id": `${SITE}/#organization` },
+  blogPost: cards.map((c) => ({
+    "@type": "BlogPosting",
+    headline: c.title,
+    url: `${SITE}/blog/${c.slug}`,
+    datePublished: c.iso,
+    ...(c.image ? { image: c.image } : {}),
+  })),
+});
+---
+
+<AppShell
+  title="Blog — PixyDust"
+  description="Guides, feature news and creative walkthroughs for AI image and video generation with PixyDust."
+  ogImage={cards[0]?.image ?? undefined}
+  jsonLd={jsonLd}
+  credits={Astro.locals.user?.credits ?? 47}
+>
+  <div class="mx-auto w-full" style="max-width:1180px;padding:28px;">
+    <PageHeader
+      kicker="PixyDust · Blog"
+      title="Blog"
+      sub="Guides, feature news and creative walkthroughs."
+    />
+
+    {
+      cards.length === 0 ? (
+        <div
+          class="rounded-2xl text-center text-ink-3"
+          style="padding:56px 24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:13.5px;"
+        >
+          No posts yet — check back soon.
+        </div>
+      ) : (
+        <div class="grid gap-5" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">
+          {cards.map((c, i) => (
+            <article
+              class="flex flex-col overflow-hidden rounded-2xl"
+              style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+            >
+              <a href={`/blog/${c.slug}`} style="text-decoration:none;display:block;">
+                {c.image ? (
+                  <img
+                    src={c.image}
+                    alt={c.title}
+                    width="600"
+                    height="338"
+                    loading={i < 3 ? "eager" : "lazy"}
+                    decoding="async"
+                    style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--pd-bg3);"
+                  />
+                ) : (
+                  <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,color-mix(in srgb,var(--pd-lilac) 26%,transparent),var(--pd-bg3));" />
+                )}
+              </a>
+              <div class="flex flex-1 flex-col" style="padding:18px 18px 20px;">
+                {c.tags.length > 0 && (
+                  <div class="mb-2 flex flex-wrap gap-1.5">
+                    {c.tags.map((t) => (
+                      <span
+                        class="font-mono uppercase"
+                        style="font-size:9.5px;letter-spacing:1px;color:var(--pd-lilac);border:0.5px solid color-mix(in srgb,var(--pd-lilac) 38%,transparent);border-radius:999px;padding:2px 8px;"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <h2 class="font-display font-semibold text-ink" style="font-size:17px;letter-spacing:-0.3px;line-height:1.25;">
+                  <a href={`/blog/${c.slug}`} style="color:inherit;text-decoration:none;">{c.title}</a>
+                </h2>
+                <p class="mt-2 flex-1 text-ink-2" style="font-size:13px;line-height:1.55;">{c.excerpt}</p>
+                <div class="mt-3 flex items-center gap-2 text-ink-4" style="font-size:11.5px;">
+                  {c.iso && <time datetime={c.iso}>{c.date}</time>}
+                  <span>·</span>
+                  <span>{c.minutes} min read</span>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</AppShell>

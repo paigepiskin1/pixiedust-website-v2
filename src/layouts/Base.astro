@@ -80,7 +80,10 @@ const baseJsonLd = {
         "query-input": "required name=search_term_string",
       },
     },
-    ...(jsonLd ? [JSON.parse(jsonLd)] : []),
+    // A page may contribute one node or several (an article passes BlogPosting
+    // plus BreadcrumbList), so accept either and flatten into the same @graph
+    // rather than emitting a competing second ld+json block.
+    ...(jsonLd ? (Array.isArray(JSON.parse(jsonLd)) ? JSON.parse(jsonLd) : [JSON.parse(jsonLd)]) : []),
   ],
 };
 ---
@@ -183,6 +186,8 @@ const baseJsonLd = {
       rel="stylesheet"
     />
 
+    {/* Page-contributed head tags (article:* meta, feed links). */}
+    <slot name="head" />
   </head>
   <body>
     <slot />

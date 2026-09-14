@@ -12,9 +12,17 @@ import type { APIContext } from "astro";
 
 const DOMAIN = "https://pixydust.com";
 
-const PAGES: { loc: string; priority: string; changefreq: string }[] = [
+interface Entry {
+  loc: string;
+  priority: string;
+  changefreq: string;
+  lastmod?: string;
+}
+
+const PAGES: Entry[] = [
   { loc: "/", priority: "1.0", changefreq: "daily" },
   { loc: "/trending", priority: "0.9", changefreq: "daily" },
+  { loc: "/blog", priority: "0.9", changefreq: "daily" },
   { loc: "/presets", priority: "0.8", changefreq: "weekly" },
   { loc: "/hair", priority: "0.8", changefreq: "weekly" },
   { loc: "/beauty", priority: "0.8", changefreq: "weekly" },
@@ -28,19 +36,42 @@ const PAGES: { loc: string; priority: string; changefreq: string }[] = [
   { loc: "/legal/acceptable-use", priority: "0.3", changefreq: "monthly" },
 ];
 
-export async function GET(_ctx: APIContext) {
+export async function GET({ locals }: APIContext) {
   const now = new Date().toISOString().split("T")[0];
+
+  // Published posts carry their own lastmod, so a re-crawl is prompted by an
+  // actual edit rather than by today's date sitting on every URL. Drafts are
+  // excluded by listPublished, so an unfinished post is never advertised.
+  let posts: Entry[] = [];
+  try {
+    const db = (locals as any)?.runtime?.env?.DB;
+    if (db) {
+      const { listPublished, isoDate } = await import("../lib/blog");
+      posts = (await listPublished(db, 500)).map((p) => ({
+        loc: `/blog/${p.slug}`,
+        priority: "0.7",
+        changefreq: "monthly",
+        lastmod: (isoDate(p.updated_at) || "").split("T")[0] || now,
+      }));
+    }
+  } catch {
+    // A sitemap missing the blog beats a sitemap that 500s.
+  }
+
+  const all: Entry[] = [...PAGES, ...posts];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${PAGES.map(
-  (p) => `  <url>
+${all
+  .map(
+    (p) => `  <url>
     <loc>${DOMAIN}${p.loc}</loc>
-    <lastmod>${now}</lastmod>
+    <lastmod>${p.lastmod || now}</lastmod>
     <changefreq>${p.changefreq}</changefreq>
     <priority>${p.priority}</priority>
   </url>`
-).join("\n")}
+  )
+  .join("\n")}
 </urlset>`;
 
   return new Response(xml, {
