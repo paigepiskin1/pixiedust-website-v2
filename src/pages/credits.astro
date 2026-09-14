@@ -181,7 +181,19 @@ const creditBoost = packDiscountPct > 0 ? 100 / (100 - packDiscountPct) : 1;
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        const data = await res.json();
+        // Read as text first: res.json() on an HTML error page throws, which
+        // used to land in the catch below and report "Network error" for what
+        // was actually a server fault.
+        const raw = await res.text();
+        let data: any;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          btn.disabled = false;
+          btn.textContent = orig;
+          (window as any).pdToast?.(`Server error ${res.status}. ${raw.slice(0, 140)}`);
+          return;
+        }
         if (res.status === 401) { window.location.href = "/auth/sign-in?redirect=/credits"; return; }
         if (data.url) window.location.href = data.url;
         else { btn.disabled = false; btn.textContent = orig; (window as any).pdToast?.(data.error || "Could not start checkout."); }

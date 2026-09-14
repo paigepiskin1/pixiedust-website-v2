@@ -7,7 +7,20 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
 
-export async function POST({ request, locals, url }: APIContext) {
+export async function POST(ctx: APIContext) {
+  // An API route must never fall through to the HTML error page. The client
+  // calls res.json(), so an HTML body throws there and surfaces as a bogus
+  // "Network error" that hides the real cause. Anything thrown below —
+  // including getUserByUid, which runs before the inner try — comes back as
+  // JSON with the actual message.
+  try {
+    return await handleCheckout(ctx);
+  } catch (err) {
+    return json({ error: `Checkout failed: ${(err as Error)?.message || String(err)}` }, 500);
+  }
+}
+
+async function handleCheckout({ request, locals, url }: APIContext) {
   const user = locals.user;
   if (!user) return json({ error: "Sign in to purchase." }, 401);
   const env = locals.runtime.env;
@@ -136,6 +149,8 @@ export async function POST({ request, locals, url }: APIContext) {
     const session = await createCheckoutSession(env.STRIPE_SECRET_KEY, params);
     return json({ url: session.url });
   } catch (err) {
-    return json({ error: "Could not create checkout session. Please try again." }, 502);
+    // Surface the provider's message: "Could not create checkout session" gave
+    // us nothing to act on when checkout started failing.
+    return json({ error: `Could not start checkout: ${(err as Error)?.message || String(err)}` }, 502);
   }
 }
