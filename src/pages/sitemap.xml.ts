@@ -30,6 +30,7 @@ const PAGES: Entry[] = [
   { loc: "/video", priority: "0.8", changefreq: "weekly" },
   { loc: "/shoots", priority: "0.7", changefreq: "weekly" },
   { loc: "/credits", priority: "0.6", changefreq: "monthly" },
+  { loc: "/about", priority: "0.5", changefreq: "monthly" },
   { loc: "/brand", priority: "0.4", changefreq: "monthly" },
   { loc: "/legal/terms", priority: "0.3", changefreq: "monthly" },
   { loc: "/legal/privacy", priority: "0.3", changefreq: "monthly" },
