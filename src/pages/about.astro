@@ -7,8 +7,25 @@ import PageHeader from "../components/ui/PageHeader.astro";
 
 // Save the headshot to /public at this path. Until it exists the <img> fails
 // to load and hands off to the monogram beside it, so the page never shows a
-// broken-image icon.
+// broken-image icon. Not lazy-loaded: at this size, above the fold, lazy
+// loading saves nothing and stops the onerror fallback from firing.
 const HEADSHOT = "/paige-piskin.jpg";
+
+// Drives both the sticky table of contents and the section headers, so the two
+// can never drift apart.
+const toc = [
+  { id: "evolution", label: "Evolution" },
+  { id: "ar-to-ai", label: "AR to AI" },
+  { id: "reach", label: "Reach" },
+  { id: "brand-work", label: "Brand work" },
+  { id: "platform", label: "The platform" },
+  { id: "who", label: "Who it's for" },
+  { id: "mission", label: "Mission & vision" },
+  { id: "founder", label: "Founder" },
+  { id: "team", label: "Team" },
+  { id: "glance", label: "At a glance" },
+  { id: "connect", label: "Connect" },
+];
 
 // Reach figures. Four cards on one row from 640px up; 2×2 only on phones.
 const stats = [
@@ -87,13 +104,14 @@ const jsonLd = JSON.stringify({
   },
 });
 
-// Shared section styles, mirroring /brand.
+const pad2 = (n: number) => String(n + 1).padStart(2, "0");
+
+// Shared styles, mirroring /brand and the legal pages.
 const card = "border-radius:16px;border:0.5px solid var(--pd-hairline);background:var(--pd-bg2);";
-const prose = "font-size:15px;line-height:1.65;max-width:68ch;";
-const h2 = "font-size:24px;letter-spacing:-0.6px;";
+const body = "font-size:14.5px;line-height:1.7;letter-spacing:-0.05px;max-width:72ch;";
 const chip =
   "display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg2);color:var(--pd-ink2);font-size:12.5px;letter-spacing:-0.1px;text-decoration:none;";
-const rule = "margin:52px 0;border:0;border-top:0.5px solid var(--pd-hairline);";
+const GRADIENT = "linear-gradient(115deg,#7C3AED,#EC4899)";
 const ArrowIcon =
   '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h7M6.5 3l3 3-3 3"/></svg>';
 ---
@@ -103,367 +121,516 @@ const ArrowIcon =
   description="PixyDust is an all-in-one AI creative platform for video, images, audio and augmented reality. Our story: from a single AR filter with 3 billion views to 400 billion+ combined views."
   jsonLd={jsonLd}
 >
-  <div class="mx-auto w-full" style="max-width:1480px;padding:28px 28px 88px;">
+  <div class="mx-auto w-full" style="max-width:1480px;padding:28px 28px 80px;">
     <PageHeader kicker="About" title="About PixyDust" sub="Imagine. Create. Magnify." />
 
-    <p class="text-ink-2" style={prose}>
-      PixyDust is an all-in-one AI creative platform built to make powerful creative technology easier to access, explore, and use.
-    </p>
-    <p class="mt-4 text-ink-2" style={prose}>
-      From AI video and image generation to audio, augmented reality, creative tools, and emerging AI workflows, PixyDust brings powerful
-      models and technologies together in one place so creators can spend less time switching between tools and more time creating.
-    </p>
-    <p class="mt-5 font-display font-medium text-ink" style="font-size:19px;letter-spacing:-0.4px;line-height:1.4;max-width:60ch;">
-      Our goal is simple: shorten the distance between imagination and creation.
-    </p>
-    <p class="mt-4 text-ink-2" style={prose}>
-      Whether you're a creator developing your next video, a marketer exploring campaign concepts, an agency producing content for clients,
-      or a business experimenting with new forms of digital media, PixyDust gives you more ways to turn an idea into something you can see,
-      hear, share, and build upon.
-    </p>
-
-    <hr style={rule} />
-
-    <section>
-      <h2 class="font-display font-medium text-ink" style={h2}>The Evolution of PixyDust</h2>
-      <p class="mt-4 text-ink-2" style={prose}>PixyDust didn't begin with generative AI. Its roots are in augmented reality.</p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        It began in January 2019 with the Pixie Dust AR filter, an interactive augmented-reality experience that generated more than
-        3 billion views across Instagram, Snapchat, and TikTok.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        What started as a single breakout AR experience grew into something much larger. Building on that success, the PixieDust brand
-        expanded into a growing library of interactive AR experiences designed to transform the way people express themselves through
-        digital media. That library eventually grew to more than 100 augmented-reality experiences, collectively generating more than
-        400 billion views across social platforms. That evolution continued in February 2025 with the launch of PixieDust Creator Studio
-        for iOS, expanding the brand from individual AR experiences into a broader creative platform that gave users new tools to create
-        and interact with digital content.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        As artificial intelligence began transforming image, video, audio, and digital production, the same idea that inspired the original
-        AR experience became even more powerful: give people creative technology that allows them to do things that previously required
-        specialized software, technical expertise, large production teams, or significant budgets. PixieDust evolved into PixyDust — a
-        broader creative platform built for the next generation of digital creation.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        The idea behind the name reaches further back. &ldquo;Pixy&rdquo; is a historical spelling of &ldquo;pixie,&rdquo; rooted in
-        centuries-old folklore surrounding magical beings associated with enchantment and transformation. Over time, &ldquo;pixy dust&rdquo;
-        and the more common &ldquo;pixie dust&rdquo; came to evoke a touch of magic capable of making something extraordinary possible. That
-        idea remains at the heart of PixyDust today: giving people powerful creative technology that can transform an idea into something
-        they can see, hear, experience, and share.
-      </p>
-    </section>
-
-    <hr style={rule} />
-
-    <section>
-      <h2 class="font-display font-medium text-ink" style={h2}>From Augmented Reality to Artificial Intelligence</h2>
-      <p class="mt-4 text-ink-2" style={prose}>
-        AR taught us something important: people don't just want to consume digital experiences. They want to participate in them.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        They want to transform themselves, experiment with identities and aesthetics, step into new worlds, tell stories, and share those
-        experiences with other people.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>Generative AI dramatically expands what's possible.</p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        An idea can become an image. An image can become a video. A prompt can become a visual concept. A photograph can become an entirely
-        new environment. Audio can add another layer to the story. AI models can make creative capabilities that once belonged primarily to
-        specialized professionals accessible to almost anyone.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        PixyDust brings those possibilities together. Our evolution from AR to AI isn't a departure from where we started. It's a
-        continuation of the same mission: using emerging technology to expand what people can create.
-      </p>
-    </section>
-
-    <hr style={rule} />
-
-    <section>
-      <h2 class="font-display font-medium text-ink" style={h2}>More Than 400 Billion Views</h2>
-      <p class="mt-4 text-ink-2" style={prose}>
-        Before evolving into today's PixyDust platform, the PixieDust AR ecosystem reached audiences at enormous scale.
-      </p>
-
-      <div class="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {
-          stats.map((s) => (
-            <div style={`${card}padding:20px 18px;`}>
-              <div class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-1.2px;line-height:1;">
-                {s.value}
-              </div>
-              <div class="mt-2.5 text-ink-3" style="font-size:12px;line-height:1.45;">
-                {s.label}
-              </div>
-            </div>
-          ))
-        }
-      </div>
-
-      <p class="mt-7 text-ink-2" style={prose}>
-        The creative work that helped shape PixyDust includes AR experiences developed for leading brands across entertainment, technology,
-        beauty, fashion, music, and culture, including L'Oréal, Bratz, Walmart, and others, with PixyDust co-founder Paige Piskin leading
-        creative development on many of those projects.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>Those experiences provided something more valuable than reach alone.</p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        They gave us years of insight into how people interact with creative technology: what makes someone stop, experiment, create,
-        personalize, share, and come back to try something new. That experience continues to influence how we build PixyDust today.
-      </p>
-    </section>
-
-    <hr style={rule} />
-
-    <section>
-      <h2 class="font-display font-medium text-ink" style={h2}>Selected Brand Work</h2>
-      <p class="mt-4 text-ink-2" style={prose}>
-        PixyDust's creative roots include augmented-reality projects and experiences developed for leading brands across entertainment,
-        technology, beauty, fashion, music, and culture.
-      </p>
-      <div class="mt-6 flex flex-wrap gap-2">
-        {brands.map((b) => <span style={chip}>{b}</span>)}
-      </div>
-    </section>
-
-    <hr style={rule} />
-
-    <section>
-      <h2 class="font-display font-medium text-ink" style={h2}>One Creative Platform. More Ways to Create.</h2>
-      <p class="mt-4 text-ink-2" style={prose}>
-        Today, PixyDust brings AI models and creative tools for video, images, audio, augmented reality, and more into a unified creative
-        platform.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        Users can explore ideas, generate new content, transform existing media, experiment with different creative directions, and move
-        between models and workflows without constantly switching platforms.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>PixyDust includes creative experiences and tools spanning areas such as:</p>
-
-      <div class="mt-6 grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));">
-        {
-          capabilities.map((c) => (
-            <div style={`${card}padding:18px;`}>
-              <div class="flex items-center gap-2">
-                <span style={`width:5px;height:5px;border-radius:999px;background:${c.color};flex:none;`} />
-                <span class="font-display font-medium text-ink" style="font-size:14.5px;letter-spacing:-0.2px;">
-                  {c.name}
-                </span>
-              </div>
-              <p class="mt-2 text-ink-3" style="font-size:12.5px;line-height:1.5;">
-                {c.desc}
-              </p>
-            </div>
-          ))
-        }
-      </div>
-
-      <p class="mt-7 text-ink-2" style={prose}>We aren't building PixyDust around a single AI model or a single type of content.</p>
-      <p class="mt-3 font-display font-medium text-ink" style="font-size:19px;letter-spacing:-0.4px;">We're building it around creation.</p>
-    </section>
-
-    <hr style={rule} />
-
-    <section>
-      <h2 class="font-display font-medium text-ink" style={h2}>Built for Creators — and Everyone Who Creates</h2>
-      <p class="mt-4 text-ink-2" style={prose}>Creativity isn't limited to people with "creator" in their job title.</p>
-
-      <div class="mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-2">
-        {
-          audiences.map(([who, what]) => (
-            <p class="text-ink-2" style="font-size:14px;line-height:1.55;">
-              <span class="font-display font-medium text-ink">{who}</span>
-              <span class="text-ink-3"> — {what}</span>
-            </p>
-          ))
-        }
-      </div>
-
-      <p class="mt-6 text-ink-2" style={prose}>And for anyone with an idea who wants a faster way to bring it to life.</p>
-      <p class="mt-3 font-display font-medium text-ink" style="font-size:19px;letter-spacing:-0.4px;line-height:1.4;max-width:58ch;">
-        You shouldn't need to be an AI expert to turn an idea into something extraordinary.
-      </p>
-    </section>
-
-    <hr style={rule} />
-
-    <section class="grid gap-9 lg:grid-cols-2">
-      <div>
-        <h2 class="font-display font-medium text-ink" style={h2}>Our Mission</h2>
-        <p class="mt-4 font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.35px;line-height:1.4;">
-          Make extraordinary creative technology accessible to everyone.
+    <!-- Lead: intro prose alongside the mission line, so the top of the page
+         carries weight instead of one narrow column against empty space. -->
+    <div class="mb-9 grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div style={`${card}padding:26px 28px;`}>
+        <p class="text-ink-2" style="font-size:15.5px;line-height:1.65;letter-spacing:-0.1px;">
+          PixyDust is an all-in-one AI creative platform built to make powerful creative technology easier to access, explore, and use.
         </p>
-        <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;">
-          Every major shift in creative technology has expanded who gets to create. Digital cameras changed photography. Social platforms
-          changed distribution. Smartphones put production tools in billions of pockets. Augmented reality turned audiences into
-          participants. Artificial intelligence is creating the next transformation.
+        <p class="mt-4 text-ink-3" style="font-size:14.5px;line-height:1.65;">
+          From AI video and image generation to audio, augmented reality, creative tools, and emerging AI workflows, PixyDust brings
+          powerful models and technologies together in one place so creators can spend less time switching between tools and more time
+          creating.
         </p>
-        <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;">
-          We believe the next generation of creative tools should make people more creative — not less. AI should reduce technical barriers,
-          accelerate experimentation, and give people more ways to express ideas that might otherwise never leave their imagination.
-        </p>
-        <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;">PixyDust exists to help make that possible.</p>
-      </div>
-      <div>
-        <h2 class="font-display font-medium text-ink" style={h2}>Our Vision</h2>
-        <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;">
-          We envision a future where the interface between an idea and its creation becomes increasingly simple.
-        </p>
-        <p class="mt-4 font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.35px;line-height:1.5;">
-          You imagine something.<br />PixyDust helps you create it.
-        </p>
-        <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;">
-          That could be an image, a video, a sound, an interactive experience, a campaign, a character, a virtual world — or a form of media
-          that doesn't exist yet. As AI models and creative technologies continue to evolve, PixyDust will continue bringing those
-          capabilities into an environment designed around what matters most: the idea.
+        <p class="mt-4 text-ink-3" style="font-size:14.5px;line-height:1.65;">
+          Whether you're a creator developing your next video, a marketer exploring campaign concepts, an agency producing content for
+          clients, or a business experimenting with new forms of digital media, PixyDust gives you more ways to turn an idea into something
+          you can see, hear, share, and build upon.
         </p>
       </div>
-    </section>
 
-    <hr style={rule} />
-
-    <section>
-      <h2 class="font-display font-medium text-ink" style={h2}>Our Story Is a Creator Story</h2>
-      <p class="mt-4 text-ink-2" style={prose}>
-        PixyDust was built from firsthand experience with the evolution of digital creativity.
-      </p>
-
-      <div class="mt-7 flex flex-col gap-6 sm:flex-row sm:items-start">
-        <img
-          src={HEADSHOT}
-          alt="Paige Piskin, Co-Founder of PixyDust"
-          width="132"
-          height="132"
-          onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
-          style="width:132px;height:132px;flex:none;border-radius:20px;object-fit:cover;object-position:center top;border:0.5px solid var(--pd-hairline2);"
-        />
-        <div
-          class="items-center justify-center font-display font-medium"
-          style="display:none;width:132px;height:132px;flex:none;border-radius:20px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg3);color:var(--pd-ink4);font-size:34px;letter-spacing:-1px;"
-          aria-hidden="true"
-        >
-          PP
+      <aside
+        class="flex flex-col justify-between overflow-hidden"
+        style={`border-radius:16px;padding:26px 28px;background:${GRADIENT};`}
+      >
+        <div class="font-mono uppercase" style="font-size:10px;color:rgba(255,255,255,0.72);letter-spacing:1.2px;">Our goal</div>
+        <div class="font-display font-medium" style="font-size:25px;letter-spacing:-0.8px;line-height:1.25;color:#fff;margin-top:14px;">
+          Shorten the distance between imagination and creation.
         </div>
-        <div>
-          <div class="font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.4px;">Paige Piskin</div>
-          <div class="mt-0.5 font-mono uppercase" style="font-size:10.5px;color:var(--pd-ink3);letter-spacing:1.2px;">
-            Co-Founder, PixyDust
-          </div>
-          <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;max-width:62ch;">
-            Paige Piskin is an AI and augmented-reality creator, creative director, and digital artist with an audience of more than
-            2 million followers across social platforms. Her work explores the intersection of technology, visual storytelling, beauty,
-            fashion, and immersive media.
-          </p>
-        </div>
-      </div>
-
-      <p class="mt-6 text-ink-2" style={prose}>
-        Paige began creating augmented-reality experiences in 2019 and has since led the creation of hundreds of AR experiences reaching
-        audiences around the world. Her work has generated hundreds of billions of views and has been used and shared by some of the
-        world's most recognizable artists, creators, and public figures.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        Her AR work has included projects and experiences involving Netflix, Warner, Samsung, L'Oréal, NYX Cosmetics, Urban Decay, Bratz,
-        Coldplay, Coachella, and others, spanning virtual beauty and fashion, interactive entertainment, music, and large-scale social AR
-        experiences. Some of Paige's most widely used AR experiences have generated millions of user-created videos, giving her firsthand
-        experience with how emerging creative technology can move from an idea into a tool used by audiences at global scale.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        Paige's work at the intersection of creativity and emerging technology has been featured by i-D, Forbes, TechCrunch, and Meta,
-        spanning her early viral AR work through more recent developments in generative AI.
-      </p>
-
-      <div class="mt-5 flex flex-wrap gap-2">
-        {
-          press.map((p) => (
-            <a href={p.url} target="_blank" rel="noopener noreferrer" style={chip}>
-              <span class="text-ink">{p.name}</span>
-              <span class="font-mono" style="font-size:10.5px;color:var(--pd-ink4);letter-spacing:0.3px;">
-                {p.domain}
+        <div class="mt-5 flex flex-wrap gap-x-5 gap-y-1.5">
+          {
+            ["Video", "Images", "Audio", "AR"].map((t) => (
+              <span class="font-mono uppercase" style="font-size:10px;color:rgba(255,255,255,0.8);letter-spacing:1px;">
+                {t}
               </span>
+            ))
+          }
+        </div>
+      </aside>
+    </div>
+
+    <div class="grid items-start gap-9 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <!-- TOC -->
+      <aside class="sticky hidden lg:block" style="top:88px;">
+        <div class="mb-0.5 font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;padding:8px 12px;">
+          Contents
+        </div>
+        {
+          toc.map((s, i) => (
+            <a
+              href={`#about-${s.id}`}
+              class="pd-toc relative mb-px flex w-full items-center gap-2.5 rounded-lg text-left font-medium"
+              data-id={s.id}
+              style="padding:8px 12px;font-size:12.5px;letter-spacing:-0.05px;color:var(--pd-ink3);text-decoration:none;"
+            >
+              <span class="pd-toc-bar absolute left-0 top-2 bottom-2 w-[2.5px] rounded-[2px] opacity-0" style="background:var(--pd-lilac);" />
+              <span class="font-mono" style="font-size:10px;letter-spacing:0.4px;min-width:18px;color:var(--pd-ink4);">{pad2(i)}</span>
+              <span>{s.label}</span>
             </a>
           ))
         }
-      </div>
+      </aside>
 
-      <p class="mt-6 text-ink-2" style={prose}>
-        That experience helped shape the creative philosophy behind PixyDust: powerful technology works best when it gives people more ways
-        to express their own ideas.
-      </p>
-    </section>
-
-    <hr style={rule} />
-
-    <section>
-      <h2 class="font-display font-medium text-ink" style={h2}>A Team Built Around Creativity and Technology</h2>
-      <p class="mt-4 text-ink-2" style={prose}>
-        Behind PixyDust is a team working across creative technology, artificial intelligence, augmented reality, product development,
-        software, digital media, and creator-focused experiences.
-      </p>
-      <p class="mt-4 text-ink-2" style={prose}>
-        Together, we're building tools designed to make emerging creative technologies easier to use, explore, and turn into something
-        meaningful.
-      </p>
-    </section>
-
-    <hr style={rule} />
-
-    <section class="grid gap-9 lg:grid-cols-2">
-      <div>
-        <h2 class="font-display font-medium text-ink" style={h2}>PixyDust at a Glance</h2>
-        <dl class="mt-5" style={`${card}padding:4px 18px;`}>
-          {
-            glance.map(([k, v], i) => (
-              <div
-                class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5"
-                style={`padding:12px 0;${i ? "border-top:0.5px solid var(--pd-hairline);" : ""}`}
-              >
-                <dt class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:0.7px;">
-                  {k}
-                </dt>
-                <dd class="text-ink-2" style="font-size:13px;">
-                  {v}
-                </dd>
+      <article style="padding-bottom:24px;">
+        <!-- 01 Evolution -->
+        <section id="about-evolution" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 01</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              The Evolution of PixyDust
+            </h2>
+          </div>
+          <div class="flex flex-col gap-3.5">
+            <p class="text-ink-2" style={body}>PixyDust didn't begin with generative AI. Its roots are in augmented reality.</p>
+            <p class="text-ink-2" style={body}>
+              It began in January 2019 with the Pixie Dust AR filter, an interactive augmented-reality experience that generated more than
+              3 billion views across Instagram, Snapchat, and TikTok.
+            </p>
+            <p class="text-ink-2" style={body}>
+              What started as a single breakout AR experience grew into something much larger. Building on that success, the PixieDust brand
+              expanded into a growing library of interactive AR experiences designed to transform the way people express themselves through
+              digital media. That library eventually grew to more than 100 augmented-reality experiences, collectively generating more than
+              400 billion views across social platforms. That evolution continued in February 2025 with the launch of PixieDust Creator
+              Studio for iOS, expanding the brand from individual AR experiences into a broader creative platform that gave users new tools
+              to create and interact with digital content.
+            </p>
+            <p class="text-ink-2" style={body}>
+              As artificial intelligence began transforming image, video, audio, and digital production, the same idea that inspired the
+              original AR experience became even more powerful: give people creative technology that allows them to do things that
+              previously required specialized software, technical expertise, large production teams, or significant budgets. PixieDust
+              evolved into PixyDust — a broader creative platform built for the next generation of digital creation.
+            </p>
+            <div
+              class="mt-1 rounded-xl"
+              style="padding:16px 18px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);border-left:2px solid var(--pd-lilac);max-width:72ch;"
+            >
+              <div class="mb-1.5 font-mono font-semibold uppercase" style="font-size:9.5px;color:var(--pd-lilac);letter-spacing:0.8px;">
+                Where the name comes from
               </div>
-            ))
-          }
-        </dl>
-      </div>
+              <div class="text-ink-2" style="font-size:13.5px;line-height:1.65;letter-spacing:-0.05px;">
+                &ldquo;Pixy&rdquo; is a historical spelling of &ldquo;pixie,&rdquo; rooted in centuries-old folklore surrounding magical
+                beings associated with enchantment and transformation. Over time, &ldquo;pixy dust&rdquo; and the more common &ldquo;pixie
+                dust&rdquo; came to evoke a touch of magic capable of making something extraordinary possible. That idea remains at the heart
+                of PixyDust today: giving people powerful creative technology that can transform an idea into something they can see, hear,
+                experience, and share.
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <div>
-        <h2 class="font-display font-medium text-ink" style={h2}>Connect With PixyDust</h2>
-        <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;">
-          Follow PixyDust for new creative tools, AI models, tutorials, product updates, and more.
-        </p>
-        <div class="mt-5 flex flex-wrap gap-2">
-          {
-            socials.map((s) => (
-              <a href={s.url} target="_blank" rel="noopener noreferrer" style={chip}>
-                <span class="text-ink">{s.name}</span>
-                <span class="font-mono" style="font-size:10.5px;color:var(--pd-ink4);letter-spacing:0.3px;">
-                  {s.handle}
-                </span>
-              </a>
-            ))
-          }
-        </div>
-      </div>
-    </section>
+        <!-- 02 AR to AI -->
+        <section id="about-ar-to-ai" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 02</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              From Augmented Reality to Artificial Intelligence
+            </h2>
+          </div>
+          <div class="flex flex-col gap-3.5">
+            <p class="text-ink-2" style={body}>
+              AR taught us something important: people don't just want to consume digital experiences. They want to participate in them.
+            </p>
+            <p class="text-ink-2" style={body}>
+              They want to transform themselves, experiment with identities and aesthetics, step into new worlds, tell stories, and share
+              those experiences with other people.
+            </p>
+          </div>
 
-    <hr style={rule} />
+          <div class="mt-5 grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));">
+            {
+              [
+                ["An idea", "becomes an image"],
+                ["An image", "becomes a video"],
+                ["A photograph", "becomes a new environment"],
+                ["Audio", "adds another layer"],
+              ].map(([from, to]) => (
+                <div style={`${card}padding:16px 18px;`}>
+                  <div class="font-display font-medium text-ink" style="font-size:14.5px;letter-spacing:-0.2px;">
+                    {from}
+                  </div>
+                  <div class="mt-1 text-ink-3" style="font-size:12.5px;line-height:1.45;">
+                    {to}
+                  </div>
+                </div>
+              ))
+            }
+          </div>
 
-    <section style={`${card}padding:36px 32px;`}>
-      <div class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.9px;">Imagine. Create. Magnify.</div>
-      <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;max-width:64ch;">
+          <div class="mt-5 flex flex-col gap-3.5">
+            <p class="text-ink-2" style={body}>
+              AI models can make creative capabilities that once belonged primarily to specialized professionals accessible to almost anyone.
+            </p>
+            <p class="text-ink-2" style={body}>
+              PixyDust brings those possibilities together. Our evolution from AR to AI isn't a departure from where we started. It's a
+              continuation of the same mission: using emerging technology to expand what people can create.
+            </p>
+          </div>
+        </section>
+
+        <!-- 03 Reach -->
+        <section id="about-reach" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 03</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              More Than 400 Billion Views
+            </h2>
+          </div>
+          <p class="text-ink-2" style={body}>
+            Before evolving into today's PixyDust platform, the PixieDust AR ecosystem reached audiences at enormous scale.
+          </p>
+
+          <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {
+              stats.map((s) => (
+                <div style={`${card}padding:22px 20px;position:relative;overflow:hidden;`}>
+                  <div style={`position:absolute;top:0;bottom:0;left:0;width:2px;background:${GRADIENT};`} />
+                  <div class="font-display font-medium text-ink" style="font-size:32px;letter-spacing:-1.4px;line-height:1;">
+                    {s.value}
+                  </div>
+                  <div class="mt-2.5 text-ink-3" style="font-size:12px;line-height:1.45;">
+                    {s.label}
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+
+          <div class="mt-6 flex flex-col gap-3.5">
+            <p class="text-ink-2" style={body}>
+              The creative work that helped shape PixyDust includes AR experiences developed for leading brands across entertainment,
+              technology, beauty, fashion, music, and culture, including L'Oréal, Bratz, Walmart, and others, with PixyDust co-founder Paige
+              Piskin leading creative development on many of those projects.
+            </p>
+            <p class="text-ink-2" style={body}>
+              Those experiences provided something more valuable than reach alone. They gave us years of insight into how people interact
+              with creative technology: what makes someone stop, experiment, create, personalize, share, and come back to try something new.
+              That experience continues to influence how we build PixyDust today.
+            </p>
+          </div>
+        </section>
+
+        <!-- 04 Brand work -->
+        <section id="about-brand-work" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 04</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              Selected Brand Work
+            </h2>
+          </div>
+          <p class="text-ink-2" style={body}>
+            PixyDust's creative roots include augmented-reality projects and experiences developed for leading brands across entertainment,
+            technology, beauty, fashion, music, and culture.
+          </p>
+          <div class="mt-5 flex flex-wrap gap-2">
+            {brands.map((b) => <span style={chip}>{b}</span>)}
+          </div>
+        </section>
+
+        <!-- 05 Platform -->
+        <section id="about-platform" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 05</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              One Creative Platform. More Ways to Create.
+            </h2>
+          </div>
+          <div class="flex flex-col gap-3.5">
+            <p class="text-ink-2" style={body}>
+              Today, PixyDust brings AI models and creative tools for video, images, audio, augmented reality, and more into a unified
+              creative platform.
+            </p>
+            <p class="text-ink-2" style={body}>
+              Users can explore ideas, generate new content, transform existing media, experiment with different creative directions, and
+              move between models and workflows without constantly switching platforms.
+            </p>
+          </div>
+
+          <div class="mt-6 grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr));">
+            {
+              capabilities.map((c) => (
+                <div style={`${card}padding:18px;`}>
+                  <div class="flex items-center gap-2">
+                    <span style={`width:5px;height:5px;border-radius:999px;background:${c.color};flex:none;`} />
+                    <span class="font-display font-medium text-ink" style="font-size:14.5px;letter-spacing:-0.2px;">
+                      {c.name}
+                    </span>
+                  </div>
+                  <p class="mt-2 text-ink-3" style="font-size:12.5px;line-height:1.5;">
+                    {c.desc}
+                  </p>
+                </div>
+              ))
+            }
+          </div>
+
+          <p class="mt-6 text-ink-2" style={body}>
+            We aren't building PixyDust around a single AI model or a single type of content.
+            <span class="font-display font-medium text-ink"> We're building it around creation.</span>
+          </p>
+        </section>
+
+        <!-- 06 Who it's for -->
+        <section id="about-who" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 06</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              Built for Creators — and Everyone Who Creates
+            </h2>
+          </div>
+          <p class="text-ink-2" style={body}>Creativity isn't limited to people with "creator" in their job title.</p>
+
+          <div class="mt-5 grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(290px,1fr));">
+            {
+              audiences.map(([who, what]) => (
+                <div style={`${card}padding:16px 18px;`}>
+                  <div class="font-display font-medium text-ink" style="font-size:14px;letter-spacing:-0.2px;">
+                    {who}
+                  </div>
+                  <div class="mt-1 text-ink-3" style="font-size:12.5px;line-height:1.5;">
+                    {what}
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+
+          <p class="mt-6 text-ink-2" style={body}>And for anyone with an idea who wants a faster way to bring it to life.</p>
+          <p class="mt-2 font-display font-medium text-ink" style="font-size:19px;letter-spacing:-0.4px;line-height:1.4;max-width:58ch;">
+            You shouldn't need to be an AI expert to turn an idea into something extraordinary.
+          </p>
+        </section>
+
+        <!-- 07 Mission & vision -->
+        <section id="about-mission" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 07</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              Our Mission &amp; Vision
+            </h2>
+          </div>
+
+          <div class="grid gap-3 lg:grid-cols-2">
+            <div style={`${card}padding:24px;`}>
+              <div class="mb-2 font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:1px;">Mission</div>
+              <div class="font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.35px;line-height:1.35;">
+                Make extraordinary creative technology accessible to everyone.
+              </div>
+              <p class="mt-3.5 text-ink-3" style="font-size:13.5px;line-height:1.65;">
+                Every major shift in creative technology has expanded who gets to create. Digital cameras changed photography. Social
+                platforms changed distribution. Smartphones put production tools in billions of pockets. Augmented reality turned audiences
+                into participants. Artificial intelligence is creating the next transformation.
+              </p>
+              <p class="mt-3 text-ink-3" style="font-size:13.5px;line-height:1.65;">
+                We believe the next generation of creative tools should make people more creative — not less. AI should reduce technical
+                barriers, accelerate experimentation, and give people more ways to express ideas that might otherwise never leave their
+                imagination. PixyDust exists to help make that possible.
+              </p>
+            </div>
+
+            <div style={`${card}padding:24px;`}>
+              <div class="mb-2 font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:1px;">Vision</div>
+              <div class="font-display font-medium text-ink" style="font-size:18px;letter-spacing:-0.35px;line-height:1.35;">
+                You imagine something.<br />PixyDust helps you create it.
+              </div>
+              <p class="mt-3.5 text-ink-3" style="font-size:13.5px;line-height:1.65;">
+                We envision a future where the interface between an idea and its creation becomes increasingly simple.
+              </p>
+              <p class="mt-3 text-ink-3" style="font-size:13.5px;line-height:1.65;">
+                That could be an image, a video, a sound, an interactive experience, a campaign, a character, a virtual world — or a form of
+                media that doesn't exist yet. As AI models and creative technologies continue to evolve, PixyDust will continue bringing
+                those capabilities into an environment designed around what matters most: the idea.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 08 Founder -->
+        <section id="about-founder" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 08</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              Our Story Is a Creator Story
+            </h2>
+          </div>
+          <p class="text-ink-2" style={body}>PixyDust was built from firsthand experience with the evolution of digital creativity.</p>
+
+          <div class="mt-5" style={`${card}padding:26px;`}>
+            <div class="flex flex-col gap-6 sm:flex-row sm:items-start">
+              <div style={`flex:none;padding:2px;border-radius:22px;background:${GRADIENT};`}>
+                <img
+                  src={HEADSHOT}
+                  alt="Paige Piskin, Co-Founder of PixyDust"
+                  width="140"
+                  height="140"
+                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+                  style="display:block;width:140px;height:140px;border-radius:20px;object-fit:cover;"
+                />
+                <div
+                  class="items-center justify-center font-display font-medium"
+                  style="display:none;width:140px;height:140px;border-radius:20px;background:var(--pd-bg3);color:var(--pd-ink4);font-size:36px;letter-spacing:-1px;"
+                  aria-hidden="true"
+                >
+                  PP
+                </div>
+              </div>
+
+              <div class="min-w-0">
+                <div class="font-display font-medium text-ink" style="font-size:20px;letter-spacing:-0.45px;">Paige Piskin</div>
+                <div class="mt-0.5 font-mono uppercase" style="font-size:10.5px;color:var(--pd-lilac);letter-spacing:1.2px;">
+                  Co-Founder, PixyDust
+                </div>
+                <p class="mt-3.5 text-ink-2" style="font-size:14px;line-height:1.65;">
+                  Paige Piskin is an AI and augmented-reality creator, creative director, and digital artist with an audience of more than
+                  2 million followers across social platforms. Her work explores the intersection of technology, visual storytelling, beauty,
+                  fashion, and immersive media.
+                </p>
+              </div>
+            </div>
+
+            <div class="mt-6 flex flex-col gap-3.5">
+              <p class="text-ink-3" style="font-size:13.5px;line-height:1.7;">
+                Paige began creating augmented-reality experiences in 2019 and has since led the creation of hundreds of AR experiences
+                reaching audiences around the world. Her work has generated hundreds of billions of views and has been used and shared by
+                some of the world's most recognizable artists, creators, and public figures.
+              </p>
+              <p class="text-ink-3" style="font-size:13.5px;line-height:1.7;">
+                Her AR work has included projects and experiences involving Netflix, Warner, Samsung, L'Oréal, NYX Cosmetics, Urban Decay,
+                Bratz, Coldplay, Coachella, and others, spanning virtual beauty and fashion, interactive entertainment, music, and
+                large-scale social AR experiences. Some of Paige's most widely used AR experiences have generated millions of user-created
+                videos, giving her firsthand experience with how emerging creative technology can move from an idea into a tool used by
+                audiences at global scale.
+              </p>
+              <p class="text-ink-3" style="font-size:13.5px;line-height:1.7;">
+                That experience helped shape the creative philosophy behind PixyDust: powerful technology works best when it gives people
+                more ways to express their own ideas.
+              </p>
+            </div>
+
+            <div class="mt-5 pt-5" style="border-top:0.5px solid var(--pd-hairline);">
+              <div class="mb-2.5 font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:1px;">Featured in</div>
+              <div class="flex flex-wrap gap-2">
+                {
+                  press.map((p) => (
+                    <a href={p.url} target="_blank" rel="noopener noreferrer" style={chip}>
+                      <span class="text-ink">{p.name}</span>
+                      <span class="font-mono" style="font-size:10.5px;color:var(--pd-ink4);letter-spacing:0.3px;">
+                        {p.domain}
+                      </span>
+                    </a>
+                  ))
+                }
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 09 Team -->
+        <section id="about-team" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 09</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              A Team Built Around Creativity and Technology
+            </h2>
+          </div>
+          <div class="flex flex-col gap-3.5">
+            <p class="text-ink-2" style={body}>
+              Behind PixyDust is a team working across creative technology, artificial intelligence, augmented reality, product development,
+              software, digital media, and creator-focused experiences.
+            </p>
+            <p class="text-ink-2" style={body}>
+              Together, we're building tools designed to make emerging creative technologies easier to use, explore, and turn into something
+              meaningful.
+            </p>
+          </div>
+        </section>
+
+        <!-- 10 At a glance -->
+        <section id="about-glance" style="margin-bottom:56px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 10</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              PixyDust at a Glance
+            </h2>
+          </div>
+          <dl class="grid gap-x-8 gap-y-0 sm:grid-cols-2" style={`${card}padding:6px 20px;`}>
+            {
+              glance.map(([k, v]) => (
+                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5" style="padding:13px 0;">
+                  <dt class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:0.7px;">
+                    {k}
+                  </dt>
+                  <dd class="text-ink-2" style="font-size:13px;">
+                    {v}
+                  </dd>
+                </div>
+              ))
+            }
+          </dl>
+        </section>
+
+        <!-- 11 Connect -->
+        <section id="about-connect" style="margin-bottom:8px;scroll-margin-top:100px;">
+          <div class="mb-3.5 flex items-baseline gap-3.5">
+            <span class="font-mono font-semibold" style="font-size:11px;color:var(--pd-lilac);letter-spacing:0.7px;">§ 11</span>
+            <h2 class="font-display font-medium text-ink" style="font-size:26px;letter-spacing:-0.6px;line-height:1.15;">
+              Connect With PixyDust
+            </h2>
+          </div>
+          <p class="text-ink-2" style={body}>
+            Follow PixyDust for new creative tools, AI models, tutorials, product updates, and more.
+          </p>
+          <div class="mt-5 grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(185px,1fr));">
+            {
+              socials.map((s) => (
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center justify-between gap-2"
+                  style={`${card}padding:13px 15px;text-decoration:none;`}
+                >
+                  <span class="text-ink" style="font-size:13px;">
+                    {s.name}
+                  </span>
+                  <span class="font-mono" style="font-size:10.5px;color:var(--pd-ink4);letter-spacing:0.3px;">
+                    {s.handle}
+                  </span>
+                </a>
+              ))
+            }
+          </div>
+        </section>
+      </article>
+    </div>
+
+    <!-- Close -->
+    <section class="mt-10 overflow-hidden" style={`border-radius:20px;padding:44px 40px;background:${GRADIENT};`}>
+      <div class="font-display font-medium" style="font-size:30px;letter-spacing:-1px;color:#fff;">Imagine. Create. Magnify.</div>
+      <p class="mt-4" style="font-size:14.5px;line-height:1.65;max-width:64ch;color:rgba(255,255,255,0.88);">
         PixyDust began by helping people transform the world around them through augmented reality. Today, we're building toward something
         much bigger: a creative platform where the world's most powerful emerging technologies become tools for human imagination.
       </p>
-      <p class="mt-4 text-ink-2" style="font-size:14.5px;line-height:1.6;max-width:64ch;">
+      <p class="mt-3" style="font-size:14.5px;line-height:1.65;max-width:64ch;color:rgba(255,255,255,0.88);">
         Whatever you imagine next, we want to make it easier to create.
       </p>
       <a
         href="/"
-        class="mt-6 inline-flex items-center gap-1.5 rounded-full font-semibold"
-        style="padding:10px 18px;background:var(--pd-ink);color:var(--pd-bg);font-size:13px;letter-spacing:-0.1px;text-decoration:none;"
+        class="mt-7 inline-flex items-center gap-1.5 rounded-full font-semibold"
+        style="padding:11px 20px;background:#fff;color:#111;font-size:13px;letter-spacing:-0.1px;text-decoration:none;"
       >
         Start creating
         <Fragment set:html={ArrowIcon} />
@@ -471,3 +638,40 @@ const ArrowIcon =
     </section>
   </div>
 </AppShell>
+
+<style>
+  .pd-toc.is-active {
+    color: var(--pd-ink) !important;
+    font-weight: 600;
+  }
+  .pd-toc.is-active .pd-toc-bar {
+    opacity: 1;
+  }
+  .pd-toc.is-active .font-mono {
+    color: var(--pd-lilac) !important;
+  }
+</style>
+
+<script>
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(".pd-toc"));
+  if (links.length) {
+    const ids = links.map((l) => l.dataset.id!);
+    const setActive = () => {
+      const y = window.scrollY + 140;
+      let cur = ids[0];
+      for (const id of ids) {
+        const el = document.getElementById("about-" + id);
+        if (el && el.offsetTop <= y) cur = id;
+      }
+      links.forEach((l) => l.classList.toggle("is-active", l.dataset.id === cur));
+    };
+    window.addEventListener("scroll", setActive, { passive: true });
+    links.forEach((l) =>
+      l.addEventListener("click", (e) => {
+        e.preventDefault();
+        document.getElementById("about-" + l.dataset.id)?.scrollIntoView({ block: "start", behavior: "smooth" });
+      })
+    );
+    setActive();
+  }
+</script>
