@@ -223,8 +223,9 @@ const config = {
                 <span class="mb-1.5 block font-medium text-ink" style="font-size:12.5px;">Aspect ratio</span>
                 <div class="flex flex-wrap gap-1.5" data-controls="aspect">
                   {template.aspects.map((a, i) => {
-                    const isMatch = a === "match" || a === "match_input_image";
+                    const isMatch = a === "match" || a === "match_input_image" || a === "original" || a === "auto";
                     const b = aspectBox(a);
+                    const label = a === "original" || a === "auto" ? "Original" : isMatch ? "Match original" : a;
                     return (
                       <button type="button" class="pd-seg inline-flex items-center gap-1.5 rounded-lg font-mono" data-val={a} data-active={i === 0 ? "true" : "false"} style="padding:6px 11px;font-size:11px;cursor:pointer;">
                         {isMatch ? (
@@ -232,7 +233,7 @@ const config = {
                         ) : (
                           <span style={`display:inline-block;width:${b.w}px;height:${b.h}px;border:1.5px solid currentColor;border-radius:2px;opacity:0.65;`}></span>
                         )}
-                        <span>{isMatch ? "Match original" : a}</span>
+                        <span>{label}</span>
                       </button>
                     );
                   })}
