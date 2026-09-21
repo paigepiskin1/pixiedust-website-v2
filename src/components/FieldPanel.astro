@@ -53,6 +53,7 @@ function formatAccept(accept: string) {
           <div class="pd-upload-error" style="display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--pd-pink) 12%,transparent);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);color:var(--pd-pink);font-size:12px;line-height:1.35;"></div>
         </div>
         {f.help && <span class="mt-1 block text-ink-4" style="font-size:11px;">{f.help}</span>}
+        {f.key === "outfit" && <slot name="after-outfit" />}
       </div>
     ) : (
       <label class="block">
@@ -374,9 +375,10 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
       el.addEventListener("drop", async e => { e.preventDefault(); dc=0; uhl(); for(const f of Array.from((e as DragEvent).dataTransfer?.files??[]).slice(0,maxFiles-urls.length)) await addFile(f); });
       el.addEventListener("change", async () => { const files=Array.from(el.files??[]).slice(0,maxFiles-urls.length); el.value=""; for(const f of files) await addFile(f); });
 
-      // Render a thumb for an already-hosted URL (preloaded reference images).
-      function addExisting(url: string) {
-        if (!url || urls.length >= maxFiles) return;
+      // Render a thumb for an already-hosted URL (preloaded reference images,
+      // or product-link picks from the studio).
+      function addExisting(url: string): boolean {
+        if (!url || urls.includes(url) || urls.length >= maxFiles) return false;
         const thumb = document.createElement("div");
         thumb.style.cssText = "position:relative;width:70px;height:70px;border-radius:10px;overflow:hidden;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);flex-shrink:0;";
         const img = document.createElement("img");
@@ -389,6 +391,14 @@ function escAttr(s: string) { return s.replace(/"/g,"&quot;").replace(/'/g,"&#39
         thumb.appendChild(img); thumb.appendChild(x);
         thumbsEl?.appendChild(thumb);
         urls.push(url);
+        syncZone();
+        return true;
+      }
+      // Expose so studio product-link UI can push selected images into this field.
+      if (wrap) {
+        (wrap as any)._pdAddUrl = addExisting;
+        (wrap as any)._pdMultiCount = () => urls.length;
+        (wrap as any)._pdMultiMax = maxFiles;
       }
       // Preload reference images from the field's default.
       try {
