@@ -16,6 +16,8 @@ export interface CatalogItem {
   href: string;
   previewImage?: string;
   previewVideo?: string;
+  /** Optional multi-image catalog thumbnail carousel. */
+  previewImages?: string[];
 }
 
 const AMBER = "var(--pd-amber)";

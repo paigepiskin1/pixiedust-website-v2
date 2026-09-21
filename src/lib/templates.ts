@@ -333,10 +333,27 @@ interface CardShape {
   href: string;
   previewImage?: string;
   previewVideo?: string;
+  previewImages?: string[];
+}
+
+/** Parse structured template.meta JSON when present. */
+export function parseTemplateMeta(meta: string | null | undefined): Record<string, unknown> | null {
+  if (!meta || !/^\s*[[{]/.test(meta)) return null;
+  try {
+    const p = JSON.parse(meta);
+    return p && typeof p === "object" ? (p as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Map a template to the catalog-card shape (uses `tag` for the pill). */
 export function templateToCard(t: Template): CardShape {
+  const metaObj = parseTemplateMeta(t.meta);
+  const fromMeta = Array.isArray(metaObj?.previewImages)
+    ? (metaObj!.previewImages as unknown[]).filter((u): u is string => typeof u === "string" && /^https?:\/\//i.test(u))
+    : [];
+  const previewImages = fromMeta.length ? fromMeta : undefined;
   return {
     name: t.title,
     sub: t.subtitle ?? undefined,
@@ -349,8 +366,9 @@ export function templateToCard(t: Template): CardShape {
     cr: t.creditCost,
     c: t.category ?? undefined,
     href: templateHref(t.id),
-    previewImage: t.previewImage ?? undefined,
+    previewImage: previewImages?.[0] ?? t.previewImage ?? undefined,
     previewVideo: t.previewVideo ?? undefined,
+    previewImages,
   };
 }
 
