@@ -22,7 +22,14 @@ export interface TemplateField {
   help?: string;
   required?: boolean;
   default?: string | number | boolean;
-  options?: { value: string; label: string }[];
+  options?: {
+    value: string;
+    label: string;
+    /** Optional preview card image in the studio UI. */
+    image?: string;
+    /** Optional backend reference image appended to model image inputs when selected. */
+    ref?: string;
+  }[];
   min?: number;
   max?: number;
   step?: number;
@@ -238,7 +245,14 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
         return val != null ? String(val) : String(byKey.get(key)?.default ?? "");
       });
     }
-    if (Array.isArray(v)) return v.map(subst);
+    // Flatten one level so ["{{files*}}", "https://…"] becomes a flat URL list
+    // (image models expect string[] — not nested arrays from multi-file fields).
+    if (Array.isArray(v)) {
+      return v.flatMap((item) => {
+        const r = subst(item);
+        return Array.isArray(r) ? r : [r];
+      });
+    }
     if (v && typeof v === "object") {
       const out: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = subst(val);
@@ -248,6 +262,39 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
   };
 
   return { input: subst(t.input) as Record<string, unknown>, errors };
+}
+
+/**
+ * When a select option carries a `ref` (or `image`) URL and the user picked a
+ * non-empty value, append that URL to the model's image input list. Used for
+ * backend outfit/style references that shouldn't appear as a user upload field.
+ */
+export function appendSelectedOptionRefs(
+  t: Template,
+  inputs: Record<string, unknown>,
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const imageKey =
+    "input_images" in input ? "input_images" : "image_input" in input ? "image_input" : null;
+  if (!imageKey) return input;
+
+  const extra: string[] = [];
+  for (const f of allFields(t)) {
+    if (f.type !== "select" || !f.options?.length) continue;
+    const selected = String(inputs[f.key] ?? f.default ?? "");
+    if (!selected.trim()) continue; // "keep original" style blank values
+    const opt = f.options.find((o) => o.value === selected);
+    const ref = opt?.ref || opt?.image;
+    if (typeof ref === "string" && /^https?:\/\//i.test(ref)) extra.push(ref);
+  }
+  if (!extra.length) return input;
+
+  const cur = input[imageKey];
+  const list = (Array.isArray(cur) ? cur : cur ? [cur] : [])
+    .flatMap((x) => (Array.isArray(x) ? x : [x]))
+    .filter((x): x is string => typeof x === "string" && /^https?:\/\//i.test(x));
+  for (const u of extra) if (!list.includes(u)) list.push(u);
+  return { ...input, [imageKey]: list };
 }
 
 /**
