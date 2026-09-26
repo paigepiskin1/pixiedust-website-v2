@@ -30,6 +30,7 @@ const PAGES: Entry[] = [
   { loc: "/video", priority: "0.8", changefreq: "weekly" },
   { loc: "/shoots", priority: "0.7", changefreq: "weekly" },
   { loc: "/credits", priority: "0.6", changefreq: "monthly" },
+  { loc: "/support", priority: "0.6", changefreq: "monthly" },
   { loc: "/about", priority: "0.5", changefreq: "monthly" },
   { loc: "/brand", priority: "0.4", changefreq: "monthly" },
   { loc: "/legal/terms", priority: "0.3", changefreq: "monthly" },
@@ -59,7 +60,29 @@ export async function GET({ locals }: APIContext) {
     // A sitemap missing the blog beats a sitemap that 500s.
   }
 
-  const all: Entry[] = [...PAGES, ...posts];
+  // Help Centre. The content is static (src/lib/help.ts), not database-backed,
+  // so every category and article is known at request time and none of it can
+  // be a draft — unlike the blog above, there is nothing to filter out.
+  let help: Entry[] = [];
+  try {
+    const { HELP_CATEGORIES, allArticles, categoryHref, articleHref } = await import("../lib/help");
+    help = [
+      ...HELP_CATEGORIES.map((c) => ({
+        loc: categoryHref(c.id),
+        priority: "0.5",
+        changefreq: "monthly",
+      })),
+      ...allArticles().map((a) => ({
+        loc: articleHref(a.categoryId, a.slug),
+        priority: "0.5",
+        changefreq: "monthly",
+      })),
+    ];
+  } catch {
+    // Same rule as the blog: a sitemap missing the help centre beats a 500.
+  }
+
+  const all: Entry[] = [...PAGES, ...posts, ...help];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

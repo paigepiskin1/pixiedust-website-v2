@@ -1,0 +1,223 @@
+---
+export const prerender = false;
+import AppShell from "../../layouts/AppShell.astro";
+import HelpIcon from "../../components/help/HelpIcon.astro";
+import {
+  HELP_CATEGORIES,
+  popularArticles,
+  allArticles,
+  categoryHref,
+  articleHref,
+  HELP_SUPPORT_EMAIL,
+} from "../../lib/help";
+
+const user = Astro.locals.user;
+const popular = popularArticles();
+const searchIndex = allArticles().map((a) => ({
+  t: a.title,
+  s: a.summary,
+  c: a.categoryTitle,
+  u: articleHref(a.categoryId, a.slug),
+}));
+---
+
+<AppShell
+  title="Help Center — PixyDust"
+  description="Find answers, setup guidance, and practical help for using PixyDust — credits, tools, models, billing, and support."
+  credits={user?.credits ?? 47}
+>
+  <div class="mx-auto w-full" style="max-width:1080px;padding:28px;">
+    <!-- Hero -->
+    <div
+      class="relative overflow-hidden rounded-2xl"
+      style="padding:44px 32px 40px;background:linear-gradient(135deg, color-mix(in srgb, var(--pd-lilac) 12%, var(--pd-bg2)), var(--pd-bg2));border:0.5px solid var(--pd-hairline);"
+    >
+      <div class="mb-[9px] flex items-center gap-[7px]">
+        <span class="size-[6px] rounded-full" style="background:var(--pd-lilac);box-shadow:0 0 8px var(--pd-lilac);"></span>
+        <span class="font-mono uppercase" style="font-size:10.5px;color:var(--pd-ink3);letter-spacing:1.2px;">Help Center · support</span>
+      </div>
+      <h1 class="font-display font-medium text-ink" style="font-size:40px;letter-spacing:-1.2px;line-height:1.03;">
+        How can we help?
+      </h1>
+      <p class="mt-2.5 text-ink-3" style="font-size:15px;line-height:1.5;max-width:560px;">
+        Search our guides, or browse by topic. Most answers are a click away.
+      </p>
+
+      <!-- Search -->
+      <div class="relative mt-6" style="max-width:620px;">
+        <div
+          class="flex items-center gap-2.5 rounded-[13px]"
+          style="padding:13px 16px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);"
+        >
+          <span class="text-ink-3"><HelpIcon name="search" size={17} /></span>
+          <input
+            id="help-search"
+            type="text"
+            autocomplete="off"
+            placeholder="Search for answers…"
+            class="min-w-0 flex-1 bg-transparent text-ink outline-none"
+            style="font-size:14.5px;letter-spacing:-0.1px;"
+          />
+        </div>
+        <div
+          id="help-results"
+          class="absolute left-0 right-0 z-20 mt-2 hidden overflow-hidden rounded-[13px]"
+          style="background:var(--pd-raised);border:0.5px solid var(--pd-hairline2);box-shadow:var(--pd-shadow);"
+        >
+        </div>
+      </div>
+    </div>
+
+    <!-- Popular topics -->
+    <div class="mt-9">
+      <h2 class="mb-3.5 font-display font-medium text-ink" style="font-size:19px;letter-spacing:-0.4px;">Popular topics</h2>
+      <div class="grid gap-2.5 sm:grid-cols-2">
+        {
+          popular.map((a) => (
+            <a
+              href={articleHref(a.categoryId, a.slug)}
+              class="pd-help-row group flex items-center gap-3 rounded-xl"
+              style="padding:14px 16px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+            >
+              <span class="shrink-0 text-ink-3"><HelpIcon name="book" size={16} /></span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate font-medium text-ink" style="font-size:13.5px;letter-spacing:-0.1px;">{a.title}</span>
+                <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.6px;">{a.categoryTitle}</span>
+              </span>
+              <span class="shrink-0 text-ink-4 transition-transform group-hover:translate-x-0.5"><HelpIcon name="chevron" size={13} /></span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+
+    <!-- Browse by topic -->
+    <div class="mt-10">
+      <h2 class="mb-3.5 font-display font-medium text-ink" style="font-size:19px;letter-spacing:-0.4px;">Browse by topic</h2>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          HELP_CATEGORIES.map((c) => (
+            <a
+              href={categoryHref(c.id)}
+              class="pd-help-card group flex flex-col rounded-2xl"
+              style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+            >
+              <span
+                class="mb-3.5 inline-flex size-9 items-center justify-center rounded-[10px]"
+                style="background:color-mix(in srgb, var(--pd-lilac) 14%, transparent);color:var(--pd-lilac);"
+              >
+                <HelpIcon name={c.icon} size={17} />
+              </span>
+              <span class="mb-1 flex items-center gap-1.5 font-display font-semibold text-ink" style="font-size:15px;letter-spacing:-0.2px;">
+                {c.title}
+                <span class="text-ink-4 transition-transform group-hover:translate-x-0.5"><HelpIcon name="arrow" size={13} /></span>
+              </span>
+              <span class="text-ink-3" style="font-size:12.5px;line-height:1.5;">{c.blurb}</span>
+              <span class="mt-3 font-mono uppercase" style="font-size:9.5px;color:var(--pd-ink4);letter-spacing:0.6px;">{c.articles.length} article{c.articles.length === 1 ? "" : "s"}</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+
+    <!-- Contact CTA -->
+    <div
+      class="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl"
+      style="padding:22px 24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+    >
+      <div>
+        <div class="font-display font-semibold text-ink" style="font-size:16px;letter-spacing:-0.2px;">Still need help?</div>
+        <div class="mt-0.5 text-ink-3" style="font-size:13px;line-height:1.5;">Can't find your answer? Our team reads every message.</div>
+      </div>
+      <div class="flex items-center gap-2.5">
+        <a href="/feedback" class="rounded-[10px] font-semibold text-ink" style="padding:10px 16px;background:transparent;border:0.5px solid var(--pd-hairline2);font-size:12.5px;">Send feedback</a>
+        <a href={`mailto:${HELP_SUPPORT_EMAIL}`} class="rounded-[10px] font-bold" style="padding:10px 16px;background:var(--pd-lilac);color:#0A0A0B;font-size:12.5px;">Contact support</a>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline define:vars={{ searchIndex }}>
+    (function () {
+      const input = document.getElementById("help-search");
+      const box = document.getElementById("help-results");
+      if (!input || !box) return;
+      const idx = searchIndex || [];
+
+      function esc(s) {
+        return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      }
+
+      function render(items) {
+        if (!items.length) {
+          box.innerHTML =
+            '<div style="padding:16px;color:var(--pd-ink3);font-size:13px;">No matching articles. Try different words, or contact support.</div>';
+          box.classList.remove("hidden");
+          return;
+        }
+        box.innerHTML = items
+          .slice(0, 8)
+          .map(
+            (a) =>
+              '<a href="' +
+              a.u +
+              '" class="pd-help-res" style="display:flex;flex-direction:column;gap:2px;padding:11px 16px;border-bottom:0.5px solid var(--pd-hairline);">' +
+              '<span style="font-size:13.5px;font-weight:500;color:var(--pd-ink);letter-spacing:-0.1px;">' +
+              esc(a.t) +
+              "</span>" +
+              '<span style="font-size:11.5px;color:var(--pd-ink3);line-height:1.4;">' +
+              esc(a.s) +
+              '</span></a>'
+          )
+          .join("");
+        box.classList.remove("hidden");
+      }
+
+      function search(q) {
+        q = q.trim().toLowerCase();
+        if (!q) {
+          box.classList.add("hidden");
+          box.innerHTML = "";
+          return;
+        }
+        const terms = q.split(/\s+/);
+        const scored = idx
+          .map((a) => {
+            const hay = (a.t + " " + a.s + " " + a.c).toLowerCase();
+            let score = 0;
+            for (const t of terms) {
+              if (hay.includes(t)) score += a.t.toLowerCase().includes(t) ? 2 : 1;
+            }
+            return { a, score };
+          })
+          .filter((x) => x.score > 0)
+          .sort((x, y) => y.score - x.score)
+          .map((x) => x.a);
+        render(scored);
+      }
+
+      input.addEventListener("input", (e) => search(e.target.value));
+      input.addEventListener("focus", (e) => { if (e.target.value) search(e.target.value); });
+      document.addEventListener("click", (e) => {
+        if (!box.contains(e.target) && e.target !== input) box.classList.add("hidden");
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") box.classList.add("hidden");
+        if (e.key === "Enter") {
+          const first = box.querySelector("a.pd-help-res");
+          if (first) window.location.href = first.getAttribute("href");
+        }
+      });
+    })();
+  </script>
+
+  <style>
+    .pd-help-row:hover,
+    .pd-help-card:hover {
+      background: var(--pd-bg3) !important;
+      border-color: var(--pd-hairline2) !important;
+    }
+    .pd-help-res:hover {
+      background: var(--pd-bg3);
+    }
+  </style>
+</AppShell>
