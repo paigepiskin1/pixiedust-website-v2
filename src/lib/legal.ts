@@ -1,7 +1,15 @@
 // Legal document content (designed example copy — replace with counsel-approved
 // text before launch). Rendered by LegalLayout.astro.
 
-export type LegalNode = string | { list: string[] } | { note: string };
+// `h` = a numbered sub-heading (e.g. "12.5 Credit Expiration and Rollover").
+// `clauses` = lettered/roman sub-clauses that carry their own "(a)" markers, so
+// they render without bullets to keep the legal numbering authoritative.
+export type LegalNode =
+  | string
+  | { list: string[] }
+  | { note: string }
+  | { h: string }
+  | { clauses: string[] };
 export interface LegalSection {
   id: string;
   title: string;
@@ -13,106 +21,12 @@ export interface LegalDoc {
   title: string;
   subtitle: string;
   lastUpdated: string;
+  /** Titles already carry their own numbering — suppress the auto "§ 01" marker. */
+  numbered?: boolean;
   sections: LegalSection[];
 }
 
-export const TERMS: LegalDoc = {
-  current: "terms",
-  kicker: "Legal · governing your use of PixieDust",
-  title: "Terms of Service",
-  subtitle:
-    "These terms cover what we promise, what we expect, and what happens when something goes wrong. Plain-English summaries are highlighted throughout.",
-  lastUpdated: "May 12, 2026",
-  sections: [
-    {
-      id: "accept",
-      title: "Accepting these terms",
-      body: [
-        'By creating an account or using PixieDust (the "Service"), you agree to these Terms of Service and the policies they reference, including our Privacy Policy and Acceptable Use Policy.',
-        { note: "If you don't agree, don't use the Service — and ask us for a refund within 14 days if you've already purchased credits." },
-        "You confirm you are at least 13 years old, or the age of digital consent in your country, whichever is higher. Some features require you to be 18+.",
-      ],
-    },
-    {
-      id: "account",
-      title: "Your account",
-      body: [
-        "You're responsible for keeping your sign-in method safe. Anything done from your account is your responsibility — including all credits spent.",
-        {
-          list: [
-            "One person, one account. Don't share logins.",
-            "Don't impersonate someone else, including in your handle, display name, or generated outputs.",
-            "Notify us at hi@pixiedust.app if you think your account has been accessed without your permission.",
-          ],
-        },
-      ],
-    },
-    {
-      id: "credits",
-      title: "Credits & payments",
-      body: [
-        "Credits are the in-app unit you spend on generations. They have no cash value outside the Service. Stripe is the source of truth for purchases; we maintain the ledger for balances.",
-        {
-          list: [
-            "Top-up credits never expire.",
-            "Subscription credits roll over for 60 days; older subscription credits are consumed first.",
-            "Failed generations are refunded to credits automatically. We do not refund failed generations in cash.",
-            "You can request a full cash refund within 14 days of any purchase by writing to billing@pixiedust.app.",
-          ],
-        },
-        { note: "TL;DR: top-ups are forever, subscription credits are use-it-or-lose-it after 60 days, broken generations don't cost you anything." },
-      ],
-    },
-    {
-      id: "license",
-      title: "License you get from us",
-      body: [
-        "We grant you a personal, worldwide, non-exclusive license to use the Service. With Plus and Free, your outputs are for personal use only.",
-        "On Studio, you receive a worldwide commercial license to use generations you create — including in advertising, products, social media, and resale of derivative works — provided you comply with the Acceptable Use Policy.",
-        "You may not resell access to the Service itself or use it to build a competing AI generation product.",
-      ],
-    },
-    {
-      id: "content",
-      title: "Content you upload & generate",
-      body: [
-        "You keep ownership of the photos and prompts you upload, and of the outputs you generate. You grant us only what we need to run the Service (storage, transmission, display back to you, and processing through third-party AI providers).",
-        "We never train models on your face or your private generations unless you explicitly opt in via the Privacy settings.",
-        {
-          list: [
-            "Don't upload other people's faces without their consent.",
-            "Don't upload material you don't have the rights to.",
-            "See the Acceptable Use Policy for the full list of what's prohibited.",
-          ],
-        },
-      ],
-    },
-    {
-      id: "liability",
-      title: "Liability & disclaimers",
-      body: [
-        'The Service is provided "as is." AI generations are probabilistic; outputs may be imperfect, inaccurate, or unsuitable for a given purpose, and we don\'t guarantee any specific result.',
-        "To the maximum extent permitted by law, PixieDust's total liability for any claim arising out of the Service is capped at the amount you paid us in the preceding 12 months.",
-      ],
-    },
-    {
-      id: "termination",
-      title: "Termination",
-      body: [
-        "You can delete your account at any time from /account → Profile → Delete account. We'll remove your data within 30 days.",
-        "We can suspend or terminate accounts that violate these terms, the AUP, or applicable law. We'll refund unused top-up credits in such cases, unless the termination is for fraud or abuse.",
-      ],
-    },
-    {
-      id: "changes",
-      title: "Changes & contact",
-      body: [
-        "We'll email account holders at least 14 days before any material change to these terms takes effect. Continuing to use the Service after that constitutes acceptance.",
-        "Questions? legal@pixiedust.app · or write to PixieDust Inc., 244 Fifth Ave, New York, NY 10001.",
-      ],
-    },
-  ],
-};
+// TERMS lives in ./legal-terms.ts (verbatim counsel-supplied document).
 
 export const PRIVACY: LegalDoc = {
   current: "privacy",
@@ -172,7 +86,7 @@ export const PRIVACY: LegalDoc = {
       id: "cookies",
       title: "Cookies & similar tech",
       body: [
-        "We use exactly three cookies: session, theme preference, and feature-flag identifier. We do not use ad-targeting cookies. No third-party trackers run on pixiedust.app.",
+        "We use exactly three cookies: session, theme preference, and feature-flag identifier. We do not use ad-targeting cookies. No third-party trackers run on pixydust.com.",
       ],
     },
     {
@@ -185,7 +99,7 @@ export const PRIVACY: LegalDoc = {
     {
       id: "contact-p",
       title: "Contact our DPO",
-      body: ["For anything privacy-related: privacy@pixiedust.app. Our DPO responds within 14 business days."],
+      body: ["For anything privacy-related: legal@pixydust.com. Our DPO responds within 14 business days."],
     },
   ],
 };
@@ -202,7 +116,7 @@ export const ACCEPTABLE_USE: LegalDoc = {
       id: "principle",
       title: "The principle",
       body: [
-        "PixieDust exists to help creators make beautiful, original work. We block uses that cause real-world harm to real-world people, that infringe other creators' rights, or that put us legally at risk.",
+        "PixyDust exists to help creators make beautiful, original work. We block uses that cause real-world harm to real-world people, that infringe other creators' rights, or that put us legally at risk.",
         { note: "Rule of thumb: if you wouldn't be comfortable explaining what you made to a friend over coffee, don't make it here." },
       ],
     },
@@ -244,14 +158,14 @@ export const ACCEPTABLE_USE: LegalDoc = {
       title: "Copyright & trademarks",
       body: [
         "You're responsible for the rights to anything you upload. Don't upload other artists' work as input, don't prompt for a living artist's \"in the style of\" output and pass it off commercially, don't generate brand logos or trademarked characters for use you don't have a license for.",
-        'We respond to DMCA notices at copyright@pixiedust.app. We honor "do not train on my work" requests for any work whose rightsholder writes to us.',
+        'We respond to DMCA notices at dmca@pixydust.com. We honor "do not train on my work" requests for any work whose rightsholder writes to us.',
       ],
     },
     {
       id: "security",
       title: "Security & abuse",
       body: [
-        "No probing, scraping, or attempts to circumvent rate limits or safety filters. No reverse-engineering the AI pipeline. No automated account creation. Bug reports welcome at security@pixiedust.app under our responsible-disclosure policy.",
+        "No probing, scraping, or attempts to circumvent rate limits or safety filters. No reverse-engineering the AI pipeline. No automated account creation. Bug reports welcome at support@pixydust.com under our responsible-disclosure policy.",
       ],
     },
     {
@@ -259,7 +173,7 @@ export const ACCEPTABLE_USE: LegalDoc = {
       title: "Enforcement",
       body: [
         "Violations are caught by a mix of automated classifiers and human review. Consequences scale: warning → temporary suspension → permanent ban. Severe violations are immediate permanent bans with no refund and, where applicable, law-enforcement referral.",
-        "Disputes: write to appeals@pixiedust.app within 30 days of a suspension. A human will review.",
+        "Disputes: write to support@pixydust.com within 30 days of a suspension. A human will review.",
       ],
     },
   ],

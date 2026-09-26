@@ -73,7 +73,7 @@ const OG_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" f
     font-weight="800"
     font-size="72"
     letter-spacing="-2"
-    fill="url(#text-grad)">PixieDust</text>
+    fill="url(#text-grad)">PixyDust</text>
 
   <!-- Tagline -->
   <text x="600" y="376"

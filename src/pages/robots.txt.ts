@@ -4,9 +4,7 @@
 export const prerender = false;
 import type { APIContext } from "astro";
 
-// New primary domain is pixydust.com. The old pixiedustapp.com hosts are kept
-// indexable during the transition (they may still serve/redirect).
-const PROD_HOSTS = new Set(["pixydust.com", "www.pixydust.com", "pixiedustapp.com", "www.pixiedustapp.com"]);
+const PROD_HOSTS = new Set(["pixydust.com"]);
 
 export function GET({ url }: APIContext) {
   const isProd = PROD_HOSTS.has(url.hostname);

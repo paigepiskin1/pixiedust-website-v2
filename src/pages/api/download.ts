@@ -42,7 +42,7 @@ export async function GET({ request, locals }: APIContext) {
   return new Response(upstream.body, {
     headers: {
       "Content-Type": ct,
-      "Content-Disposition": `attachment; filename="pixiedust-${id.slice(0, 8)}.${ext}"`,
+      "Content-Disposition": `attachment; filename="pixydust-${id.slice(0, 8)}.${ext}"`,
       "Cache-Control": "private, no-store",
     },
   });
