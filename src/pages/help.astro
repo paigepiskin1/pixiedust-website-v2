@@ -1,0 +1,5 @@
+---
+// The support/help center now lives at /support. Redirect any /help hits.
+export const prerender = false;
+return Astro.redirect("/support", 301);
+---

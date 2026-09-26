@@ -659,11 +659,11 @@ export function popularArticles(): ArticleRef[] {
 }
 
 export function categoryHref(id: string): string {
-  return `/help/${id}`;
+  return `/support/${id}`;
 }
 
 export function articleHref(categoryId: string, slug: string): string {
-  return `/help/${categoryId}/${slug}`;
+  return `/support/${categoryId}/${slug}`;
 }
 
 export const HELP_SUPPORT_EMAIL = SUPPORT_EMAIL;

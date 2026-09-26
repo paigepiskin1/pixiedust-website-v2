@@ -7,7 +7,7 @@ import { getCategory, articleHref, HELP_SUPPORT_EMAIL } from "../../../lib/help"
 const user = Astro.locals.user;
 const { category: categoryId } = Astro.params;
 const category = categoryId ? getCategory(categoryId) : undefined;
-if (!category) return Astro.redirect("/help");
+if (!category) return Astro.redirect("/support");
 ---
 
 <AppShell
@@ -18,7 +18,7 @@ if (!category) return Astro.redirect("/help");
   <div class="mx-auto w-full" style="max-width:820px;padding:28px;">
     <!-- Breadcrumb -->
     <nav class="mb-5 flex items-center gap-1.5 font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:0.6px;">
-      <a href="/help" class="pd-crumb">Help Center</a>
+      <a href="/support" class="pd-crumb">Help Center</a>
       <span><HelpIcon name="chevron" size={11} /></span>
       <span style="color:var(--pd-ink2);">{category.title}</span>
     </nav>

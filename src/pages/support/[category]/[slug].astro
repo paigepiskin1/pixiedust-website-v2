@@ -7,7 +7,7 @@ import { getArticle, articleHref, HELP_SUPPORT_EMAIL } from "../../../lib/help";
 const user = Astro.locals.user;
 const { category: categoryId, slug } = Astro.params;
 const found = categoryId && slug ? getArticle(categoryId, slug) : null;
-if (!found) return Astro.redirect("/help");
+if (!found) return Astro.redirect("/support");
 const { category, article } = found;
 const related = category.articles.filter((a) => a.slug !== article.slug).slice(0, 4);
 ---
@@ -20,9 +20,9 @@ const related = category.articles.filter((a) => a.slug !== article.slug).slice(0
   <div class="mx-auto w-full" style="max-width:760px;padding:28px;">
     <!-- Breadcrumb -->
     <nav class="mb-5 flex flex-wrap items-center gap-1.5 font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:0.6px;">
-      <a href="/help" class="pd-crumb">Help Center</a>
+      <a href="/support" class="pd-crumb">Help Center</a>
       <span><HelpIcon name="chevron" size={11} /></span>
-      <a href={`/help/${category.id}`} class="pd-crumb">{category.title}</a>
+      <a href={`/support/${category.id}`} class="pd-crumb">{category.title}</a>
       <span><HelpIcon name="chevron" size={11} /></span>
       <span style="color:var(--pd-ink2);">{article.title}</span>
     </nav>
