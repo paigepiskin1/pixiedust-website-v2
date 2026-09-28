@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIContext } from "astro";
-import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults } from "../../../lib/templates";
+import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChainStep, applyFieldDefaults, expandOmniMediaInputs } from "../../../lib/templates";
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
@@ -33,7 +33,8 @@ export async function POST({ request, locals }: APIContext) {
   if (!template || (template.isHidden && !user.isAdmin)) return json({ error: "Template not found." }, 404);
   // Apply field defaults before validation/resolve so optional prompts with a
   // baked-in `default` still reach the model when the user leaves them blank.
-  const inputs = applyFieldDefaults(template, body.inputs ?? {});
+  // Omni templates: also split mixed image/video/audio uploads into typed lists.
+  const inputs = expandOmniMediaInputs(template, applyFieldDefaults(template, body.inputs ?? {}));
 
   // Validate required fields (covers single + multi-step via allFields).
   const missing = allFields(template).filter((f) => f.required && (inputs[f.key] == null || inputs[f.key] === ""));
@@ -42,6 +43,12 @@ export async function POST({ request, locals }: APIContext) {
   const qty = Math.max(1, Math.min(Number(body.quantity) || 1, 4));
   const duration = Number(body.duration) || undefined;
   const cost = computeCost(template, { quality: body.quality, quantity: qty, duration });
+  const userInputsJson = JSON.stringify({
+    inputs,
+    aspect: body.aspect ?? undefined,
+    duration: duration ?? undefined,
+    quality: body.quality ?? undefined,
+  });
 
   // Limits
   const tier = await getUserTier(db, userId);
@@ -87,13 +94,24 @@ export async function POST({ request, locals }: APIContext) {
     const chain = { stepIndex: 0, userInputs: chainInputs, steps };
     const step0Input = resolveChainStep(steps[0].input, { user: chainInputs, outputs: {} }) as Record<string, unknown>;
 
-    await db
-      .prepare(
-        `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, chain_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
-      )
-      .bind(genId, userId, template.id, template.kind, template.type, steps[0].provider, steps[0].model, JSON.stringify(step0Input), cost, body.quality ?? null, qty, JSON.stringify(chain))
-      .run();
+    try {
+      await db
+        .prepare(
+          `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, chain_json, user_inputs_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`
+        )
+        .bind(genId, userId, template.id, template.kind, template.type, steps[0].provider, steps[0].model, JSON.stringify(step0Input), cost, body.quality ?? null, qty, JSON.stringify(chain), userInputsJson)
+        .run();
+    } catch {
+      // Migration 0015 may not be applied yet — store without user_inputs_json.
+      await db
+        .prepare(
+          `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, chain_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
+        )
+        .bind(genId, userId, template.id, template.kind, template.type, steps[0].provider, steps[0].model, JSON.stringify(step0Input), cost, body.quality ?? null, qty, JSON.stringify(chain))
+        .run();
+    }
 
     try {
       const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: steps[0].provider, model: steps[0].model, input: step0Input });
@@ -169,13 +187,23 @@ export async function POST({ request, locals }: APIContext) {
     }
   }
 
-  await db
-    .prepare(
-      `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
-    )
-    .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty)
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity, user_inputs_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
+      )
+      .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty, userInputsJson)
+      .run();
+  } catch {
+    await db
+      .prepare(
+        `INSERT INTO generations (id, user_id, template_id, kind, type, provider, model, input_json, status, credits_charged, quality, quantity)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`
+      )
+      .bind(genId, userId, template.id, template.kind, template.type, template.provider, template.model, JSON.stringify(input), cost, body.quality ?? null, qty)
+      .run();
+  }
 
   try {
     const { jobId } = await submitGeneration(env.SYNCNODE_API_KEY, { provider: template.provider, model: template.model, input });
