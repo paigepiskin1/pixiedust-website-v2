@@ -1,0 +1,70 @@
+---
+export const prerender = false;
+import AppShell from "../../../layouts/AppShell.astro";
+import HelpIcon from "../../../components/help/HelpIcon.astro";
+import { getCategory, articleHref, HELP_SUPPORT_EMAIL } from "../../../lib/help";
+
+const user = Astro.locals.user;
+const { category: categoryId } = Astro.params;
+const category = categoryId ? getCategory(categoryId) : undefined;
+if (!category) return Astro.redirect("/support");
+---
+
+<AppShell
+  title={`${category.title} — Help Center — PixyDust`}
+  description={category.blurb}
+  credits={user?.credits ?? 47}
+>
+  <div class="mx-auto w-full" style="max-width:820px;padding:28px;">
+    <!-- Breadcrumb -->
+    <nav class="mb-5 flex items-center gap-1.5 font-mono uppercase" style="font-size:10px;color:var(--pd-ink4);letter-spacing:0.6px;">
+      <a href="/support" class="pd-crumb">Help Center</a>
+      <span><HelpIcon name="chevron" size={11} /></span>
+      <span style="color:var(--pd-ink2);">{category.title}</span>
+    </nav>
+
+    <div class="flex items-center gap-3.5">
+      <span
+        class="inline-flex size-11 items-center justify-center rounded-[13px]"
+        style="background:color-mix(in srgb, var(--pd-lilac) 14%, transparent);color:var(--pd-lilac);"
+      >
+        <HelpIcon name={category.icon} size={21} />
+      </span>
+      <div>
+        <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.8px;line-height:1.05;">{category.title}</h1>
+        <p class="mt-1 text-ink-3" style="font-size:13.5px;line-height:1.45;">{category.blurb}</p>
+      </div>
+    </div>
+
+    <div class="mt-7 flex flex-col gap-2.5">
+      {
+        category.articles.map((a) => (
+          <a
+            href={articleHref(category.id, a.slug)}
+            class="pd-help-row group flex items-center gap-3 rounded-xl"
+            style="padding:16px 18px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+          >
+            <span class="min-w-0 flex-1">
+              <span class="block font-medium text-ink" style="font-size:14.5px;letter-spacing:-0.1px;">{a.title}</span>
+              <span class="mt-0.5 block text-ink-3" style="font-size:12.5px;line-height:1.45;">{a.summary}</span>
+            </span>
+            <span class="shrink-0 text-ink-4 transition-transform group-hover:translate-x-0.5"><HelpIcon name="chevron" size={14} /></span>
+          </a>
+        ))
+      }
+    </div>
+
+    <div
+      class="mt-9 flex flex-wrap items-center justify-between gap-4 rounded-2xl"
+      style="padding:20px 22px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+    >
+      <div class="text-ink-3" style="font-size:13px;line-height:1.5;">Didn't find it? We're happy to help.</div>
+      <a href={`mailto:${HELP_SUPPORT_EMAIL}`} class="rounded-[10px] font-bold" style="padding:9px 15px;background:var(--pd-lilac);color:#0A0A0B;font-size:12.5px;">Contact support</a>
+    </div>
+  </div>
+
+  <style>
+    .pd-help-row:hover { background: var(--pd-bg3) !important; border-color: var(--pd-hairline2) !important; }
+    .pd-crumb:hover { color: var(--pd-ink2); }
+  </style>
+</AppShell>

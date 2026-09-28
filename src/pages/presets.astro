@@ -11,7 +11,7 @@ const items = (await listTemplates(db, { kind: "preset" })).map(templateToCard);
 const cats = deriveCats(PRESET_CATS, items);
 ---
 
-<AppShell title="AI Photo Presets — PixieDust" description="Apply stunning AI-powered photo presets to your images. Cinematic, editorial, and artistic styles in one click." credits={Astro.locals.user?.credits ?? 47}>
+<AppShell title="AI Photo Presets — PixyDust" description="Apply stunning AI-powered photo presets to your images. Cinematic, editorial, and artistic styles in one click." credits={Astro.locals.user?.credits ?? 47}>
   <div class="mx-auto w-full" style="max-width:1480px;padding:28px;">
     <PageHeader
       kicker="Single-image restyle · 2 cr"

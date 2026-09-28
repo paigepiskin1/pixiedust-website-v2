@@ -3,6 +3,7 @@ import type { APIContext } from "astro";
 import { getUserByUid } from "../../../lib/users";
 import { adjustBalance } from "../../../lib/credits";
 import { pollStatus, submitGeneration } from "../../../lib/syncnode";
+import { cleanupByteplusAssets } from "../../../lib/byteplus-assets";
 import { resolveChainStep } from "../../../lib/templates";
 
 function json(data: unknown, status = 200) {
@@ -10,6 +11,16 @@ function json(data: unknown, status = 200) {
     status,
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
+}
+
+/** Prime the Bunny CDN for a freshly generated output so the client's first
+ * load isn't a cold miss (which can briefly serve an empty/0-byte file). */
+async function warmCdn(url: string | null | undefined): Promise<void> {
+  if (!url) return;
+  try {
+    const r = await fetch(url);
+    await r.arrayBuffer(); // full pull so Bunny caches the whole file
+  } catch { /* best-effort */ }
 }
 
 interface GenRow {
@@ -23,6 +34,7 @@ interface GenRow {
   credits_charged: number;
   credits_refunded: number;
   chain_json: string | null;
+  input_json: string | null;
 }
 
 interface ChainStep {
@@ -112,6 +124,7 @@ export async function GET({ url, locals }: APIContext) {
       .prepare("UPDATE generations SET status='completed', output_url=?, chain_json=?, updated_at=datetime('now') WHERE id=?")
       .bind(cur.output, JSON.stringify(chain), id)
       .run();
+    await warmCdn(cur.output);
     return json({ id, status: "completed", outputs: cur.output ? [cur.output] : [] });
   }
 
@@ -122,6 +135,12 @@ export async function GET({ url, locals }: APIContext) {
       .prepare("UPDATE generations SET status = 'completed', output_url = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(poll.outputs[0] ?? null, id)
       .run();
+    // Warm the CDN, then release any BytePlus library assets we uploaded for
+    // this generation (best-effort; the video is already saved).
+    await warmCdn(poll.outputs[0]);
+    if (gen.provider === "byteplus" && gen.input_json) {
+      try { await cleanupByteplusAssets(env.SYNCNODE_API_KEY, JSON.parse(gen.input_json)); } catch { /* best-effort */ }
+    }
     return json({ id, status: "completed", outputs: poll.outputs });
   }
 

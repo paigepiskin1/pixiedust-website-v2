@@ -1,8 +1,8 @@
 // Admin AI-assist via OpenRouter (Anthropic Opus). Converts pasted provider
-// params / a freeform description into a PixieDust template scaffold.
+// params / a freeform description into a PixyDust template scaffold.
 const MODEL = "anthropic/claude-opus-4.1";
 
-const SYSTEM = `You convert a Replicate model's example input JSON (or a plain description) into a PixieDust template.
+const SYSTEM = `You convert a Replicate model's example input JSON (or a plain description) into a PixyDust template.
 Return STRICT JSON only (no prose, no markdown fences) shaped exactly as:
 { "input_json": <object>, "fields_json": <array> }
 Rules:
@@ -16,7 +16,7 @@ export interface AiTemplate {
   fields: unknown;
 }
 
-const TEMPLATE_SYSTEM = `You design a PixieDust generation template from a plain-language request, returning STRICT JSON only (no prose/markdown):
+const TEMPLATE_SYSTEM = `You design a PixyDust generation template from a plain-language request, returning STRICT JSON only (no prose/markdown):
 { "id","title","kind","type","model","input_json","fields_json","credit_cost","tone","engine","subtitle","tags","aspects","quantities" }
 Rules:
 - id: lowercase slug (a–z,0–9,dash). type: "image" or "video". kind: one of preset|shoot|cinema|i2v|fashion-video|game-video|motion|beauty|fashion|avatar|ad.
@@ -55,7 +55,7 @@ export async function aiTemplate(
 }
 
 // ── Multi-step (chained) template generation ───────────────────────────────
-const CHAIN_SYSTEM = `You design a MULTI-STEP (chained) PixieDust generation template from a plain-language request. Return STRICT JSON only (no prose/markdown):
+const CHAIN_SYSTEM = `You design a MULTI-STEP (chained) PixyDust generation template from a plain-language request. Return STRICT JSON only (no prose/markdown):
 { "id","title","kind","type","subtitle","credit_cost","tone","tags","fields_json","steps_json" }
 
 How chains work:

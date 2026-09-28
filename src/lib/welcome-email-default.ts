@@ -3,7 +3,7 @@
  * Variables: {{name}}, {{email}}, {{credits}}
  * Falls back gracefully when variables are missing.
  */
-export const DEFAULT_WELCOME_SUBJECT = "Welcome to PixieDust ✨ — Your AI creative studio is ready";
+export const DEFAULT_WELCOME_SUBJECT = "Welcome to PixyDust ✨ — Your AI creative studio is ready";
 
 export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -11,7 +11,7 @@ export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
-<title>Welcome to PixieDust</title>
+<title>Welcome to PixyDust</title>
 </head>
 <body style="margin:0;padding:0;background:#0d0d12;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 
@@ -32,7 +32,7 @@ export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
             <img src="https://pixiecdn.b-cdn.net/brand/logo-icon-256.png" alt="" width="40" height="40" style="display:block;width:40px;height:40px;border-radius:11px;" />
           </td>
           <td style="vertical-align:middle;">
-            <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">PixieDust</span>
+            <span style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">PixyDust</span>
           </td>
         </tr>
       </table>
@@ -50,14 +50,14 @@ export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
         Welcome aboard — you've got <span style="color:#a855f7;">{{credits}} free credits</span> to start creating.
       </h2>
       <p style="margin:0 0 32px;color:rgba(255,255,255,0.55);font-size:15px;line-height:1.7;">
-        PixieDust gives you instant access to 150+ AI templates for images, videos, beauty edits, fashion try-ons, and more. No design skills required — just pick a template and go.
+        PixyDust gives you instant access to 150+ AI templates for images, videos, beauty edits, fashion try-ons, and more. No design skills required — just pick a template and go.
       </p>
 
       <!-- CTA Button -->
       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 40px;">
         <tr>
           <td style="background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:12px;">
-            <a href="https://pixiedustapp.com" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;letter-spacing:-0.2px;">Start creating →</a>
+            <a href="https://pixydust.com" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;letter-spacing:-0.2px;">Start creating →</a>
           </td>
         </tr>
       </table>
@@ -118,11 +118,11 @@ export const DEFAULT_WELCOME_HTML = `<!DOCTYPE html>
     <td style="padding:24px 40px 32px;border-top:1px solid rgba(255,255,255,0.07);">
       <p style="margin:0 0 8px;color:rgba(255,255,255,0.25);font-size:12px;line-height:1.6;text-align:center;">
         You're receiving this because you created an account at
-        <a href="https://pixiedustapp.com" style="color:rgba(168,85,247,0.8);text-decoration:none;">pixiedustapp.com</a>
+        <a href="https://pixydust.com" style="color:rgba(168,85,247,0.8);text-decoration:none;">pixydust.com</a>
         with {{email}}.
       </p>
       <p style="margin:0;color:rgba(255,255,255,0.15);font-size:11px;text-align:center;">
-        © 2025 PixieDust. All rights reserved.
+        © 2025 PixyDust. All rights reserved.
       </p>
     </td>
   </tr>

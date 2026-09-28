@@ -1,49 +1,96 @@
+// Sitemap for pixydust.com.
+//
+// Only publicly reachable, indexable pages belong here. Two rules to keep in
+// mind when editing:
+//  • No auth-gated routes (/account, /gallery, /invite) — they 302 to sign-in,
+//    and a sitemap full of redirects is treated as a quality signal.
+//  • No /studio/* template pages — robots.txt disallows that prefix.
+// This list previously advertised /explore and /explore/<category>, neither of
+// which is a route: 24 of the 25 URLs Google was given returned 404.
 export const prerender = false;
 import type { APIContext } from "astro";
 
-const DOMAIN = "https://pixiedustapp.com";
+const DOMAIN = "https://pixydust.com";
 
-const STATIC_PAGES = [
+interface Entry {
+  loc: string;
+  priority: string;
+  changefreq: string;
+  lastmod?: string;
+}
+
+const PAGES: Entry[] = [
   { loc: "/", priority: "1.0", changefreq: "daily" },
-  { loc: "/explore", priority: "0.9", changefreq: "daily" },
-  { loc: "/legal/privacy", priority: "0.3", changefreq: "monthly" },
+  { loc: "/trending", priority: "0.9", changefreq: "daily" },
+  { loc: "/blog", priority: "0.9", changefreq: "daily" },
+  { loc: "/presets", priority: "0.8", changefreq: "weekly" },
+  { loc: "/hair", priority: "0.8", changefreq: "weekly" },
+  { loc: "/beauty", priority: "0.8", changefreq: "weekly" },
+  { loc: "/avatar", priority: "0.8", changefreq: "weekly" },
+  { loc: "/video", priority: "0.8", changefreq: "weekly" },
+  { loc: "/shoots", priority: "0.7", changefreq: "weekly" },
+  { loc: "/credits", priority: "0.6", changefreq: "monthly" },
+  { loc: "/support", priority: "0.6", changefreq: "monthly" },
+  { loc: "/about", priority: "0.5", changefreq: "monthly" },
+  { loc: "/brand", priority: "0.4", changefreq: "monthly" },
   { loc: "/legal/terms", priority: "0.3", changefreq: "monthly" },
+  { loc: "/legal/privacy", priority: "0.3", changefreq: "monthly" },
+  { loc: "/legal/acceptable-use", priority: "0.3", changefreq: "monthly" },
 ];
 
 export async function GET({ locals }: APIContext) {
-  const db = locals.runtime?.env?.DB;
+  const now = new Date().toISOString().split("T")[0];
 
-  // Collect category slugs from live templates
-  const categoryPages: { loc: string; priority: string; changefreq: string }[] = [];
-  if (db) {
-    try {
-      const rows = await db
-        .prepare("SELECT DISTINCT category FROM templates WHERE is_hidden = 0 AND category IS NOT NULL")
-        .all<{ category: string }>();
-      for (const { category } of rows.results ?? []) {
-        if (category) {
-          categoryPages.push({
-            loc: `/explore/${encodeURIComponent(category.toLowerCase().replace(/\s+/g, "-"))}`,
-            priority: "0.7",
-            changefreq: "weekly",
-          });
-        }
-      }
-    } catch {
-      // Non-fatal — sitemap still works with static pages only
+  // Published posts carry their own lastmod, so a re-crawl is prompted by an
+  // actual edit rather than by today's date sitting on every URL. Drafts are
+  // excluded by listPublished, so an unfinished post is never advertised.
+  let posts: Entry[] = [];
+  try {
+    const db = (locals as any)?.runtime?.env?.DB;
+    if (db) {
+      const { listPublished, isoDate } = await import("../lib/blog");
+      posts = (await listPublished(db, 500)).map((p) => ({
+        loc: `/blog/${p.slug}`,
+        priority: "0.7",
+        changefreq: "monthly",
+        lastmod: (isoDate(p.updated_at) || "").split("T")[0] || now,
+      }));
     }
+  } catch {
+    // A sitemap missing the blog beats a sitemap that 500s.
   }
 
-  const allPages = [...STATIC_PAGES, ...categoryPages];
-  const now = new Date().toISOString().split("T")[0];
+  // Help Centre. The content is static (src/lib/help.ts), not database-backed,
+  // so every category and article is known at request time and none of it can
+  // be a draft — unlike the blog above, there is nothing to filter out.
+  let help: Entry[] = [];
+  try {
+    const { HELP_CATEGORIES, allArticles, categoryHref, articleHref } = await import("../lib/help");
+    help = [
+      ...HELP_CATEGORIES.map((c) => ({
+        loc: categoryHref(c.id),
+        priority: "0.5",
+        changefreq: "monthly",
+      })),
+      ...allArticles().map((a) => ({
+        loc: articleHref(a.categoryId, a.slug),
+        priority: "0.5",
+        changefreq: "monthly",
+      })),
+    ];
+  } catch {
+    // Same rule as the blog: a sitemap missing the help centre beats a 500.
+  }
+
+  const all: Entry[] = [...PAGES, ...posts, ...help];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${allPages
+${all
   .map(
     (p) => `  <url>
     <loc>${DOMAIN}${p.loc}</loc>
-    <lastmod>${now}</lastmod>
+    <lastmod>${p.lastmod || now}</lastmod>
     <changefreq>${p.changefreq}</changefreq>
     <priority>${p.priority}</priority>
   </url>`

@@ -4,6 +4,7 @@ import { getTemplate, resolveInput, computeCost, isChain, allFields, resolveChai
 import { getUserByUid } from "../../../lib/users";
 import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
+import { prepareByteplusAssets } from "../../../lib/byteplus-assets";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
 
 function json(data: unknown, status = 200) {
@@ -147,6 +148,25 @@ export async function POST({ request, locals }: APIContext) {
   // the regex guard prevents abstract tiers (std/pro/cinema) from leaking through.
   if (body.quality && "resolution" in input && /^(\d+p|\d+k)$/i.test(body.quality)) {
     input.resolution = body.quality;
+  }
+
+  // Opt-in (template meta { "assetLibrary": true }): push each uploaded photo
+  // into the BytePlus asset library and swap it for an asset://<id> reference,
+  // which is how Ark authorizes real faces. Runs before the row is stored so
+  // input_json records the final asset refs; on failure we refund + surface the
+  // real reason (moderation / bad photo) instead of a generic error.
+  let useAssetLib = false;
+  try {
+    const m = template.meta ? JSON.parse(template.meta) : null;
+    useAssetLib = !!(m && m.assetLibrary);
+  } catch { /* meta isn't JSON */ }
+  if (template.provider === "byteplus" && useAssetLib) {
+    try {
+      await prepareByteplusAssets(env.SYNCNODE_API_KEY, db, input);
+    } catch (err) {
+      await adjustBalance(db, userId, cost, { reason: "generation_refund", refType: "generation", refId: genId, note: "asset prep failed" });
+      return json({ error: String((err as Error).message || err) + " — you weren't charged." }, 502);
+    }
   }
 
   await db
