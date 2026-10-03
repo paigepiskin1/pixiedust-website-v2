@@ -19,6 +19,22 @@ interface SaveBody {
   author?: string;
   tags?: string[];
   status?: "draft" | "published";
+  /** ISO-8601 (or 'YYYY-MM-DD HH:MM:SS') publish time, UTC. A future value
+   *  schedules the post. "" clears it back to "stamp on next publish". */
+  publishedAt?: string | null;
+}
+
+/** Normalise a client-supplied publish time to D1's 'YYYY-MM-DD HH:MM:SS' UTC.
+ *  Returns undefined when the field was not sent (leave as-is), null when it
+ *  was explicitly cleared, and a string when it parses. An unparseable value is
+ *  rejected rather than silently coerced — a typo here would otherwise either
+ *  hide a live post or publish a draft early. */
+function normalisePublishedAt(raw: string | null | undefined): string | null | undefined | false {
+  if (raw === undefined) return undefined;
+  if (raw === null || String(raw).trim() === "") return null;
+  const d = new Date(String(raw).includes("T") ? String(raw) : String(raw).replace(" ", "T") + "Z");
+  if (Number.isNaN(d.getTime())) return false;
+  return d.toISOString().slice(0, 19).replace("T", " ");
 }
 
 export async function POST({ request, locals }: APIContext) {
@@ -73,11 +89,22 @@ export async function POST({ request, locals }: APIContext) {
     const slug = wantSlug === existing.slug ? existing.slug : await uniqueSlug(db, wantSlug, existing.id);
 
     const status: BlogPost["status"] = body.status === "published" ? "published" : "draft";
-    // published_at is stamped once, on first publish, and kept thereafter —
-    // re-publishing an edited post must not reorder the index or reset the
-    // date search engines already recorded.
+
+    // published_at doubles as the schedule: a future value keeps the post out
+    // of /blog and the sitemap until the clock passes it (see lib/blog.ts).
+    const wanted = normalisePublishedAt(body.publishedAt);
+    if (wanted === false) return json({ error: "Unreadable publish date" }, 400);
+
     const publishedAt =
-      status === "published" ? existing.published_at ?? new Date().toISOString().slice(0, 19).replace("T", " ") : existing.published_at;
+      wanted !== undefined
+        ? // An explicit date always wins, including clearing it.
+          wanted
+        : status === "published"
+          ? // Stamped once, on first publish, and kept thereafter — re-publishing
+            // an edited post must not reorder the index or reset the date search
+            // engines already recorded.
+            existing.published_at ?? new Date().toISOString().slice(0, 19).replace("T", " ")
+          : existing.published_at;
 
     const tags = Array.isArray(body.tags)
       ? body.tags.map((t) => String(t).trim()).filter(Boolean).slice(0, 8)
@@ -105,8 +132,9 @@ export async function POST({ request, locals }: APIContext) {
       )
       .run();
 
-    await auditAdmin(db, actor, "save_blog_post", "blog_posts", String(existing.id), { slug, status });
-    return json({ ok: true, id: existing.id, slug, status, publishedAt });
+    const scheduled = status === "published" && !!publishedAt && publishedAt > new Date().toISOString().slice(0, 19).replace("T", " ");
+    await auditAdmin(db, actor, "save_blog_post", "blog_posts", String(existing.id), { slug, status, publishedAt, scheduled });
+    return json({ ok: true, id: existing.id, slug, status, publishedAt, scheduled });
   } catch (err) {
     return json({ error: `Blog save failed: ${(err as Error)?.message || String(err)}` }, 500);
   }

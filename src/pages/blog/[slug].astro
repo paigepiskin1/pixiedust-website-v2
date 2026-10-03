@@ -185,8 +185,11 @@ const jsonLd = JSON.stringify([
   .pd-prose ul { list-style: disc; }
   .pd-prose ol { list-style: decimal; }
   .pd-prose li + li { margin-top: 0.4em; }
+  /* width:100% is the default for an image the author never resized. An inline
+     style="width:NN%" set in the editor overrides it on specificity, and
+     max-width keeps that honest on narrow screens. */
   .pd-prose img, .pd-prose video {
-    display: block; width: 100%; height: auto; border-radius: 14px;
+    display: block; width: 100%; max-width: 100%; height: auto; border-radius: 14px;
     border: 0.5px solid var(--pd-hairline); margin: 1.8em 0;
   }
   .pd-prose figure { margin: 1.8em 0; }

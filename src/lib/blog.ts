@@ -98,12 +98,36 @@ export function displayDate(sqlDate: string | null): string {
   return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 }
 
-/** Published posts, newest first. Used by /blog and the sitemap. */
+/** Scheduling works by letting published_at sit in the future rather than by
+ *  adding a 'scheduled' status or a cron job. A post goes live the moment the
+ *  clock passes its date, because every public read filters on
+ *  `published_at <= now` — there is no job to miss, nothing to retry, and a
+ *  missed window is impossible. The cost is that "is this live?" is a function
+ *  of the current time, so the admin computes the label rather than storing it.
+ *
+ *  SQL comparison is safe here: D1 stores 'YYYY-MM-DD HH:MM:SS' in UTC, which
+ *  sorts and compares lexicographically in the same order as chronologically. */
+const LIVE = `status = 'published' AND published_at IS NOT NULL AND published_at <= datetime('now')`;
+
+/** True once the post's publish time has passed. */
+export function isLive(post: Pick<BlogPost, "status" | "published_at">): boolean {
+  if (post.status !== "published" || !post.published_at) return false;
+  const t = isoDate(post.published_at);
+  return !!t && new Date(t).getTime() <= Date.now();
+}
+
+/** Published with a future date — queued, not yet visible. */
+export function isScheduled(post: Pick<BlogPost, "status" | "published_at">): boolean {
+  return post.status === "published" && !!post.published_at && !isLive(post);
+}
+
+/** Live posts, newest first. Used by /blog and the sitemap. Excludes both
+ *  drafts and anything scheduled for later. */
 export async function listPublished(db: D1Database, limit = 100): Promise<BlogPost[]> {
   const r = await db
     .prepare(
       `SELECT * FROM blog_posts
-       WHERE status = 'published' AND published_at IS NOT NULL
+       WHERE ${LIVE}
        ORDER BY published_at DESC, id DESC
        LIMIT ?`
     )
@@ -115,7 +139,7 @@ export async function listPublished(db: D1Database, limit = 100): Promise<BlogPo
 export async function getPublishedBySlug(db: D1Database, slug: string): Promise<BlogPost | null> {
   return (
     (await db
-      .prepare("SELECT * FROM blog_posts WHERE slug = ? AND status = 'published' AND published_at IS NOT NULL")
+      .prepare(`SELECT * FROM blog_posts WHERE slug = ? AND ${LIVE}`)
       .bind(slug)
       .first<BlogPost>()) ?? null
   );
