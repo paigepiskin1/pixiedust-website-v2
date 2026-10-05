@@ -1,0 +1,672 @@
+---
+export const prerender = false;
+import AdminShell from "../../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../../lib/admin";
+import { getById, tagsOf, isoDate, BLOG_AUTHOR_FALLBACK } from "../../../../lib/blog";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const id = Number(Astro.params.id);
+const post = Number.isFinite(id) ? await getById(db, id) : null;
+if (!post) return Astro.redirect("/admin/blog");
+
+const initial = {
+  id: post.id,
+  slug: post.slug,
+  title: post.title,
+  excerpt: post.excerpt ?? "",
+  contentHtml: post.content_html ?? "",
+  thumbnailUrl: post.thumbnail_url ?? "",
+  thumbnailAlt: post.thumbnail_alt ?? "",
+  author: post.author ?? "",
+  tags: tagsOf(post),
+  status: post.status,
+  // ISO (UTC) or "" — the browser converts to and from the author's local zone.
+  publishedAt: isoDate(post.published_at) ?? "",
+};
+---
+
+<AdminShell title={`${post.title} — Blog — PixyDust Admin`} tab="blog">
+  <script type="application/json" id="pd-post-data" set:html={JSON.stringify(initial)} />
+
+  <div class="mx-auto w-full" style="max-width:1240px;padding:24px;">
+    <!-- Bar -->
+    <div class="mb-5 flex flex-wrap items-center gap-3">
+      <a href="/admin/blog" class="text-ink-3" style="font-size:12.5px;text-decoration:none;">← All posts</a>
+      <span id="pd-save-state" class="text-ink-4" style="font-size:11.5px;"></span>
+      <div class="ml-auto flex items-center gap-2">
+        <a id="pd-view" href={`/blog/${post.slug}`} target="_blank" rel="noopener"
+          class="rounded-xl font-semibold text-ink-2"
+          style="padding:9px 14px;font-size:12.5px;border:0.5px solid var(--pd-hairline2);text-decoration:none;">View</a>
+        <button type="button" id="pd-save" class="rounded-xl font-semibold text-ink"
+          style="padding:9px 16px;font-size:12.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg2);cursor:pointer;">Save draft</button>
+        <button type="button" id="pd-publish" class="rounded-xl font-bold"
+          style="padding:10px 18px;font-size:12.5px;background:var(--pd-lilac);color:#0A0A0B;border:none;cursor:pointer;">
+          {post.status === "published" ? "Update" : "Publish"}
+        </button>
+      </div>
+    </div>
+
+    <div class="grid gap-5" style="grid-template-columns:minmax(0,1fr) 320px;">
+      <!-- ── Main column ─────────────────────────────────────────────── -->
+      <div>
+        <input id="pd-title" type="text" value={post.title} placeholder="Post title"
+          class="w-full font-display font-semibold text-ink"
+          style="background:transparent;border:none;outline:none;font-size:32px;letter-spacing:-0.8px;padding:4px 0;" />
+
+        <div class="mt-2 flex items-center gap-1.5 text-ink-4" style="font-size:12px;">
+          <span>pixydust.com/blog/</span>
+          <input id="pd-slug" type="text" value={post.slug}
+            style="background:transparent;border:none;outline:none;color:var(--pd-lilac);font-size:12px;flex:1;min-width:0;" />
+        </div>
+
+        <!-- Toolbar -->
+        <div id="pd-toolbar" class="mt-5 flex flex-wrap items-center gap-1 rounded-xl"
+          style="padding:7px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);position:sticky;top:calc(var(--pd-topbar-h) + 8px);z-index:20;">
+          <button type="button" data-cmd="formatBlock" data-arg="h2" title="Heading 2">H2</button>
+          <button type="button" data-cmd="formatBlock" data-arg="h3" title="Heading 3">H3</button>
+          <button type="button" data-cmd="formatBlock" data-arg="p" title="Paragraph">¶</button>
+          <span class="pd-sep"></span>
+          <button type="button" data-cmd="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>
+          <button type="button" data-cmd="italic" title="Italic (Ctrl+I)"><em>I</em></button>
+          <button type="button" data-cmd="createLink" title="Link (Ctrl+K)">Link</button>
+          <span class="pd-sep"></span>
+          <button type="button" data-cmd="insertUnorderedList" title="Bullet list">• List</button>
+          <button type="button" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+          <button type="button" data-cmd="formatBlock" data-arg="blockquote" title="Quote">&ldquo;</button>
+          <button type="button" data-cmd="formatBlock" data-arg="pre" title="Code block">&lt;/&gt;</button>
+          <button type="button" data-cmd="insertHorizontalRule" title="Divider">—</button>
+          <span class="pd-sep"></span>
+          <button type="button" id="pd-img-btn" title="Insert image">🖼 Image</button>
+          <button type="button" data-cmd="removeFormat" title="Clear formatting">Clear</button>
+          <span class="ml-auto text-ink-4" style="font-size:11px;padding-right:6px;" id="pd-wordcount"></span>
+        </div>
+
+        <div id="pd-editor" contenteditable="true" spellcheck="true"
+          class="pd-prose mt-3 rounded-xl"
+          style="min-height:460px;padding:22px 24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);outline:none;"
+          set:html={post.content_html || "<p></p>"} />
+
+        <!-- Resize affordances for the selected image. Positioned absolutely
+             against the page, so they sit outside the contenteditable and can
+             never be typed into or saved as part of the article. -->
+        <div id="pd-img-grip" contenteditable="false"></div>
+        <div id="pd-img-bar" contenteditable="false">
+          <button type="button" data-w="25">25%</button>
+          <button type="button" data-w="50">50%</button>
+          <button type="button" data-w="75">75%</button>
+          <button type="button" data-w="100">Full</button>
+          <button type="button" data-w="reset" title="Clear the set width">Auto</button>
+        </div>
+
+        <p class="mt-2 text-ink-4" style="font-size:11.5px;">
+          Paste or drag images straight in — they upload to the CDN automatically.
+          Click an image to resize it.
+        </p>
+        <input type="file" id="pd-file" accept="image/*" multiple hidden />
+      </div>
+
+      <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+      <div class="flex flex-col gap-4">
+        <!-- Thumbnail -->
+        <section class="rounded-xl" style="padding:14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div class="font-semibold text-ink" style="font-size:12.5px;">Thumbnail</div>
+          <p class="mt-1 text-ink-4" style="font-size:11px;">Card image, social preview and structured data.</p>
+          <div id="pd-thumb-wrap" class="mt-2.5 overflow-hidden rounded-lg"
+            style="aspect-ratio:16/9;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline2);display:grid;place-items:center;">
+            <span class="text-ink-4" style="font-size:11px;">No image</span>
+          </div>
+          <div class="mt-2 flex gap-1.5">
+            <button type="button" id="pd-thumb-upload" class="flex-1 rounded-lg font-semibold text-ink"
+              style="padding:7px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">Upload</button>
+            <button type="button" id="pd-thumb-from-body" class="flex-1 rounded-lg font-semibold text-ink"
+              style="padding:7px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;"
+              title="Use the first image in the article body">From body</button>
+            <button type="button" id="pd-thumb-clear" class="rounded-lg text-ink-3"
+              style="padding:7px 9px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">✕</button>
+          </div>
+          <input id="pd-thumb-alt" type="text" value={initial.thumbnailAlt} placeholder="Image alt text (accessibility + SEO)"
+            class="mt-2 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;" />
+          <input type="file" id="pd-thumb-file" accept="image/*" hidden />
+        </section>
+
+        <!-- SEO -->
+        <section class="rounded-xl" style="padding:14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <div class="font-semibold text-ink" style="font-size:12.5px;">SEO</div>
+          <label class="mt-2 block text-ink-3" style="font-size:11px;">Meta description</label>
+          <textarea id="pd-excerpt" rows="3" placeholder="One or two sentences for search results."
+            class="mt-1 w-full rounded-lg text-ink"
+            style="padding:8px 9px;font-size:12px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;resize:vertical;">{initial.excerpt}</textarea>
+          <div class="mt-1 flex justify-between text-ink-4" style="font-size:10.5px;">
+            <span id="pd-excerpt-hint">Ideal 120–155 characters</span>
+            <span id="pd-excerpt-count"></span>
+          </div>
+
+          <div class="mt-3 rounded-lg" style="padding:10px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);">
+            <div class="text-ink-4" style="font-size:10px;margin-bottom:5px;">Search preview</div>
+            <div id="pd-seo-url" style="font-size:11px;color:var(--pd-mint);word-break:break-all;"></div>
+            <div id="pd-seo-title" style="font-size:13.5px;color:#8ab4f8;line-height:1.3;margin-top:2px;"></div>
+            <div id="pd-seo-desc" class="text-ink-3" style="font-size:11.5px;line-height:1.45;margin-top:2px;"></div>
+          </div>
+        </section>
+
+        <!-- Meta -->
+        <section class="rounded-xl" style="padding:14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <label class="block text-ink-3" style="font-size:11px;">Tags (comma separated)</label>
+          <input id="pd-tags" type="text" value={initial.tags.join(", ")} placeholder="tutorial, video"
+            class="mt-1 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;" />
+
+          <label class="mt-3 block text-ink-3" style="font-size:11px;">Author</label>
+          <input id="pd-author" type="text" value={initial.author} placeholder={BLOG_AUTHOR_FALLBACK}
+            class="mt-1 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;" />
+
+          <div class="mt-3 flex items-center justify-between">
+            <span class="text-ink-3" style="font-size:11px;">Status</span>
+            <span id="pd-status-pill" class="font-mono uppercase"
+              style="font-size:9.5px;letter-spacing:1px;border-radius:999px;padding:3px 9px;"></span>
+          </div>
+
+          <!-- Publish time. A future value schedules the post; it goes live on
+               its own when the clock passes, with no job to run. -->
+          <label class="mt-3 block text-ink-3" style="font-size:11px;">Publish date &amp; time</label>
+          <input id="pd-published-at" type="datetime-local" class="mt-1 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;color-scheme:dark;" />
+          <div class="mt-1 flex items-center justify-between gap-2">
+            <span id="pd-schedule-hint" class="text-ink-4" style="font-size:10.5px;line-height:1.35;"></span>
+            <button type="button" id="pd-now" class="shrink-0 rounded-md text-ink-3"
+              style="padding:3px 7px;font-size:10px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">Now</button>
+          </div>
+          <button type="button" id="pd-schedule" class="mt-2 w-full rounded-lg font-semibold"
+            style="padding:7px;font-size:11.5px;border:0.5px solid color-mix(in srgb,var(--pd-amber) 45%,transparent);background:transparent;color:var(--pd-amber);cursor:pointer;">Schedule</button>
+          <button type="button" id="pd-unpublish" class="mt-2 w-full rounded-lg text-ink-3"
+            style="padding:7px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">Revert to draft</button>
+          <button type="button" id="pd-delete" class="mt-2 w-full rounded-lg"
+            style="padding:7px;font-size:11.5px;border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);background:transparent;color:var(--pd-pink);cursor:pointer;">Delete post</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <style is:global>
+    #pd-toolbar button {
+      background: var(--pd-bg); color: var(--pd-ink2); border: 0.5px solid var(--pd-hairline2);
+      border-radius: 7px; padding: 5px 9px; font-size: 11.5px; cursor: pointer; line-height: 1;
+    }
+    #pd-toolbar button:hover { color: var(--pd-ink); border-color: var(--pd-lilac); }
+    #pd-toolbar .pd-sep { width: 1px; height: 16px; background: var(--pd-hairline2); margin: 0 3px; }
+    #pd-editor:empty::before { content: "Write the article…"; color: var(--pd-ink-4, #666); }
+    #pd-editor:focus { border-color: color-mix(in srgb, var(--pd-lilac) 45%, transparent); }
+    #pd-editor img { max-width: 100%; border-radius: 12px; }
+    /* Resize: the selected image gets an outline and a corner grip. The grip is
+       a sibling overlay rather than a pseudo-element on the image, because
+       contenteditable will not deliver pointer events to an ::after on a
+       replaced element. */
+    #pd-editor img.pd-sel { outline: 2px solid var(--pd-lilac); outline-offset: 2px; }
+    #pd-img-grip {
+      position: absolute; width: 14px; height: 14px; border-radius: 3px;
+      background: var(--pd-lilac); border: 2px solid var(--pd-bg);
+      cursor: nwse-resize; z-index: 30; display: none;
+    }
+    #pd-img-bar {
+      position: absolute; z-index: 30; display: none; gap: 2px; padding: 3px;
+      border-radius: 9px; background: var(--pd-bg3); border: 0.5px solid var(--pd-hairline2);
+      box-shadow: var(--pd-shadow-sm);
+    }
+    #pd-img-bar button {
+      background: transparent; color: var(--pd-ink2); border: 0; border-radius: 6px;
+      padding: 4px 8px; font-size: 10.5px; cursor: pointer; line-height: 1; font-family: var(--font-mono);
+    }
+    #pd-img-bar button:hover { background: var(--pd-raised); color: var(--pd-ink); }
+    #pd-img-bar button.is-on { background: var(--pd-lilac); color: #fff; }
+    /* Article body styles, mirrored from the public page so the editor is WYSIWYG. */
+    #pd-editor { font-size: 15.5px; line-height: 1.72; color: var(--pd-ink2); }
+    #pd-editor > * + * { margin-top: 1.15em; }
+    #pd-editor h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; color: var(--pd-ink); margin-top: 1.9em; }
+    #pd-editor h3 { font-size: 18.5px; font-weight: 600; color: var(--pd-ink); margin-top: 1.6em; }
+    #pd-editor a { color: var(--pd-lilac); }
+    #pd-editor ul { list-style: disc; padding-left: 1.3em; }
+    #pd-editor ol { list-style: decimal; padding-left: 1.3em; }
+    #pd-editor blockquote { border-left: 2px solid var(--pd-lilac); padding-left: 1em; font-style: italic; }
+    #pd-editor pre { background: var(--pd-bg3); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-family: ui-monospace, monospace; font-size: 13px; }
+    #pd-editor.pd-drop { border-color: var(--pd-lilac); }
+  </style>
+
+  <script>
+    const data = JSON.parse(document.getElementById("pd-post-data")!.textContent || "{}");
+
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const editor = $<HTMLDivElement>("pd-editor");
+    const titleEl = $<HTMLInputElement>("pd-title");
+    const slugEl = $<HTMLInputElement>("pd-slug");
+    const excerptEl = $<HTMLTextAreaElement>("pd-excerpt");
+    const tagsEl = $<HTMLInputElement>("pd-tags");
+    const authorEl = $<HTMLInputElement>("pd-author");
+    const thumbAltEl = $<HTMLInputElement>("pd-thumb-alt");
+    const stateEl = $<HTMLSpanElement>("pd-save-state");
+    const toast = (m: string) => (window as any).pdToast?.(m);
+
+    let thumbUrl: string = data.thumbnailUrl || "";
+    let status: string = data.status || "draft";
+    let dirty = false;
+    const markDirty = () => { dirty = true; stateEl.textContent = "Unsaved changes"; };
+
+    // ── slug: follow the title until the author edits it by hand ──────────
+    let slugTouched = data.slug !== slugify(data.title);
+    function slugify(s: string) {
+      return (s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    }
+    titleEl.addEventListener("input", () => {
+      if (!slugTouched) slugEl.value = slugify(titleEl.value);
+      markDirty(); renderSeo();
+    });
+    slugEl.addEventListener("input", () => { slugTouched = true; markDirty(); renderSeo(); });
+
+    // ── SEO preview + counters ────────────────────────────────────────────
+    function firstImageInBody(): string {
+      const img = editor.querySelector("img");
+      return img?.getAttribute("src") || "";
+    }
+    function renderSeo() {
+      const t = (titleEl.value || "Untitled post") + " — PixyDust";
+      const plain = (editor.innerText || "").replace(/\s+/g, " ").trim();
+      const d = excerptEl.value.trim() || plain.slice(0, 155);
+      $("pd-seo-url").textContent = `https://pixydust.com/blog/${slugEl.value || "…"}`;
+      $("pd-seo-title").textContent = t.length > 60 ? t.slice(0, 59) + "…" : t;
+      $("pd-seo-desc").textContent = d.length > 155 ? d.slice(0, 154) + "…" : d;
+      const n = excerptEl.value.length;
+      $("pd-excerpt-count").textContent = `${n}`;
+      $("pd-excerpt-count").style.color = n === 0 ? "" : n < 120 || n > 155 ? "var(--pd-amber)" : "var(--pd-mint)";
+      const words = plain ? plain.split(/\s+/).length : 0;
+      $("pd-wordcount").textContent = `${words} words · ${Math.max(1, Math.round(words / 225))} min`;
+    }
+    excerptEl.addEventListener("input", () => { markDirty(); renderSeo(); });
+    editor.addEventListener("input", () => { markDirty(); renderSeo(); });
+    [tagsEl, authorEl, thumbAltEl].forEach((el) => el.addEventListener("input", markDirty));
+
+    // ── toolbar ───────────────────────────────────────────────────────────
+    document.querySelectorAll<HTMLButtonElement>("#pd-toolbar button[data-cmd]").forEach((b) => {
+      b.addEventListener("mousedown", (e) => e.preventDefault()); // keep the selection
+      b.addEventListener("click", () => {
+        const cmd = b.dataset.cmd!;
+        if (cmd === "createLink") {
+          const url = prompt("Link URL");
+          if (url) document.execCommand("createLink", false, url);
+        } else if (cmd === "formatBlock") {
+          document.execCommand("formatBlock", false, b.dataset.arg!);
+        } else {
+          document.execCommand(cmd, false);
+        }
+        editor.focus(); markDirty(); renderSeo();
+      });
+    });
+
+    // ── image upload ──────────────────────────────────────────────────────
+    async function uploadImage(file: File): Promise<string | null> {
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        const j = await res.json();
+        if (j.url) return j.url as string;
+        toast(j.error || "Upload failed.");
+      } catch { toast("Upload failed."); }
+      return null;
+    }
+    function insertImage(url: string) {
+      editor.focus();
+      document.execCommand("insertHTML", false, `<img src="${url}" alt="" loading="lazy" /><p></p>`);
+      markDirty(); renderSeo();
+    }
+    async function handleFiles(files: FileList | File[]) {
+      for (const f of Array.from(files)) {
+        if (!f.type.startsWith("image/")) continue;
+        stateEl.textContent = "Uploading image…";
+        const url = await uploadImage(f);
+        if (url) insertImage(url);
+      }
+      stateEl.textContent = "Unsaved changes";
+    }
+
+    $("pd-img-btn").addEventListener("click", () => $<HTMLInputElement>("pd-file").click());
+    $<HTMLInputElement>("pd-file").addEventListener("change", (e) => {
+      const f = (e.target as HTMLInputElement).files;
+      if (f?.length) handleFiles(f);
+      (e.target as HTMLInputElement).value = "";
+    });
+
+    // Paste: images upload; everything else lands as plain text so Word/Docs
+    // markup never ends up stored in the article body.
+    editor.addEventListener("paste", (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      const imgs = items ? Array.from(items).filter((i) => i.type.startsWith("image/")) : [];
+      if (imgs.length) {
+        e.preventDefault();
+        handleFiles(imgs.map((i) => i.getAsFile()).filter(Boolean) as File[]);
+        return;
+      }
+      const html = e.clipboardData?.getData("text/html");
+      if (html) {
+        e.preventDefault();
+        const clean = html
+          .replace(/<(script|style|meta|link)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+          .replace(/\sstyle="[^"]*"/gi, "")
+          .replace(/\sclass="[^"]*"/gi, "")
+          .replace(/<!--[\s\S]*?-->/g, "");
+        document.execCommand("insertHTML", false, clean);
+        markDirty(); renderSeo();
+      }
+    });
+
+    editor.addEventListener("dragover", (e) => { e.preventDefault(); editor.classList.add("pd-drop"); });
+    editor.addEventListener("dragleave", () => editor.classList.remove("pd-drop"));
+    editor.addEventListener("drop", (e: DragEvent) => {
+      editor.classList.remove("pd-drop");
+      if (e.dataTransfer?.files?.length) { e.preventDefault(); handleFiles(e.dataTransfer.files); }
+    });
+
+    // ── inline image resize ───────────────────────────────────────────────
+    // Widths are stored as a percentage inline style on the <img>. Percent, not
+    // pixels, so an image sized against the 900px editor still behaves on a
+    // phone; inline, so it beats the .pd-prose rule on the public page without
+    // needing a class that the sanitiser would have to allow through.
+    const grip = $<HTMLDivElement>("pd-img-grip");
+    const bar = $<HTMLDivElement>("pd-img-bar");
+    let selectedImg: HTMLImageElement | null = null;
+
+    function widthPctOf(img: HTMLImageElement): number | null {
+      const m = /([\d.]+)%/.exec(img.style.width || "");
+      return m ? Math.round(parseFloat(m[1])) : null;
+    }
+
+    function placeChrome() {
+      if (!selectedImg) return;
+      const r = selectedImg.getBoundingClientRect();
+      const sx = window.scrollX, sy = window.scrollY;
+      grip.style.display = "block";
+      grip.style.left = `${r.right + sx - 7}px`;
+      grip.style.top = `${r.bottom + sy - 7}px`;
+      bar.style.display = "flex";
+      bar.style.left = `${r.left + sx}px`;
+      bar.style.top = `${Math.max(sy + 4, r.top + sy - 34)}px`;
+      const pct = widthPctOf(selectedImg);
+      bar.querySelectorAll<HTMLButtonElement>("button").forEach((b) => {
+        b.classList.toggle("is-on", b.dataset.w === String(pct));
+      });
+    }
+
+    function selectImg(img: HTMLImageElement | null) {
+      if (selectedImg) selectedImg.classList.remove("pd-sel");
+      selectedImg = img;
+      if (!img) {
+        grip.style.display = "none";
+        bar.style.display = "none";
+        return;
+      }
+      img.classList.add("pd-sel");
+      placeChrome();
+    }
+
+    editor.addEventListener("click", (e) => {
+      const t = e.target as HTMLElement;
+      selectImg(t.tagName === "IMG" ? (t as HTMLImageElement) : null);
+    });
+    // Any edit or reflow can move the image out from under the chrome.
+    ["scroll", "resize"].forEach((ev) => window.addEventListener(ev, () => selectedImg && placeChrome(), { passive: true }));
+    editor.addEventListener("input", () => selectedImg && (document.contains(selectedImg) ? placeChrome() : selectImg(null)));
+    document.addEventListener("mousedown", (e) => {
+      const t = e.target as HTMLElement;
+      if (t === grip || bar.contains(t) || t.tagName === "IMG") return;
+      if (!editor.contains(t)) selectImg(null);
+    });
+
+    bar.querySelectorAll<HTMLButtonElement>("button").forEach((b) => {
+      b.addEventListener("mousedown", (e) => e.preventDefault());
+      b.addEventListener("click", () => {
+        if (!selectedImg) return;
+        if (b.dataset.w === "reset") selectedImg.style.removeProperty("width");
+        else selectedImg.style.width = `${b.dataset.w}%`;
+        markDirty(); placeChrome();
+      });
+    });
+
+    // Drag the corner grip. Width is computed against the editor's content box
+    // so the percentage means the same thing the reader will see.
+    grip.addEventListener("mousedown", (e) => {
+      if (!selectedImg) return;
+      e.preventDefault();
+      const img = selectedImg;
+      const startX = e.clientX;
+      const startW = img.getBoundingClientRect().width;
+      const avail = editor.clientWidth - parseFloat(getComputedStyle(editor).paddingLeft) - parseFloat(getComputedStyle(editor).paddingRight);
+
+      const onMove = (ev: MouseEvent) => {
+        const next = startW + (ev.clientX - startX);
+        // 10% floor keeps the image from collapsing to an untappable sliver.
+        const pct = Math.max(10, Math.min(100, Math.round((next / avail) * 100)));
+        img.style.width = `${pct}%`;
+        placeChrome();
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        markDirty();
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+
+    // ── thumbnail ─────────────────────────────────────────────────────────
+    function renderThumb() {
+      const wrap = $("pd-thumb-wrap");
+      const effective = thumbUrl || firstImageInBody();
+      if (effective) {
+        wrap.innerHTML = "";
+        const img = document.createElement("img");
+        img.src = effective;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+        wrap.appendChild(img);
+        if (!thumbUrl) {
+          const tag = document.createElement("span");
+          tag.textContent = "from body";
+          tag.style.cssText = "position:absolute;margin:6px;font-size:9px;background:rgba(0,0,0,.6);color:#fff;padding:2px 6px;border-radius:999px;";
+          wrap.style.position = "relative";
+          wrap.appendChild(tag);
+        }
+      } else {
+        wrap.innerHTML = '<span class="text-ink-4" style="font-size:11px;">No image</span>';
+      }
+    }
+    $("pd-thumb-upload").addEventListener("click", () => $<HTMLInputElement>("pd-thumb-file").click());
+    $<HTMLInputElement>("pd-thumb-file").addEventListener("change", async (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0];
+      (e.target as HTMLInputElement).value = "";
+      if (!f) return;
+      stateEl.textContent = "Uploading thumbnail…";
+      const url = await uploadImage(f);
+      if (url) { thumbUrl = url; renderThumb(); markDirty(); }
+      stateEl.textContent = "Unsaved changes";
+    });
+    $("pd-thumb-from-body").addEventListener("click", () => {
+      const src = firstImageInBody();
+      if (!src) return toast("No image in the article body yet.");
+      thumbUrl = src; renderThumb(); markDirty();
+    });
+    $("pd-thumb-clear").addEventListener("click", () => { thumbUrl = ""; renderThumb(); markDirty(); });
+
+    // ── scheduling ────────────────────────────────────────────────────────
+    // The control is a datetime-local, which has no timezone, so it is read and
+    // written in the author's local zone and converted to UTC at the boundary.
+    // Storing what the author literally typed would publish at the wrong moment
+    // for anyone not sitting in UTC.
+    const publishedAtEl = $<HTMLInputElement>("pd-published-at");
+
+    const toLocalInput = (iso: string) => {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "";
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : "");
+
+    publishedAtEl.value = toLocalInput(data.publishedAt || "");
+
+    const scheduledFor = () => {
+      const v = publishedAtEl.value;
+      if (!v) return null;
+      const t = new Date(v).getTime();
+      return Number.isNaN(t) || t <= Date.now() ? null : new Date(v);
+    };
+
+    function renderSchedule() {
+      const when = scheduledFor();
+      const hint = $("pd-schedule-hint");
+      const btn = $<HTMLButtonElement>("pd-schedule");
+      if (when) {
+        const mins = Math.round((when.getTime() - Date.now()) / 60000);
+        const rel =
+          mins < 60 ? `in ${mins} min` : mins < 1440 ? `in ${Math.round(mins / 60)} h` : `in ${Math.round(mins / 1440)} d`;
+        hint.textContent = status === "published" ? `Goes live ${rel}` : `Will go live ${rel} once scheduled`;
+        hint.style.color = "var(--pd-amber)";
+        btn.style.display = status === "published" ? "none" : "";
+      } else {
+        hint.textContent = publishedAtEl.value ? "In the past — publishes immediately" : "Empty — stamped when you publish";
+        hint.style.color = "";
+        btn.style.display = "none";
+      }
+    }
+
+    publishedAtEl.addEventListener("input", () => { markDirty(); renderSchedule(); renderStatus(); });
+    $("pd-now").addEventListener("click", () => {
+      publishedAtEl.value = toLocalInput(new Date().toISOString());
+      markDirty(); renderSchedule(); renderStatus();
+    });
+
+    // ── status pill ───────────────────────────────────────────────────────
+    function renderStatus() {
+      const pill = $("pd-status-pill");
+      // "Scheduled" is derived, not stored: published + a future date. Showing
+      // plain "published" here would claim the post is on /blog when it isn't.
+      const pending = status === "published" && !!scheduledFor();
+      const label = pending ? "scheduled" : status;
+      pill.textContent = label;
+      pill.style.cssText = pill.style.cssText.replace(/color:[^;]+;|border:[^;]+;/g, "");
+      pill.style.cssText +=
+        pending
+          ? "color:var(--pd-amber);border:0.5px solid color-mix(in srgb,var(--pd-amber) 40%,transparent);"
+          : status === "published"
+            ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
+            : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);";
+      $("pd-unpublish").style.display = status === "published" ? "" : "none";
+      $<HTMLButtonElement>("pd-publish").textContent =
+        status === "published" ? "Update" : scheduledFor() ? "Publish now" : "Publish";
+    }
+
+    // ── save ──────────────────────────────────────────────────────────────
+    /** Editor HTML without the transient selection class, which is a UI state
+     *  and would otherwise be persisted into the article and rendered publicly
+     *  as a stray outline on whichever image happened to be selected. */
+    function cleanBody(): string {
+      const copy = editor.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll("img.pd-sel").forEach((img) => {
+        img.classList.remove("pd-sel");
+        if (!img.getAttribute("class")) img.removeAttribute("class");
+      });
+      return copy.innerHTML;
+    }
+
+    async function save(nextStatus?: string) {
+      const payload = {
+        action: "save",
+        id: data.id,
+        title: titleEl.value,
+        slug: slugEl.value,
+        excerpt: excerptEl.value,
+        contentHtml: cleanBody(),
+        thumbnailUrl: thumbUrl,
+        thumbnailAlt: thumbAltEl.value,
+        author: authorEl.value,
+        tags: tagsEl.value.split(",").map((t) => t.trim()).filter(Boolean),
+        status: nextStatus ?? status,
+        publishedAt: fromLocalInput(publishedAtEl.value),
+      };
+      stateEl.textContent = "Saving…";
+      try {
+        const res = await fetch("/api/admin/blog", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        });
+        const raw = await res.text();
+        let j: any;
+        try { j = JSON.parse(raw); } catch {
+          stateEl.textContent = "Save failed";
+          toast(`Server error ${res.status}.`);
+          return false;
+        }
+        if (!j.ok) { stateEl.textContent = "Save failed"; toast(j.error || "Could not save."); return false; }
+        status = j.status;
+        slugEl.value = j.slug;
+        // The server normalises and may stamp the date, so mirror it back
+        // rather than trusting what the field happened to hold.
+        if (j.publishedAt !== undefined) {
+          publishedAtEl.value = toLocalInput(j.publishedAt ? String(j.publishedAt).replace(" ", "T") + "Z" : "");
+        }
+        $<HTMLAnchorElement>("pd-view").href = `/blog/${j.slug}`;
+        dirty = false;
+        stateEl.textContent = `Saved ${new Date().toLocaleTimeString()}`;
+        renderStatus(); renderSeo(); renderSchedule();
+        return true;
+      } catch {
+        stateEl.textContent = "Save failed";
+        toast("Network error.");
+        return false;
+      }
+    }
+
+    $("pd-save").addEventListener("click", () => save());
+    $("pd-publish").addEventListener("click", async () => {
+      // "Publish" on a future-dated draft means now, not later — otherwise the
+      // button would silently do nothing visible.
+      if (scheduledFor()) publishedAtEl.value = toLocalInput(new Date().toISOString());
+      if (await save("published")) toast("Published — live on /blog");
+    });
+    $("pd-schedule").addEventListener("click", async () => {
+      const when = scheduledFor();
+      if (!when) return toast("Pick a future date and time first.");
+      if (await save("published")) {
+        toast(`Scheduled for ${when.toLocaleString()} — hidden from /blog until then.`);
+      }
+    });
+    $("pd-unpublish").addEventListener("click", async () => {
+      if (await save("draft")) toast("Reverted to draft — removed from /blog and the sitemap.");
+    });
+
+    $("pd-delete").addEventListener("click", async () => {
+      if (!confirm("Delete this post permanently? This cannot be undone.")) return;
+      const res = await fetch("/api/admin/blog", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id: data.id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (j.ok) window.location.href = "/admin/blog";
+      else toast(j.error || "Could not delete.");
+    });
+
+    // Ctrl/Cmd+S saves; Ctrl/Cmd+K links.
+    document.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k" && document.activeElement === editor) {
+        e.preventDefault();
+        const url = prompt("Link URL");
+        if (url) { document.execCommand("createLink", false, url); markDirty(); }
+      }
+    });
+    window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+    renderThumb(); renderSchedule(); renderStatus(); renderSeo();
+  </script>
+</AdminShell>

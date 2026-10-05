@@ -105,7 +105,7 @@ export function startGoogleSignIn(dest: string): void {
   // The registered redirect URI is the bare production origin. On any other
   // host (previews, local) fall back to that host's origin — OAuth there is
   // unregistered anyway, and prod is what matters.
-  const redirectUri = location.hostname.endsWith("pixiedustapp.com") ? "https://pixiedustapp.com" : location.origin;
+  const redirectUri = location.hostname.endsWith("pixydust.com") ? "https://pixydust.com" : location.origin;
   const q = new URLSearchParams({
     client_id: GOOGLE_WEB_CLIENT_ID,
     redirect_uri: redirectUri,

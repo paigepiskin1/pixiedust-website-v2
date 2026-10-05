@@ -12,19 +12,27 @@ interface Props {
   noindex?: boolean;
   /** Optional extra JSON-LD object (stringified) to inject alongside the base schema */
   jsonLd?: string;
+  /** Comma-separated meta keywords. Defaults to the brand set. */
+  keywords?: string;
 }
 
 const {
-  title = "PixieDust",
+  title = "PixyDust",
   description = "Your pocket creative studio, in your browser.",
   ogImage,
   ogType = "website",
   noindex = false,
   jsonLd,
+  keywords = "PixyDust, Pixy Dust, PixieDust, Pixie Dust, AI Creative Suite, AI Creative Tools, AI Creative Platform, AR Filters, AR Lenses, AI Image Generator, Image Generator, AI Video Generator, Video Generator, AI Image Editor, Image Editor, AI Video Editor, Video Editor, AI Content Creation, Generative AI Tools",
 } = Astro.props;
 
-const SITE = "https://pixiedustapp.com";
-const canonicalURL = new URL(Astro.url.pathname, SITE).href;
+const SITE = "https://pixydust.com";
+// Normalize to exactly one leading slash and no repeats, matching the URL
+// middleware redirects to. The leading-slash guarantee matters: a path starting
+// "//" is protocol-relative, so new URL("//trending", SITE) yields
+// "https://trending/" — a canonical pointing at someone else's domain.
+const canonicalPath = "/" + Astro.url.pathname.split("/").filter(Boolean).join("/");
+const canonicalURL = new URL(canonicalPath, SITE).href;
 const resolvedOgImage = ogImage ?? `${SITE}/og-default.png`;
 
 // Base WebSite + WebApplication JSON-LD — always present on every page
@@ -34,27 +42,48 @@ const baseJsonLd = {
     {
       "@type": "Organization",
       "@id": `${SITE}/#organization`,
-      name: "PixieDust",
+      name: "PixyDust",
       url: SITE,
       logo: {
         "@type": "ImageObject",
         url: `${SITE}/favicon.svg`,
       },
+      // Verified brand profiles. `sameAs` is how search engines tie this site to
+      // the accounts, so these must stay canonical (x.com, not www.x.com) and
+      // exact — a wrong or dead handle here weakens the entity rather than
+      // helping it.
+      sameAs: [
+        "https://www.instagram.com/PixyDustAI",
+        "https://www.facebook.com/PixyDustAI",
+        "https://x.com/PixyDustAI",
+        "https://www.youtube.com/@PixyDustAI",
+        "https://www.tiktok.com/@PixyDustAI",
+        "https://www.linkedin.com/company/PixyDustAI",
+        "https://www.pinterest.com/PixyDustAI",
+      ],
     },
     {
       "@type": "WebSite",
       "@id": `${SITE}/#website`,
       url: SITE,
-      name: "PixieDust",
-      description: "AI-powered creative studio — generate images and videos in seconds.",
+      name: "PixyDust",
+      // Brand variants, including the pre-rebrand spelling. This is the
+      // structured-data way to tell search engines that people searching
+      // "PixieDust" are looking for this site.
+      alternateName: ["Pixy Dust", "PixieDust", "Pixie Dust", "PixyDust AI"],
+      description:
+        "Create, edit and transform images, videos and whatever you imagine with PixyDust. Explore AI image and video generation tools, templates, AR filters and more.",
       publisher: { "@id": `${SITE}/#organization` },
       potentialAction: {
         "@type": "SearchAction",
-        target: { "@type": "EntryPoint", urlTemplate: `${SITE}/explore?q={search_term_string}` },
+        target: { "@type": "EntryPoint", urlTemplate: `${SITE}/search?q={search_term_string}` },
         "query-input": "required name=search_term_string",
       },
     },
-    ...(jsonLd ? [JSON.parse(jsonLd)] : []),
+    // A page may contribute one node or several (an article passes BlogPosting
+    // plus BreadcrumbList), so accept either and flatten into the same @graph
+    // rather than emitting a competing second ld+json block.
+    ...(jsonLd ? (Array.isArray(JSON.parse(jsonLd)) ? JSON.parse(jsonLd) : [JSON.parse(jsonLd)]) : []),
   ],
 };
 ---
@@ -80,6 +109,9 @@ const baseJsonLd = {
     <!-- Primary meta -->
     <title>{title}</title>
     <meta name="description" content={description} />
+    {/* Google and Bing have ignored meta keywords for years; kept because some
+        smaller engines and internal tools still read it, and it costs nothing. */}
+    <meta name="keywords" content={keywords} />
     <link rel="canonical" href={canonicalURL} />
     {noindex && <meta name="robots" content="noindex,nofollow" />}
 
@@ -91,15 +123,19 @@ const baseJsonLd = {
     <meta property="og:image" content={resolvedOgImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:site_name" content="PixieDust" />
+    <meta property="og:site_name" content="PixyDust" />
     <meta property="og:locale" content="en_US" />
 
     <!-- Twitter / X Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@pixiedustapp" />
+    <meta name="twitter:site" content="@PixyDustAI" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={resolvedOgImage} />
+
+    <!-- Site name signals: Google picks the SERP site name from WebSite.name,
+         og:site_name and application-name, so all three must agree. -->
+    <meta name="application-name" content="PixyDust" />
 
     <!-- Icons + theme -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -150,8 +186,8 @@ const baseJsonLd = {
       rel="stylesheet"
     />
 
-    <!-- Clicky analytics (site 101479986 — same property the admin dashboard reads) -->
-    <script async data-id="101479986" src="https://static.getclicky.com/js" is:inline></script>
+    {/* Page-contributed head tags (article:* meta, feed links). */}
+    <slot name="head" />
   </head>
   <body>
     <slot />

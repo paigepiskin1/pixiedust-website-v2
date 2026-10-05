@@ -22,11 +22,25 @@ const firebaseAuthProxy = {
 // `export const prerender = false`. platformProxy exposes D1/KV/R2 bindings in `astro dev`.
 export default defineConfig({
   output: 'static',
+  // NOTE: deliberately NOT `trailingSlash: 'never'`. Astro implements that with
+  // its own 308 issued *before* middleware runs, which on the old domain meant
+  // a same-host slash-strip followed by the migration 301 — two hops for every
+  // indexed legacy URL. Middleware does it instead, in a single 301 that strips
+  // the slash and changes host at the same time. See src/middleware.ts.
   adapter: cloudflare({
     platformProxy: /** @type {any} */ ({ enabled: true, remote: true }),
-    // Route Firebase's reserved /__/* auth paths to the worker so the
-    // middleware can proxy them same-origin (mobile OAuth redirect fix).
-    routes: { extend: { include: [{ pattern: '/__/*' }] } },
+    // Every page is server-rendered (`prerender = false`), so Astro emits a
+    // single `include: ["/*"]` here and the worker sees all non-asset requests.
+    // That matters for two things:
+    //  • /__/*  — Firebase's reserved auth paths, proxied same-origin so mobile
+    //    OAuth redirects complete (see middleware).
+    //  • unmatched legacy URLs (/index.php, deleted pages) — they reach the
+    //    server-rendered 404 route, so middleware runs and the old-domain 301
+    //    to pixydust.com fires instead of Pages serving a static 404.
+    // If a page is ever switched back to prerendered, Astro enumerates explicit
+    // paths instead of "/*" and both of those silently break. Cloudflare rejects
+    // overlapping rules, so they can't just be listed alongside "/*" — the page
+    // has to stay on-demand, or the catch-all has to be reinstated another way.
   }),
   integrations: [react(), firebaseAuthProxy],
   vite: {

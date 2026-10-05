@@ -47,7 +47,7 @@ export async function POST({ request, locals, url }: APIContext) {
     const t = token();
     await env.SESSIONS.put(`verify:${t}`, JSON.stringify({ uid: claims.uid, email: claims.email }), { expirationTtl: 86400 });
 
-    const origin = url.origin || "https://pixiedustapp.com";
+    const origin = url.origin || "https://pixydust.com";
     const link = `${origin}/auth/verify?token=${t}`;
 
     const res = await sendEmail(env, env.DB, {
