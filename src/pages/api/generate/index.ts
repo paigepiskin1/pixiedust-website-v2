@@ -6,6 +6,7 @@ import { debit, adjustBalance } from "../../../lib/credits";
 import { submitGeneration } from "../../../lib/syncnode";
 import { prepareByteplusAssets } from "../../../lib/byteplus-assets";
 import { getUserTier, checkRateLimit, countActiveGenerations } from "../../../lib/limits";
+import { isMatchAspect, resolveGptImageAspect } from "../../../lib/aspect";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -21,7 +22,17 @@ export async function POST({ request, locals }: APIContext) {
   if (!dbUser) return json({ error: "Account not found." }, 401);
   const userId = dbUser.id;
 
-  let body: { templateId?: string; inputs?: Record<string, unknown>; quality?: string; quantity?: number; aspect?: string; duration?: number };
+  let body: {
+    templateId?: string;
+    inputs?: Record<string, unknown>;
+    quality?: string;
+    quantity?: number;
+    aspect?: string;
+    duration?: number;
+    /** Pixel size of the first upload — used to resolve "original" aspect. */
+    imageWidth?: number;
+    imageHeight?: number;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -114,33 +125,25 @@ export async function POST({ request, locals }: APIContext) {
   // Prefer the explicit aspect selection; fall back to the template's first
   // defined aspect so aspect_ratio is never sent as an empty string.
   let effectiveAspect = body.aspect || template.aspects?.[0] || null;
-  // "match" = keep the uploaded photo's aspect ratio. The value the model
-  // expects differs: GPT-Image uses "auto"; nano-banana / seedream / flux use
-  // "match_input_image".
-  if (effectiveAspect === "match" || effectiveAspect === "match_input_image") {
-    effectiveAspect = /gpt-image/i.test(template.model) ? "auto" : "match_input_image";
-  }
-  // openai/gpt-image-2 on Replicate only accepts 1:1 | 3:2 | 2:3 | auto.
-  // Map common studio ratios to the nearest supported value so 4:5 / 9:16 / 16:9
-  // don't 422 at submit (shown in the studio as a generic 502).
-  if (effectiveAspect && /gpt-image/i.test(template.model)) {
-    const gptAspect: Record<string, string> = {
-      auto: "auto",
-      "1:1": "1:1",
-      "3:2": "3:2",
-      "2:3": "2:3",
-      "16:9": "3:2",
-      "4:3": "3:2",
-      "9:16": "2:3",
-      "4:5": "2:3",
-      "3:4": "2:3",
-      "5:4": "1:1",
-    };
-    effectiveAspect = gptAspect[effectiveAspect] ?? "1:1";
+  const imgW = Number(body.imageWidth) || 0;
+  const imgH = Number(body.imageHeight) || 0;
+  // "original"/"match" = keep the upload's aspect ratio as closely as the model allows.
+  if (/gpt-image/i.test(template.model)) {
+    effectiveAspect = resolveGptImageAspect(effectiveAspect, imgW, imgH);
+  } else if (isMatchAspect(effectiveAspect)) {
+    // nano-banana / seedream / flux
+    effectiveAspect = "match_input_image";
   }
   if (effectiveAspect && "aspect_ratio" in input) input.aspect_ratio = effectiveAspect;
   // BytePlus (Ark) uses `ratio` instead of `aspect_ratio`.
-  if (effectiveAspect && effectiveAspect !== "match" && "ratio" in input) input.ratio = effectiveAspect;
+  if (
+    effectiveAspect &&
+    !isMatchAspect(effectiveAspect) &&
+    effectiveAspect !== "match_input_image" &&
+    "ratio" in input
+  ) {
+    input.ratio = effectiveAspect;
+  }
   if (template.type === "image" && "num_outputs" in input) input.num_outputs = qty;
   if (duration && "duration" in input) input.duration = duration;
   // Map the selected quality to the model's native resolution param. Quality
