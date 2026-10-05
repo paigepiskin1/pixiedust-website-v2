@@ -2,7 +2,7 @@
 export const prerender = false;
 import AdminShell from "../../../../layouts/AdminShell.astro";
 import { isAdmin } from "../../../../lib/admin";
-import { getById, tagsOf, BLOG_AUTHOR_FALLBACK } from "../../../../lib/blog";
+import { getById, tagsOf, isoDate, BLOG_AUTHOR_FALLBACK } from "../../../../lib/blog";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
 
@@ -22,6 +22,8 @@ const initial = {
   author: post.author ?? "",
   tags: tagsOf(post),
   status: post.status,
+  // ISO (UTC) or "" — the browser converts to and from the author's local zone.
+  publishedAt: isoDate(post.published_at) ?? "",
 };
 ---
 
@@ -86,8 +88,21 @@ const initial = {
           style="min-height:460px;padding:22px 24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);outline:none;"
           set:html={post.content_html || "<p></p>"} />
 
+        <!-- Resize affordances for the selected image. Positioned absolutely
+             against the page, so they sit outside the contenteditable and can
+             never be typed into or saved as part of the article. -->
+        <div id="pd-img-grip" contenteditable="false"></div>
+        <div id="pd-img-bar" contenteditable="false">
+          <button type="button" data-w="25">25%</button>
+          <button type="button" data-w="50">50%</button>
+          <button type="button" data-w="75">75%</button>
+          <button type="button" data-w="100">Full</button>
+          <button type="button" data-w="reset" title="Clear the set width">Auto</button>
+        </div>
+
         <p class="mt-2 text-ink-4" style="font-size:11.5px;">
           Paste or drag images straight in — they upload to the CDN automatically.
+          Click an image to resize it.
         </p>
         <input type="file" id="pd-file" accept="image/*" multiple hidden />
       </div>
@@ -154,6 +169,19 @@ const initial = {
             <span id="pd-status-pill" class="font-mono uppercase"
               style="font-size:9.5px;letter-spacing:1px;border-radius:999px;padding:3px 9px;"></span>
           </div>
+
+          <!-- Publish time. A future value schedules the post; it goes live on
+               its own when the clock passes, with no job to run. -->
+          <label class="mt-3 block text-ink-3" style="font-size:11px;">Publish date &amp; time</label>
+          <input id="pd-published-at" type="datetime-local" class="mt-1 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;color-scheme:dark;" />
+          <div class="mt-1 flex items-center justify-between gap-2">
+            <span id="pd-schedule-hint" class="text-ink-4" style="font-size:10.5px;line-height:1.35;"></span>
+            <button type="button" id="pd-now" class="shrink-0 rounded-md text-ink-3"
+              style="padding:3px 7px;font-size:10px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">Now</button>
+          </div>
+          <button type="button" id="pd-schedule" class="mt-2 w-full rounded-lg font-semibold"
+            style="padding:7px;font-size:11.5px;border:0.5px solid color-mix(in srgb,var(--pd-amber) 45%,transparent);background:transparent;color:var(--pd-amber);cursor:pointer;">Schedule</button>
           <button type="button" id="pd-unpublish" class="mt-2 w-full rounded-lg text-ink-3"
             style="padding:7px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">Revert to draft</button>
           <button type="button" id="pd-delete" class="mt-2 w-full rounded-lg"
@@ -173,6 +201,27 @@ const initial = {
     #pd-editor:empty::before { content: "Write the article…"; color: var(--pd-ink-4, #666); }
     #pd-editor:focus { border-color: color-mix(in srgb, var(--pd-lilac) 45%, transparent); }
     #pd-editor img { max-width: 100%; border-radius: 12px; }
+    /* Resize: the selected image gets an outline and a corner grip. The grip is
+       a sibling overlay rather than a pseudo-element on the image, because
+       contenteditable will not deliver pointer events to an ::after on a
+       replaced element. */
+    #pd-editor img.pd-sel { outline: 2px solid var(--pd-lilac); outline-offset: 2px; }
+    #pd-img-grip {
+      position: absolute; width: 14px; height: 14px; border-radius: 3px;
+      background: var(--pd-lilac); border: 2px solid var(--pd-bg);
+      cursor: nwse-resize; z-index: 30; display: none;
+    }
+    #pd-img-bar {
+      position: absolute; z-index: 30; display: none; gap: 2px; padding: 3px;
+      border-radius: 9px; background: var(--pd-bg3); border: 0.5px solid var(--pd-hairline2);
+      box-shadow: var(--pd-shadow-sm);
+    }
+    #pd-img-bar button {
+      background: transparent; color: var(--pd-ink2); border: 0; border-radius: 6px;
+      padding: 4px 8px; font-size: 10.5px; cursor: pointer; line-height: 1; font-family: var(--font-mono);
+    }
+    #pd-img-bar button:hover { background: var(--pd-raised); color: var(--pd-ink); }
+    #pd-img-bar button.is-on { background: var(--pd-lilac); color: #fff; }
     /* Article body styles, mirrored from the public page so the editor is WYSIWYG. */
     #pd-editor { font-size: 15.5px; line-height: 1.72; color: var(--pd-ink2); }
     #pd-editor > * + * { margin-top: 1.15em; }
@@ -320,6 +369,97 @@ const initial = {
       if (e.dataTransfer?.files?.length) { e.preventDefault(); handleFiles(e.dataTransfer.files); }
     });
 
+    // ── inline image resize ───────────────────────────────────────────────
+    // Widths are stored as a percentage inline style on the <img>. Percent, not
+    // pixels, so an image sized against the 900px editor still behaves on a
+    // phone; inline, so it beats the .pd-prose rule on the public page without
+    // needing a class that the sanitiser would have to allow through.
+    const grip = $<HTMLDivElement>("pd-img-grip");
+    const bar = $<HTMLDivElement>("pd-img-bar");
+    let selectedImg: HTMLImageElement | null = null;
+
+    function widthPctOf(img: HTMLImageElement): number | null {
+      const m = /([\d.]+)%/.exec(img.style.width || "");
+      return m ? Math.round(parseFloat(m[1])) : null;
+    }
+
+    function placeChrome() {
+      if (!selectedImg) return;
+      const r = selectedImg.getBoundingClientRect();
+      const sx = window.scrollX, sy = window.scrollY;
+      grip.style.display = "block";
+      grip.style.left = `${r.right + sx - 7}px`;
+      grip.style.top = `${r.bottom + sy - 7}px`;
+      bar.style.display = "flex";
+      bar.style.left = `${r.left + sx}px`;
+      bar.style.top = `${Math.max(sy + 4, r.top + sy - 34)}px`;
+      const pct = widthPctOf(selectedImg);
+      bar.querySelectorAll<HTMLButtonElement>("button").forEach((b) => {
+        b.classList.toggle("is-on", b.dataset.w === String(pct));
+      });
+    }
+
+    function selectImg(img: HTMLImageElement | null) {
+      if (selectedImg) selectedImg.classList.remove("pd-sel");
+      selectedImg = img;
+      if (!img) {
+        grip.style.display = "none";
+        bar.style.display = "none";
+        return;
+      }
+      img.classList.add("pd-sel");
+      placeChrome();
+    }
+
+    editor.addEventListener("click", (e) => {
+      const t = e.target as HTMLElement;
+      selectImg(t.tagName === "IMG" ? (t as HTMLImageElement) : null);
+    });
+    // Any edit or reflow can move the image out from under the chrome.
+    ["scroll", "resize"].forEach((ev) => window.addEventListener(ev, () => selectedImg && placeChrome(), { passive: true }));
+    editor.addEventListener("input", () => selectedImg && (document.contains(selectedImg) ? placeChrome() : selectImg(null)));
+    document.addEventListener("mousedown", (e) => {
+      const t = e.target as HTMLElement;
+      if (t === grip || bar.contains(t) || t.tagName === "IMG") return;
+      if (!editor.contains(t)) selectImg(null);
+    });
+
+    bar.querySelectorAll<HTMLButtonElement>("button").forEach((b) => {
+      b.addEventListener("mousedown", (e) => e.preventDefault());
+      b.addEventListener("click", () => {
+        if (!selectedImg) return;
+        if (b.dataset.w === "reset") selectedImg.style.removeProperty("width");
+        else selectedImg.style.width = `${b.dataset.w}%`;
+        markDirty(); placeChrome();
+      });
+    });
+
+    // Drag the corner grip. Width is computed against the editor's content box
+    // so the percentage means the same thing the reader will see.
+    grip.addEventListener("mousedown", (e) => {
+      if (!selectedImg) return;
+      e.preventDefault();
+      const img = selectedImg;
+      const startX = e.clientX;
+      const startW = img.getBoundingClientRect().width;
+      const avail = editor.clientWidth - parseFloat(getComputedStyle(editor).paddingLeft) - parseFloat(getComputedStyle(editor).paddingRight);
+
+      const onMove = (ev: MouseEvent) => {
+        const next = startW + (ev.clientX - startX);
+        // 10% floor keeps the image from collapsing to an untappable sliver.
+        const pct = Math.max(10, Math.min(100, Math.round((next / avail) * 100)));
+        img.style.width = `${pct}%`;
+        placeChrome();
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        markDirty();
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+
     // ── thumbnail ─────────────────────────────────────────────────────────
     function renderThumb() {
       const wrap = $("pd-thumb-wrap");
@@ -358,19 +498,88 @@ const initial = {
     });
     $("pd-thumb-clear").addEventListener("click", () => { thumbUrl = ""; renderThumb(); markDirty(); });
 
+    // ── scheduling ────────────────────────────────────────────────────────
+    // The control is a datetime-local, which has no timezone, so it is read and
+    // written in the author's local zone and converted to UTC at the boundary.
+    // Storing what the author literally typed would publish at the wrong moment
+    // for anyone not sitting in UTC.
+    const publishedAtEl = $<HTMLInputElement>("pd-published-at");
+
+    const toLocalInput = (iso: string) => {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "";
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : "");
+
+    publishedAtEl.value = toLocalInput(data.publishedAt || "");
+
+    const scheduledFor = () => {
+      const v = publishedAtEl.value;
+      if (!v) return null;
+      const t = new Date(v).getTime();
+      return Number.isNaN(t) || t <= Date.now() ? null : new Date(v);
+    };
+
+    function renderSchedule() {
+      const when = scheduledFor();
+      const hint = $("pd-schedule-hint");
+      const btn = $<HTMLButtonElement>("pd-schedule");
+      if (when) {
+        const mins = Math.round((when.getTime() - Date.now()) / 60000);
+        const rel =
+          mins < 60 ? `in ${mins} min` : mins < 1440 ? `in ${Math.round(mins / 60)} h` : `in ${Math.round(mins / 1440)} d`;
+        hint.textContent = status === "published" ? `Goes live ${rel}` : `Will go live ${rel} once scheduled`;
+        hint.style.color = "var(--pd-amber)";
+        btn.style.display = status === "published" ? "none" : "";
+      } else {
+        hint.textContent = publishedAtEl.value ? "In the past — publishes immediately" : "Empty — stamped when you publish";
+        hint.style.color = "";
+        btn.style.display = "none";
+      }
+    }
+
+    publishedAtEl.addEventListener("input", () => { markDirty(); renderSchedule(); renderStatus(); });
+    $("pd-now").addEventListener("click", () => {
+      publishedAtEl.value = toLocalInput(new Date().toISOString());
+      markDirty(); renderSchedule(); renderStatus();
+    });
+
     // ── status pill ───────────────────────────────────────────────────────
     function renderStatus() {
       const pill = $("pd-status-pill");
-      pill.textContent = status;
+      // "Scheduled" is derived, not stored: published + a future date. Showing
+      // plain "published" here would claim the post is on /blog when it isn't.
+      const pending = status === "published" && !!scheduledFor();
+      const label = pending ? "scheduled" : status;
+      pill.textContent = label;
+      pill.style.cssText = pill.style.cssText.replace(/color:[^;]+;|border:[^;]+;/g, "");
       pill.style.cssText +=
-        status === "published"
-          ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
-          : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);";
+        pending
+          ? "color:var(--pd-amber);border:0.5px solid color-mix(in srgb,var(--pd-amber) 40%,transparent);"
+          : status === "published"
+            ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
+            : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);";
       $("pd-unpublish").style.display = status === "published" ? "" : "none";
-      $<HTMLButtonElement>("pd-publish").textContent = status === "published" ? "Update" : "Publish";
+      $<HTMLButtonElement>("pd-publish").textContent =
+        status === "published" ? "Update" : scheduledFor() ? "Publish now" : "Publish";
     }
 
     // ── save ──────────────────────────────────────────────────────────────
+    /** Editor HTML without the transient selection class, which is a UI state
+     *  and would otherwise be persisted into the article and rendered publicly
+     *  as a stray outline on whichever image happened to be selected. */
+    function cleanBody(): string {
+      const copy = editor.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll("img.pd-sel").forEach((img) => {
+        img.classList.remove("pd-sel");
+        if (!img.getAttribute("class")) img.removeAttribute("class");
+      });
+      return copy.innerHTML;
+    }
+
     async function save(nextStatus?: string) {
       const payload = {
         action: "save",
@@ -378,12 +587,13 @@ const initial = {
         title: titleEl.value,
         slug: slugEl.value,
         excerpt: excerptEl.value,
-        contentHtml: editor.innerHTML,
+        contentHtml: cleanBody(),
         thumbnailUrl: thumbUrl,
         thumbnailAlt: thumbAltEl.value,
         author: authorEl.value,
         tags: tagsEl.value.split(",").map((t) => t.trim()).filter(Boolean),
         status: nextStatus ?? status,
+        publishedAt: fromLocalInput(publishedAtEl.value),
       };
       stateEl.textContent = "Saving…";
       try {
@@ -400,10 +610,15 @@ const initial = {
         if (!j.ok) { stateEl.textContent = "Save failed"; toast(j.error || "Could not save."); return false; }
         status = j.status;
         slugEl.value = j.slug;
+        // The server normalises and may stamp the date, so mirror it back
+        // rather than trusting what the field happened to hold.
+        if (j.publishedAt !== undefined) {
+          publishedAtEl.value = toLocalInput(j.publishedAt ? String(j.publishedAt).replace(" ", "T") + "Z" : "");
+        }
         $<HTMLAnchorElement>("pd-view").href = `/blog/${j.slug}`;
         dirty = false;
         stateEl.textContent = `Saved ${new Date().toLocaleTimeString()}`;
-        renderStatus(); renderSeo();
+        renderStatus(); renderSeo(); renderSchedule();
         return true;
       } catch {
         stateEl.textContent = "Save failed";
@@ -414,7 +629,17 @@ const initial = {
 
     $("pd-save").addEventListener("click", () => save());
     $("pd-publish").addEventListener("click", async () => {
+      // "Publish" on a future-dated draft means now, not later — otherwise the
+      // button would silently do nothing visible.
+      if (scheduledFor()) publishedAtEl.value = toLocalInput(new Date().toISOString());
       if (await save("published")) toast("Published — live on /blog");
+    });
+    $("pd-schedule").addEventListener("click", async () => {
+      const when = scheduledFor();
+      if (!when) return toast("Pick a future date and time first.");
+      if (await save("published")) {
+        toast(`Scheduled for ${when.toLocaleString()} — hidden from /blog until then.`);
+      }
     });
     $("pd-unpublish").addEventListener("click", async () => {
       if (await save("draft")) toast("Reverted to draft — removed from /blog and the sitemap.");
@@ -442,6 +667,6 @@ const initial = {
     });
     window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 
-    renderThumb(); renderStatus(); renderSeo();
+    renderThumb(); renderSchedule(); renderStatus(); renderSeo();
   </script>
 </AdminShell>

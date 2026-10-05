@@ -2,7 +2,7 @@
 export const prerender = false;
 import AdminShell from "../../../layouts/AdminShell.astro";
 import { isAdmin } from "../../../lib/admin";
-import { listAll, thumbnailFor, displayDate, excerptFor } from "../../../lib/blog";
+import { listAll, thumbnailFor, displayDate, excerptFor, isScheduled } from "../../../lib/blog";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
 
@@ -15,16 +15,28 @@ try {
   missingTable = true;
 }
 
-const rows = posts.map((p) => ({
-  id: p.id,
-  slug: p.slug,
-  title: p.title,
-  status: p.status,
-  image: thumbnailFor(p),
-  excerpt: excerptFor(p, 90),
-  date: p.published_at ? displayDate(p.published_at) : `Updated ${displayDate(p.updated_at)}`,
-}));
+const rows = posts.map((p) => {
+  // Scheduled is derived from the clock, not stored — a post published with a
+  // future date is queued, not live. Labelling it "published" here would say it
+  // is on /blog when it is deliberately hidden.
+  const queued = isScheduled(p);
+  return {
+    id: p.id,
+    slug: p.slug,
+    title: p.title,
+    status: queued ? "scheduled" : p.status,
+    queued,
+    image: thumbnailFor(p),
+    excerpt: excerptFor(p, 90),
+    date: queued
+      ? `Goes live ${displayDate(p.published_at)}`
+      : p.published_at
+        ? displayDate(p.published_at)
+        : `Updated ${displayDate(p.updated_at)}`,
+  };
+});
 const publishedCount = rows.filter((r) => r.status === "published").length;
+const scheduledCount = rows.filter((r) => r.queued).length;
 ---
 
 <AdminShell title="Blog — PixyDust Admin" tab="blog">
@@ -33,7 +45,9 @@ const publishedCount = rows.filter((r) => r.status === "published").length;
       <div>
         <h1 class="font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.6px;">Blog</h1>
         <p class="mt-1 text-ink-3" style="font-size:13px;">
-          {rows.length} post{rows.length === 1 ? "" : "s"} · {publishedCount} live on <a href="/blog" style="color:var(--pd-lilac);">/blog</a>
+          {rows.length} post{rows.length === 1 ? "" : "s"} · {publishedCount} live on <a href="/blog" style="color:var(--pd-lilac);">/blog</a>{
+            scheduledCount > 0 && <span style="color:var(--pd-amber);"> · {scheduledCount} scheduled</span>
+          }
         </p>
       </div>
       <button
@@ -84,9 +98,11 @@ const publishedCount = rows.filter((r) => r.status === "published").length;
           <span
             class="font-mono uppercase"
             style={`flex:none;font-size:9.5px;letter-spacing:1px;border-radius:999px;padding:3px 9px;${
-              r.status === "published"
-                ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
-                : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);"
+              r.queued
+                ? "color:var(--pd-amber);border:0.5px solid color-mix(in srgb,var(--pd-amber) 40%,transparent);"
+                : r.status === "published"
+                  ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
+                  : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);"
             }`}
           >
             {r.status}
