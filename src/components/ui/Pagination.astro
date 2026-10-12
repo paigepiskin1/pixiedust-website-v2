@@ -14,7 +14,10 @@ interface Props {
 }
 const { page, pages, total, perPage, base, noun = "articles" } = Astro.props;
 
-const href = (n: number) => (n <= 1 ? base : `${base}?page=${n}`);
+// `base` may already carry a query (a sub-category filter), so join with "&"
+// in that case. The parameter order must match the page's canonical form, or
+// every paginated link would 302 once before landing.
+const href = (n: number) => (n <= 1 ? base : `${base}${base.includes("?") ? "&" : "?"}page=${n}`);
 
 /** Page numbers with gaps: 1 … 4 5 6 … 12. Always shows first, last, current
  *  and its neighbours, so the control keeps a stable width however many pages

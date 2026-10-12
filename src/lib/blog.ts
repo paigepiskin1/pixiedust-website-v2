@@ -16,7 +16,10 @@ export interface BlogPost {
   published_at: string | null;
   created_at: string;
   updated_at: string;
-  /** Primary category id from blog-taxonomy. Null until classified. */
+  /** Section the item is filed under (blog, made-with, ar-effects …). Null
+   *  only for rows written before sections existed; treated as "blog". */
+  section: string | null;
+  /** Optional sub-category within the section. */
   category: string | null;
   /** Editor's ordered override: JSON array of blog_posts.id. */
   related_json: string;
@@ -165,41 +168,26 @@ export interface Page<T> {
  *  with what page 3 actually contains. `page` is clamped into range rather than
  *  404ing: ?page=99 lands on the last page, which is friendlier to a stale link
  *  and stops a crawler manufacturing endless empty pages. */
-/** Categories whose posts live under their own path rather than /blog. The
- *  blog index excludes them: a section's posts belong on the section page, and
- *  listing them here too would put the same article in two places. */
-const NOT_IN_SECTION = `category IS NULL OR category NOT IN (SELECT id FROM collections WHERE url_mode = 'section')`;
-
-export async function listPublishedPage(db: D1Database, page = 1, perPage = 12): Promise<Page<BlogPost>> {
-  const row = await db
-    .prepare(`SELECT COUNT(*) AS n FROM blog_posts WHERE ${LIVE} AND (${NOT_IN_SECTION})`)
-    .first<{ n: number }>();
-  const total = row?.n ?? 0;
-  const pages = Math.max(1, Math.ceil(total / perPage));
-  const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
-  const r = await db
-    .prepare(
-      `SELECT * FROM blog_posts
-       WHERE ${LIVE} AND (${NOT_IN_SECTION})
-       ORDER BY published_at DESC, id DESC
-       LIMIT ? OFFSET ?`
-    )
-    .bind(perPage, (current - 1) * perPage)
-    .all<BlogPost>();
-  return { items: r.results ?? [], page: current, perPage, total, pages };
-}
-
-/** One page of live posts within a category — what a category or section
- *  index page lists. Same clamping and counting rules as listPublishedPage. */
-export async function listPublishedPageByCategory(
+/** One page of live items in a section, newest first — what a section's index
+ *  page lists. Optionally narrowed to one of the section's sub-categories.
+ *
+ *  Counts and selects in the same request so "page 3 of 7" cannot disagree
+ *  with what page 3 holds, and clamps the requested page into range rather
+ *  than 404ing, so a stale link lands on the last page instead of an error.
+ *  A NULL section is read as "blog" so items saved before sections existed
+ *  still appear. */
+export async function listPublishedPageBySection(
   db: D1Database,
-  category: string,
+  sectionId: string,
   page = 1,
-  perPage = 12
+  perPage = 12,
+  categoryId?: string | null
 ): Promise<Page<BlogPost>> {
+  const where = `COALESCE(section, 'blog') = ? AND ${LIVE}${categoryId ? " AND category = ?" : ""}`;
+  const binds = categoryId ? [sectionId, categoryId] : [sectionId];
   const row = await db
-    .prepare(`SELECT COUNT(*) AS n FROM blog_posts WHERE category = ? AND ${LIVE}`)
-    .bind(category)
+    .prepare(`SELECT COUNT(*) AS n FROM blog_posts WHERE ${where}`)
+    .bind(...binds)
     .first<{ n: number }>();
   const total = row?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / perPage));
@@ -207,11 +195,11 @@ export async function listPublishedPageByCategory(
   const r = await db
     .prepare(
       `SELECT * FROM blog_posts
-       WHERE category = ? AND ${LIVE}
+       WHERE ${where}
        ORDER BY published_at DESC, id DESC
        LIMIT ? OFFSET ?`
     )
-    .bind(category, perPage, (current - 1) * perPage)
+    .bind(...binds, perPage, (current - 1) * perPage)
     .all<BlogPost>();
   return { items: r.results ?? [], page: current, perPage, total, pages };
 }
@@ -292,12 +280,17 @@ export async function relatedPosts(db: D1Database, post: BlogPost, limit = 3): P
     .map((p) => {
       const shared = tagsOf(p).filter((t) => myTags.has(t.toLowerCase())).length;
       const sameCategory = !!post.category && p.category === post.category;
-      // Category dominates: any same-category post outranks a cross-category
-      // one, however many tags the latter happens to share.
-      const score = (sameCategory ? 100 : 0) + shared * 10;
+      const sameSection = (p.section || "blog") === (post.section || "blog");
+      // Sub-category dominates: any same-sub-category item outranks one that
+      // merely shares tags. Same section is only a nudge between otherwise
+      // equal candidates — Blog is broad enough that "also in Blog" says
+      // nothing about topic, so on its own it must not qualify an item.
+      const score = (sameCategory ? 100 : 0) + shared * 10 + (sameSection ? 5 : 0);
       return { p, score };
     })
-    .filter((s) => s.score > 0)
+    // Needs a shared sub-category or at least one shared tag; the section
+    // nudge alone (5) never clears this bar.
+    .filter((s) => s.score >= 10)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const at = a.p.published_at || "";

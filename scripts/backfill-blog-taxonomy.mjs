@@ -77,8 +77,15 @@ const textOf = (html) =>
     .trim();
 
 const rows = d1(
-  "SELECT id, title, excerpt, content_html, category, tags_json, status FROM blog_posts ORDER BY id;"
+  "SELECT id, title, excerpt, content_html, category, tags_json, status, COALESCE(section, 'blog') AS section FROM blog_posts ORDER BY id;"
 )[0].results;
+
+// The classifier knows Blog's editorial categories. A guess is only a valid
+// sub-category if it belongs to the item's own section — otherwise an AR
+// effect could be filed under Blog's "Beauty".
+const subParent = new Map(
+  d1("SELECT id, parent_id FROM collections WHERE parent_id IS NOT NULL;")[0].results.map((r) => [r.id, r.parent_id])
+);
 
 console.log(`${rows.length} posts\n`);
 
@@ -97,7 +104,9 @@ for (const r of rows) {
     continue;
   }
 
-  const { category, tags } = classify(r.title || "", r.excerpt || "", textOf(r.content_html));
+  const guess = classify(r.title || "", r.excerpt || "", textOf(r.content_html));
+  const category = subParent.get(guess.category) === r.section ? guess.category : null;
+  const tags = guess.tags;
   const nextCategory = FORCE ? category : r.category || category;
   const nextTags = FORCE || !hasTags ? tags : JSON.parse(r.tags_json || "[]");
 

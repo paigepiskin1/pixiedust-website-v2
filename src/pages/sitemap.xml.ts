@@ -22,7 +22,6 @@ interface Entry {
 const PAGES: Entry[] = [
   { loc: "/", priority: "1.0", changefreq: "daily" },
   { loc: "/trending", priority: "0.9", changefreq: "daily" },
-  { loc: "/blog", priority: "0.9", changefreq: "daily" },
   { loc: "/presets", priority: "0.8", changefreq: "weekly" },
   { loc: "/hair", priority: "0.8", changefreq: "weekly" },
   { loc: "/beauty", priority: "0.8", changefreq: "weekly" },
@@ -41,23 +40,30 @@ const PAGES: Entry[] = [
 export async function GET({ locals }: APIContext) {
   const now = new Date().toISOString().split("T")[0];
 
-  // Published posts carry their own lastmod, so a re-crawl is prompted by an
-  // actual edit rather than by today's date sitting on every URL. Drafts are
-  // excluded by listPublished, so an unfinished post is never advertised.
+  // Items: every live item at its section URL, with its own lastmod so a
+  // re-crawl is prompted by an actual edit rather than by today's date sitting
+  // on every URL. listPublished excludes drafts and anything scheduled for
+  // later, so an unfinished item is never advertised. One pass over all items
+  // — Blog is a section like the others — so nothing can be listed twice.
   let posts: Entry[] = [];
   try {
     const db = (locals as any)?.runtime?.env?.DB;
     if (db) {
       const { listPublished, isoDate } = await import("../lib/blog");
-      posts = (await listPublished(db, 500)).map((p) => ({
-        loc: `/blog/${p.slug}`,  // listPublished already excludes section posts
-        priority: "0.7",
-        changefreq: "monthly",
-        lastmod: (isoDate(p.updated_at) || "").split("T")[0] || now,
-      }));
+      const { sectionsById, itemHref } = await import("../lib/sections");
+      const [items, sections] = await Promise.all([listPublished(db, 2000), sectionsById(db)]);
+      posts = items
+        // An item filed under an unpublished section has no reachable page.
+        .filter((p) => sections.has(p.section || "blog"))
+        .map((p) => ({
+          loc: itemHref(sections, p),
+          priority: "0.7",
+          changefreq: "monthly",
+          lastmod: (isoDate(p.updated_at) || "").split("T")[0] || now,
+        }));
     }
   } catch {
-    // A sitemap missing the blog beats a sitemap that 500s.
+    // A sitemap missing the items beats a sitemap that 500s.
   }
 
   // Help Centre, now database-backed and editable in the admin. listCategories
@@ -78,32 +84,18 @@ export async function GET({ locals }: APIContext) {
     // Same rule as the blog: a sitemap missing the help centre beats a 500.
   }
 
-  // Content collections: each section's index page plus every live item.
-  // allLiveItems already drops drafts, scheduled-for-later and external-only
-  // entries — the last of those have no page of ours to index.
+  // Section index pages (/blog, /made-with-pixydust …). Their items are
+  // listed above.
   let sections: Entry[] = [];
   try {
     const db = (locals as any)?.runtime?.env?.DB;
     if (db) {
-      const { listCollections, collectionHref, isoDate } = await import("../lib/collections");
-      // Section index pages, plus every live post addressed under a section.
-      const { listPublishedPageByCategory } = await import("../lib/blog");
-      const cols = await listCollections(db);
-      const entries: Entry[] = [];
-      for (const c of cols) {
-        entries.push({ loc: collectionHref(c), priority: "0.6", changefreq: "weekly" });
-        if (c.url_mode !== "section") continue;
-        const { items } = await listPublishedPageByCategory(db, c.id, 1, 500);
-        for (const p of items) {
-          entries.push({
-            loc: `/${c.slug}/${p.slug}`,
-            priority: "0.6",
-            changefreq: "monthly",
-            lastmod: (isoDate(p.updated_at) || "").split("T")[0] || now,
-          });
-        }
-      }
-      sections = entries;
+      const { listSections } = await import("../lib/sections");
+      sections = (await listSections(db)).map((sec) => ({
+        loc: `/${sec.slug}`,
+        priority: sec.id === "blog" ? "0.9" : "0.7",
+        changefreq: "weekly",
+      }));
     }
   } catch {
     // Same rule as above: a smaller sitemap beats a 500.
