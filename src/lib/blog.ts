@@ -134,6 +134,23 @@ export function isLive(post: Pick<BlogPost, "status" | "published_at">): boolean
   return !!t && new Date(t).getTime() <= Date.now();
 }
 
+/** Where an item stands, as the admin should describe it.
+ *
+ *    live       published and its date has passed — on the site now
+ *    scheduled  published with a future date — goes live on its own
+ *    draft      not published — not on the site
+ *    undated    published with no date — the admin used to call this
+ *               "published", but the site never shows it. Unreachable from the
+ *               editor since the publish fix; can still arrive from a script or
+ *               an import, so it is surfaced rather than hidden. */
+export type ItemState = "live" | "scheduled" | "draft" | "undated";
+
+export function itemState(post: Pick<BlogPost, "status" | "published_at">): ItemState {
+  if (post.status !== "published") return "draft";
+  if (!post.published_at) return "undated";
+  return isLive(post) ? "live" : "scheduled";
+}
+
 /** Published with a future date — queued, not yet visible. */
 export function isScheduled(post: Pick<BlogPost, "status" | "published_at">): boolean {
   return post.status === "published" && !!post.published_at && !isLive(post);

@@ -112,15 +112,24 @@ export async function POST({ request, locals }: APIContext) {
     const wanted = normalisePublishedAt(body.publishedAt);
     if (wanted === false) return json({ error: "Unreadable publish date" }, 400);
 
+    // A published item always has a date, because the date is what makes it
+    // visible: the public pages show published items whose date has passed, so
+    // "published, no date" is an item the admin calls published that the site
+    // never shows. That state used to be reachable — the editor sends "" for an
+    // empty date field, "" was read as an explicit clear, and an explicit value
+    // won — so publishing a brand-new item left it invisible.
+    //
+    // The rule now: an explicit date wins, an empty one means "no specific
+    // date", and on publish that resolves to the date the item already had or,
+    // failing that, now. Stamped once and kept thereafter — re-publishing an
+    // edited item must not reorder the index or reset the date search engines
+    // already recorded. Drafts may carry a date (a planned schedule) or none.
+    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
     const publishedAt =
-      wanted !== undefined
-        ? // An explicit date always wins, including clearing it.
-          wanted
-        : status === "published"
-          ? // Stamped once, on first publish, and kept thereafter — re-publishing
-            // an edited post must not reorder the index or reset the date search
-            // engines already recorded.
-            existing.published_at ?? new Date().toISOString().slice(0, 19).replace("T", " ")
+      status === "published"
+        ? wanted || existing.published_at || now
+        : wanted !== undefined
+          ? wanted
           : existing.published_at;
 
     const contentHtml = body.contentHtml ?? existing.content_html;

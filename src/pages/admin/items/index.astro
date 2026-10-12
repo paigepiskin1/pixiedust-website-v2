@@ -1,10 +1,10 @@
 ---
-// Items — every piece of content, whatever section it is filed under. Blog is
-// one section among several; the section decides an item's URL root.
+// Items — every piece of content, whatever section it is filed under, grouped
+// by where it stands: needs attention, scheduled, drafts, live.
 export const prerender = false;
 import AdminShell from "../../../layouts/AdminShell.astro";
 import { isAdmin } from "../../../lib/admin";
-import { listAll, thumbnailFor, displayDate, isScheduled } from "../../../lib/blog";
+import { listAll, thumbnailFor, isoDate, itemState, type ItemState } from "../../../lib/blog";
 import { adminListAll } from "../../../lib/sections";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
@@ -15,74 +15,98 @@ const [posts, all] = await Promise.all([listAll(db), adminListAll(db)]);
 const sections = all.filter((s) => !s.parent_id);
 const byId = new Map(all.map((s) => [s.id, s]));
 const sectionFilter = Astro.url.searchParams.get("section") || "";
-const statusFilter = Astro.url.searchParams.get("status") || "";
+const STATES: ItemState[] = ["undated", "scheduled", "draft", "live"];
+const rawStatus = Astro.url.searchParams.get("status") || "";
+const statusFilter = (STATES as string[]).includes(rawStatus) ? (rawStatus as ItemState) : "";
 
-const stateOf = (p: (typeof posts)[number]) =>
-  isScheduled(p) ? "scheduled" : p.status === "published" ? "published" : "draft";
+const allRows = posts.map((p) => {
+  const sectionId = p.section || "blog";
+  const section = byId.get(sectionId);
+  const sub = p.category ? byId.get(p.category) : undefined;
+  return {
+    id: p.id,
+    title: p.title,
+    sectionId,
+    sectionTitle: section?.title ?? sectionId,
+    subTitle: sub && sub.parent_id === sectionId ? sub.title : null,
+    path: `/${section?.slug ?? "blog"}/${p.slug}`,
+    state: itemState(p),
+    image: thumbnailFor(p),
+    // ISO strings — formatted in the browser so times show in the viewer's own
+    // timezone. The server cannot know it, and a schedule shown in UTC reads
+    // as the wrong day for anyone in the Americas.
+    publishedIso: isoDate(p.published_at),
+    updatedIso: isoDate(p.updated_at),
+  };
+});
 
-const rows = posts
-  .map((p) => {
-    const sectionId = p.section || "blog";
-    const section = byId.get(sectionId);
-    const sub = p.category ? byId.get(p.category) : undefined;
-    const state = stateOf(p);
-    return {
-      id: p.id,
-      title: p.title,
-      sectionId,
-      sectionTitle: section?.title ?? sectionId,
-      subTitle: sub && sub.parent_id === sectionId ? sub.title : null,
-      path: `/${section?.slug ?? "blog"}/${p.slug}`,
-      state,
-      image: thumbnailFor(p),
-      date:
-        state === "scheduled"
-          ? `Goes live ${displayDate(p.published_at)}`
-          : p.published_at
-            ? displayDate(p.published_at)
-            : `Updated ${displayDate(p.updated_at)}`,
-    };
+// Counts are over the section filter but not the status filter, so the board
+// keeps showing where everything is while one state is selected.
+const inSection = allRows.filter((r) => !sectionFilter || r.sectionId === sectionFilter);
+const count = (s: ItemState) => inSection.filter((r) => r.state === s).length;
+const counts = { live: count("live"), scheduled: count("scheduled"), draft: count("draft"), undated: count("undated") };
+const nextUp = inSection
+  .filter((r) => r.state === "scheduled" && r.publishedIso)
+  .sort((a, b) => a.publishedIso!.localeCompare(b.publishedIso!))[0];
+
+// Each group sorted the way it is read: the soonest release first, the most
+// recently touched draft first, the newest live item first.
+const groups = (
+  [
+    { state: "undated", title: "Needs a date", note: "Marked published, but with no date they never appear on the site. Open one and press Publish to fix it." },
+    { state: "scheduled", title: "Scheduled", note: "Published with a future date. Each goes live by itself at the time shown — nothing else to do." },
+    { state: "draft", title: "Drafts", note: "Not on the site." },
+    { state: "live", title: "Live", note: "On the site now." },
+  ] as { state: ItemState; title: string; note: string }[]
+)
+  .filter((g) => !statusFilter || g.state === statusFilter)
+  .map((g) => {
+    const rows = inSection.filter((r) => r.state === g.state);
+    rows.sort((a, b) =>
+      g.state === "scheduled"
+        ? (a.publishedIso ?? "").localeCompare(b.publishedIso ?? "")
+        : g.state === "live"
+          ? (b.publishedIso ?? "").localeCompare(a.publishedIso ?? "")
+          : (b.updatedIso ?? "").localeCompare(a.updatedIso ?? "")
+    );
+    return { ...g, rows };
   })
-  .filter((r) => (!sectionFilter || r.sectionId === sectionFilter) && (!statusFilter || r.state === statusFilter));
-
-// Counts for the filter chips are over all items, not the filtered view, so
-// the chips keep telling you where things are while a filter is applied.
-const countBySection = new Map<string, number>();
-for (const p of posts) countBySection.set(p.section || "blog", (countBySection.get(p.section || "blog") ?? 0) + 1);
-const states = posts.map(stateOf);
-const counts = {
-  published: states.filter((s) => s === "published").length,
-  scheduled: states.filter((s) => s === "scheduled").length,
-  draft: states.filter((s) => s === "draft").length,
-};
+  .filter((g) => g.rows.length > 0);
 
 const link = (params: Record<string, string>) => {
-  const q = new URLSearchParams({ ...(sectionFilter ? { section: sectionFilter } : {}), ...(statusFilter ? { status: statusFilter } : {}), ...params });
+  const q = new URLSearchParams({
+    ...(sectionFilter ? { section: sectionFilter } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...params,
+  });
   for (const [k, v] of [...q.entries()]) if (!v) q.delete(k);
   const qs = q.toString();
   return qs ? `/admin/items?${qs}` : "/admin/items";
 };
+const countBySection = new Map<string, number>();
+for (const r of allRows) countBySection.set(r.sectionId, (countBySection.get(r.sectionId) ?? 0) + 1);
 const activeSection = sections.find((s) => s.id === sectionFilter);
-const pill = (s: string) =>
-  s === "published"
-    ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
-    : s === "scheduled"
-      ? "color:var(--pd-amber);border:0.5px solid color-mix(in srgb,var(--pd-amber) 40%,transparent);"
-      : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);";
+
+const TONE: Record<ItemState, string> = {
+  live: "var(--pd-mint)",
+  scheduled: "var(--pd-amber)",
+  draft: "var(--pd-ink4)",
+  undated: "var(--pd-pink)",
+};
+const LABEL: Record<ItemState, string> = { live: "Live", scheduled: "Scheduled", draft: "Draft", undated: "Needs a date" };
 ---
 
 <AdminShell title="Items — PixyDust Admin" tab="items">
-  <script type="application/json" id="pd-items-data"
-    set:html={JSON.stringify({ section: sectionFilter || "blog", sections: sections.map((s) => ({ id: s.id, title: s.title })) })} />
+  <script type="application/json" id="pd-items-data" set:html={JSON.stringify({ section: sectionFilter || "blog" })} />
 
   <div class="mx-auto w-full" style="max-width:1180px;padding:28px;">
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 class="font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.6px;">Items</h1>
-        <p class="mt-1 text-ink-3" style="font-size:13px;">
-          {posts.length} items across {sections.length} sections · {counts.published} live
-          {counts.scheduled > 0 && <span style="color:var(--pd-amber);"> · {counts.scheduled} scheduled</span>}
-          {counts.draft > 0 && <span> · {counts.draft} draft</span>}
+        <h1 class="font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.6px;">
+          Items{activeSection && <span class="text-ink-3"> · {activeSection.title}</span>}
+        </h1>
+        <p class="mt-1 text-ink-3" style="font-size:12.5px;">
+          Times are shown in your timezone: <span id="pd-tz" class="text-ink-2">—</span>
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -95,67 +119,200 @@ const pill = (s: string) =>
       </div>
     </div>
 
+    <!-- Status board. Each card is a filter; click again (or "All") to clear. -->
+    <div class="pd-board mt-5">
+      <a href={link({ status: statusFilter === "live" ? "" : "live" })} class={`pd-card ${statusFilter === "live" ? "is-on" : ""}`} style={`--tone:${TONE.live};`}>
+        <span class="pd-card-k">Live</span>
+        <span class="pd-card-n">{counts.live}</span>
+        <span class="pd-card-s">On the site now</span>
+      </a>
+      <a href={link({ status: statusFilter === "scheduled" ? "" : "scheduled" })} class={`pd-card ${statusFilter === "scheduled" ? "is-on" : ""}`} style={`--tone:${TONE.scheduled};`}>
+        <span class="pd-card-k">Scheduled</span>
+        <span class="pd-card-n">{counts.scheduled}</span>
+        <span class="pd-card-s">
+          {nextUp ? (<>Next <time class="pd-t" data-iso={nextUp.publishedIso} data-fmt="rel">soon</time></>) : "Nothing queued"}
+        </span>
+      </a>
+      <a href={link({ status: statusFilter === "draft" ? "" : "draft" })} class={`pd-card ${statusFilter === "draft" ? "is-on" : ""}`} style={`--tone:${TONE.draft};`}>
+        <span class="pd-card-k">Drafts</span>
+        <span class="pd-card-n">{counts.draft}</span>
+        <span class="pd-card-s">Not on the site</span>
+      </a>
+      {counts.undated > 0 && (
+        <a href={link({ status: statusFilter === "undated" ? "" : "undated" })} class={`pd-card pd-card-warn ${statusFilter === "undated" ? "is-on" : ""}`} style={`--tone:${TONE.undated};`}>
+          <span class="pd-card-k">Needs a date</span>
+          <span class="pd-card-n">{counts.undated}</span>
+          <span class="pd-card-s">Says published, not showing</span>
+        </a>
+      )}
+    </div>
+
     <!-- Section filter -->
-    <nav class="mt-5 flex flex-wrap gap-1.5" aria-label="Filter by section">
-      <a href={link({ section: "" })} class={`pd-af ${sectionFilter ? "" : "is-on"}`}>All <span>{posts.length}</span></a>
+    <nav class="mt-4 flex flex-wrap gap-1.5" aria-label="Filter by section">
+      <a href={link({ section: "" })} class={`pd-af ${sectionFilter ? "" : "is-on"}`}>All sections <span>{allRows.length}</span></a>
       {sections.map((s) => (
         <a href={link({ section: s.id })} class={`pd-af ${sectionFilter === s.id ? "is-on" : ""}`}>
           {s.title} <span>{countBySection.get(s.id) ?? 0}</span>
         </a>
       ))}
     </nav>
-    <nav class="mt-2 flex flex-wrap gap-1.5" aria-label="Filter by status">
-      <a href={link({ status: "" })} class={`pd-af pd-af-sm ${statusFilter ? "" : "is-on"}`}>Any status</a>
-      <a href={link({ status: "published" })} class={`pd-af pd-af-sm ${statusFilter === "published" ? "is-on" : ""}`}>Live <span>{counts.published}</span></a>
-      <a href={link({ status: "scheduled" })} class={`pd-af pd-af-sm ${statusFilter === "scheduled" ? "is-on" : ""}`}>Scheduled <span>{counts.scheduled}</span></a>
-      <a href={link({ status: "draft" })} class={`pd-af pd-af-sm ${statusFilter === "draft" ? "is-on" : ""}`}>Draft <span>{counts.draft}</span></a>
-    </nav>
+    {statusFilter && (
+      <p class="mt-3 text-ink-3" style="font-size:12px;">
+        Showing {LABEL[statusFilter].toLowerCase()} only · <a href={link({ status: "" })} style="color:var(--pd-lilac);">show everything</a>
+      </p>
+    )}
 
-    {rows.length === 0 && (
+    {groups.length === 0 && (
       <div class="mt-6 rounded-2xl text-center text-ink-3"
         style="padding:56px 24px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);font-size:13.5px;">
-        No items here yet. Hit <strong class="text-ink">New item</strong> to add the first one.
+        Nothing here. Hit <strong class="text-ink">New item</strong> to add one.
       </div>
     )}
 
-    <div class="mt-5 flex flex-col gap-2">
-      {rows.map((r) => (
-        <a href={`/admin/items/edit/${r.id}`} class="flex items-center gap-4 rounded-xl"
-          style="padding:12px 14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);text-decoration:none;">
-          {r.image ? (
-            <img src={r.image} alt="" width="88" height="50" loading="lazy"
-              style="width:88px;height:50px;object-fit:cover;border-radius:8px;background:var(--pd-bg3);flex:none;" />
-          ) : (
-            <div style="width:88px;height:50px;border-radius:8px;flex:none;background:linear-gradient(135deg,color-mix(in srgb,var(--pd-lilac) 26%,transparent),var(--pd-bg3));" />
-          )}
-          <div style="min-width:0;flex:1;">
-            <div class="font-semibold text-ink" style="font-size:14px;letter-spacing:-0.2px;">{r.title}</div>
-            <div class="mt-0.5 truncate text-ink-4" style="font-size:11.5px;">{r.path} · {r.date}</div>
-          </div>
-          <span class="hidden shrink-0 text-ink-3 sm:inline" style="font-size:11.5px;">
-            {r.sectionTitle}{r.subTitle && <span class="text-ink-4"> › {r.subTitle}</span>}
-          </span>
-          <span class="font-mono uppercase"
-            style={`flex:none;font-size:9.5px;letter-spacing:1px;border-radius:999px;padding:3px 9px;${pill(r.state)}`}>{r.state}</span>
-        </a>
-      ))}
-    </div>
+    {groups.map((g) => (
+      <section class="mt-7">
+        <div class="mb-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 class="flex items-center gap-2 font-display font-semibold text-ink" style="font-size:15px;letter-spacing:-0.2px;">
+            <span style={`width:8px;height:8px;border-radius:999px;background:${TONE[g.state]};display:inline-block;`}></span>
+            {g.title} <span class="font-mono text-ink-4" style="font-size:11px;font-weight:500;">{g.rows.length}</span>
+          </h2>
+          <span class="text-ink-4" style="font-size:11.5px;">{g.note}</span>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          {g.rows.map((r) => (
+            <a href={`/admin/items/edit/${r.id}`} class="pd-row" style={`--tone:${TONE[r.state]};`}>
+              {r.image ? (
+                <img src={r.image} alt="" width="80" height="45" loading="lazy"
+                  style="width:80px;height:45px;object-fit:cover;border-radius:7px;background:var(--pd-bg3);flex:none;" />
+              ) : (
+                <div style="width:80px;height:45px;border-radius:7px;flex:none;background:linear-gradient(135deg,color-mix(in srgb,var(--pd-lilac) 26%,transparent),var(--pd-bg3));" />
+              )}
+              <div style="min-width:0;flex:1;">
+                <div class="truncate font-semibold text-ink" style="font-size:13.5px;letter-spacing:-0.2px;">{r.title}</div>
+                <div class="mt-0.5 truncate text-ink-4" style="font-size:11px;">
+                  {r.sectionTitle}{r.subTitle && <> › {r.subTitle}</>} · <span class="font-mono">{r.path}</span>
+                </div>
+              </div>
+              <div class="pd-when">
+                {r.state === "scheduled" && (
+                  <>
+                    <span class="pd-when-main"><time class="pd-t" data-iso={r.publishedIso} data-fmt="full">{r.publishedIso}</time></span>
+                    <span class="pd-when-sub" style="color:var(--pd-amber);"><time class="pd-t" data-iso={r.publishedIso} data-fmt="rel">—</time></span>
+                  </>
+                )}
+                {r.state === "live" && (
+                  <>
+                    <span class="pd-when-main">Live since</span>
+                    <span class="pd-when-sub"><time class="pd-t" data-iso={r.publishedIso} data-fmt="date">{r.publishedIso}</time></span>
+                  </>
+                )}
+                {r.state === "draft" && (
+                  <>
+                    <span class="pd-when-main">Edited</span>
+                    <span class="pd-when-sub"><time class="pd-t" data-iso={r.updatedIso} data-fmt="rel">{r.updatedIso}</time></span>
+                  </>
+                )}
+                {r.state === "undated" && (
+                  <>
+                    <span class="pd-when-main" style="color:var(--pd-pink);">Not showing</span>
+                    <span class="pd-when-sub">Open and press Publish</span>
+                  </>
+                )}
+              </div>
+              <span class="pd-state">{LABEL[r.state]}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
   </div>
 
   <style is:global>
+    .pd-board { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+    .pd-card {
+      position: relative; display: flex; flex-direction: column; gap: 2px; padding: 14px 16px 13px;
+      border-radius: 14px; text-decoration: none; overflow: hidden;
+      background: var(--pd-bg2); border: 0.5px solid var(--pd-hairline);
+      transition: border-color 0.15s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .pd-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tone); }
+    .pd-card:hover { border-color: var(--pd-hairline3); transform: translateY(-1px); }
+    .pd-card.is-on { border-color: var(--tone); background: color-mix(in srgb, var(--tone) 8%, var(--pd-bg2)); }
+    .pd-card-k { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--tone); }
+    .pd-card-n { font-family: var(--font-display, inherit); font-size: 28px; font-weight: 600; letter-spacing: -1px; color: var(--pd-ink); line-height: 1.1; }
+    .pd-card-s { font-size: 11.5px; color: var(--pd-ink3); }
+    .pd-card-warn { animation: pd-pulse 2.4s ease-in-out infinite; }
+    @keyframes pd-pulse { 50% { border-color: color-mix(in srgb, var(--pd-pink) 55%, transparent); } }
+
     .pd-af {
-      display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
-      font-size: 12px; font-weight: 600; text-decoration: none; color: var(--pd-ink2);
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+      font-size: 11.5px; font-weight: 600; text-decoration: none; color: var(--pd-ink2);
       background: var(--pd-bg2); border: 0.5px solid var(--pd-hairline2);
     }
     .pd-af span { font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--pd-ink4); }
     .pd-af:hover { color: var(--pd-ink); border-color: var(--pd-hairline3); }
     .pd-af.is-on { color: var(--pd-bg); background: var(--pd-ink); border-color: var(--pd-ink); }
     .pd-af.is-on span { color: var(--pd-bg); opacity: 0.6; }
-    .pd-af-sm { padding: 4px 10px; font-size: 11px; }
+
+    .pd-row {
+      position: relative; display: flex; align-items: center; gap: 13px; padding: 10px 13px 10px 16px;
+      border-radius: 11px; text-decoration: none; overflow: hidden;
+      background: var(--pd-bg2); border: 0.5px solid var(--pd-hairline);
+    }
+    .pd-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tone); }
+    .pd-row:hover { border-color: var(--pd-hairline3); }
+    .pd-when { display: none; flex-direction: column; align-items: flex-end; text-align: right; flex: none; min-width: 150px; }
+    .pd-when-main { font-size: 11.5px; color: var(--pd-ink2); }
+    .pd-when-sub { font-size: 11px; color: var(--pd-ink4); }
+    @media (min-width: 720px) { .pd-when { display: flex; } }
+    .pd-state {
+      flex: none; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--tone); border: 0.5px solid color-mix(in srgb, var(--tone) 45%, transparent);
+      border-radius: 999px; padding: 3px 9px;
+    }
+    @media (prefers-reduced-motion: reduce) { .pd-card-warn { animation: none; } .pd-card:hover { transform: none; } }
   </style>
 
   <script>
+    // Render every time in the viewer's own timezone, with a live countdown on
+    // scheduled items. Server-rendered UTC is only the no-JS fallback.
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tzShort = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+      .formatToParts(new Date()).find((p) => p.type === "timeZoneName")?.value ?? "";
+    const tzEl = document.getElementById("pd-tz");
+    if (tzEl) tzEl.textContent = `${tz.replace(/_/g, " ")} (${tzShort})`;
+
+    const full = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+    const date = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+    const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+    function relative(t: number): string {
+      const diff = t - Date.now();
+      const abs = Math.abs(diff);
+      const min = 60_000, hr = 60 * min, day = 24 * hr;
+      if (abs < min) return diff >= 0 ? "in under a minute" : "just now";
+      if (abs < hr) return rtf.format(Math.round(diff / min), "minute");
+      if (abs < day) return rtf.format(Math.round(diff / hr), "hour");
+      return rtf.format(Math.round(diff / day), "day");
+    }
+
+    function render() {
+      document.querySelectorAll<HTMLTimeElement>("time.pd-t").forEach((el) => {
+        const iso = el.dataset.iso;
+        if (!iso) return;
+        const t = new Date(iso);
+        if (Number.isNaN(t.getTime())) return;
+        el.dateTime = iso;
+        el.title = full.format(t);
+        const f = el.dataset.fmt;
+        el.textContent = f === "full" ? full.format(t) : f === "date" ? date.format(t) : relative(t.getTime());
+      });
+    }
+    render();
+    // Keep countdowns honest while the page sits open.
+    setInterval(render, 30_000);
+
     const data = JSON.parse(document.getElementById("pd-items-data")!.textContent || "{}");
     document.getElementById("pd-new-item")?.addEventListener("click", async (e) => {
       const btn = e.currentTarget as HTMLButtonElement;

@@ -73,6 +73,11 @@ const initial = {
       </div>
     </div>
 
+    <!-- What the site is showing right now, from the last save. Unsaved edits
+         to the date or status are not reflected until saved, on purpose: this
+         answers "is it live?", which only the saved state can. -->
+    <div id="pd-banner" class="pd-banner mb-5" role="status" aria-live="polite"></div>
+
     <div class="grid gap-5" style="grid-template-columns:minmax(0,1fr) 320px;">
       <!-- ── Main column ─────────────────────────────────────────────── -->
       <div>
@@ -247,6 +252,16 @@ const initial = {
   </div>
 
   <style is:global>
+    .pd-banner {
+      position: relative; display: flex; align-items: flex-start; gap: 11px; padding: 12px 15px 12px 18px;
+      border-radius: 13px; overflow: hidden;
+      background: color-mix(in srgb, var(--tone) 9%, var(--pd-bg2));
+      border: 0.5px solid color-mix(in srgb, var(--tone) 38%, transparent);
+    }
+    .pd-banner::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tone); }
+    .pd-banner-dot { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 999px; background: var(--tone); }
+    .pd-banner-title { font-size: 13.5px; font-weight: 600; color: var(--pd-ink); letter-spacing: -0.1px; }
+    .pd-banner-detail { margin-top: 2px; font-size: 12px; color: var(--pd-ink3); line-height: 1.45; }
     #pd-toolbar button {
       background: var(--pd-bg); color: var(--pd-ink2); border: 0.5px solid var(--pd-hairline2);
       border-radius: 7px; padding: 5px 9px; font-size: 11.5px; cursor: pointer; line-height: 1;
@@ -695,20 +710,82 @@ const initial = {
     });
 
     // ── status pill ───────────────────────────────────────────────────────
+    // ── status banner ─────────────────────────────────────────────────────
+    let savedPublishedIso: string = data.publishedAt || "";
+    const bannerFull = new Intl.DateTimeFormat(undefined, {
+      weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short",
+    });
+    const bannerDate = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+    const bannerRtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+    const bannerRel = (t: number) => {
+      const d = t - Date.now(), a = Math.abs(d), m = 60_000, h = 60 * m, day = 24 * h;
+      if (a < m) return d >= 0 ? "in under a minute" : "just now";
+      if (a < h) return bannerRtf.format(Math.round(d / m), "minute");
+      if (a < day) return bannerRtf.format(Math.round(d / h), "hour");
+      return bannerRtf.format(Math.round(d / day), "day");
+    };
+    function renderBanner() {
+      const el = $("pd-banner");
+      const t = savedPublishedIso ? new Date(savedPublishedIso).getTime() : NaN;
+      const url = `pixydust.com/${sectionSlugOf()}/${slugEl.value}`;
+      let tone = "", title = "", detail = "";
+      if (status !== "published") {
+        tone = "var(--pd-ink4)";
+        title = "Draft — not on the site";
+        const when = scheduledFor();
+        detail = when
+          ? `A date is set (${bannerFull.format(when)}). Press Schedule to queue it, or Publish to put it live now.`
+          : "Press Publish to put it live now, or set a date and press Schedule.";
+      } else if (Number.isNaN(t)) {
+        tone = "var(--pd-pink)";
+        title = "Marked published, but not showing";
+        detail = "It has no publish date, so the site never shows it. Press Publish to fix it.";
+      } else if (t > Date.now()) {
+        tone = "var(--pd-amber)";
+        title = `Scheduled — goes live ${bannerFull.format(t)}`;
+        detail = `${bannerRel(t)}. It appears on its own at that time — no need to come back.`;
+      } else {
+        tone = "var(--pd-mint)";
+        title = "Live on the site";
+        detail = `Since ${bannerDate.format(t)} · ${url}`;
+      }
+      el.style.setProperty("--tone", tone);
+      el.innerHTML = "";
+      const dot = document.createElement("span");
+      dot.className = "pd-banner-dot";
+      const body = document.createElement("div");
+      const h = document.createElement("div");
+      h.className = "pd-banner-title";
+      h.textContent = title;
+      const d = document.createElement("div");
+      d.className = "pd-banner-detail";
+      d.textContent = detail;
+      body.append(h, d);
+      el.append(dot, body);
+    }
+    // Keep the countdown honest while the editor sits open — and flip a
+    // scheduled item to "Live" on screen when its time arrives.
+    setInterval(renderBanner, 30_000);
+
     function renderStatus() {
+      renderBanner();
       const pill = $("pd-status-pill");
       // "Scheduled" is derived, not stored: published + a future date. Showing
       // plain "published" here would claim the post is on /blog when it isn't.
       const pending = status === "published" && !!scheduledFor();
-      const label = pending ? "scheduled" : status;
+      // Published with no saved date is not live — never label it as if it were.
+      const undated = status === "published" && !savedPublishedIso;
+      const label = undated ? "no date" : pending ? "scheduled" : status === "published" ? "live" : "draft";
       pill.textContent = label;
       pill.style.cssText = pill.style.cssText.replace(/color:[^;]+;|border:[^;]+;/g, "");
       pill.style.cssText +=
-        pending
-          ? "color:var(--pd-amber);border:0.5px solid color-mix(in srgb,var(--pd-amber) 40%,transparent);"
-          : status === "published"
-            ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
-            : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);";
+        undated
+          ? "color:var(--pd-pink);border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);"
+          : pending
+            ? "color:var(--pd-amber);border:0.5px solid color-mix(in srgb,var(--pd-amber) 40%,transparent);"
+            : status === "published"
+              ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
+              : "color:var(--pd-ink3);border:0.5px solid var(--pd-hairline2);";
       $("pd-unpublish").style.display = status === "published" ? "" : "none";
       $<HTMLButtonElement>("pd-publish").textContent =
         status === "published" ? "Update" : scheduledFor() ? "Publish now" : "Publish";
@@ -763,6 +840,7 @@ const initial = {
         slugEl.value = j.slug;
         // The server normalises and may stamp the date, so mirror it back
         // rather than trusting what the field happened to hold.
+        savedPublishedIso = j.publishedAt ? String(j.publishedAt).replace(" ", "T") + "Z" : "";
         if (j.publishedAt !== undefined) {
           publishedAtEl.value = toLocalInput(j.publishedAt ? String(j.publishedAt).replace(" ", "T") + "Z" : "");
         }
@@ -786,8 +864,11 @@ const initial = {
     $("pd-publish").addEventListener("click", async () => {
       // "Publish" on a future-dated draft means now, not later — otherwise the
       // button would silently do nothing visible.
-      if (scheduledFor()) publishedAtEl.value = toLocalInput(new Date().toISOString());
-      if (await save("published")) toast("Published — live on /blog");
+      // Publish means now. An empty field is filled rather than sent empty, so
+      // the date that goes live is the one on screen; a future date is
+      // overridden too — that is what Schedule is for.
+      if (!publishedAtEl.value || scheduledFor()) publishedAtEl.value = toLocalInput(new Date().toISOString());
+      if (await save("published")) toast(`Published — live at /${sectionSlugOf()}/${slugEl.value}`);
     });
     $("pd-schedule").addEventListener("click", async () => {
       const when = scheduledFor();

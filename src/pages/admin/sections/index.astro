@@ -36,7 +36,7 @@ const label = (list: readonly { id: string; label: string }[], id: string) =>
 
     <ul id="pd-sections" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;">
       {sections.map((s) => {
-        const c = counts.bySection.get(s.id) ?? { total: 0, live: 0 };
+        const c = counts.bySection.get(s.id) ?? { total: 0, live: 0, scheduled: 0, draft: 0 };
         const subs = subsOf(s.id);
         return (
           <li data-id={s.id} class="overflow-hidden rounded-2xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
@@ -54,7 +54,11 @@ const label = (list: readonly { id: string; label: string }[], id: string) =>
                 </div>
                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ink-4" style="font-size:11px;">
                   <a href={`/${s.slug}`} target="_blank" rel="noopener" class="font-mono" style="color:var(--pd-lilac);text-decoration:none;">/{s.slug}</a>
-                  <span>{c.live} live · {c.total} total</span>
+                  <span>
+                    <a href={`/admin/items?section=${s.id}&status=live`} style="color:var(--pd-mint);text-decoration:none;">{c.live} live</a>
+                    {c.scheduled > 0 && <> · <a href={`/admin/items?section=${s.id}&status=scheduled`} style="color:var(--pd-amber);text-decoration:none;">{c.scheduled} scheduled</a></>}
+                    {c.draft > 0 && <> · <a href={`/admin/items?section=${s.id}&status=draft`} style="color:inherit;text-decoration:none;">{c.draft} draft</a></>}
+                  </span>
                   <span>{label(INDEX_TEMPLATES, s.index_template)} page · {label(ITEM_TEMPLATES, s.item_template)} items</span>
                 </div>
               </div>

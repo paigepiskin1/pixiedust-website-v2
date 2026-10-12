@@ -107,21 +107,25 @@ export async function adminGet(db: D1Database, id: string): Promise<Section | nu
 /** Item counts per section and per sub-category, live and total. */
 export async function itemCounts(
   db: D1Database
-): Promise<{ bySection: Map<string, { total: number; live: number }>; bySub: Map<string, number> }> {
+): Promise<{ bySection: Map<string, { total: number; live: number; scheduled: number; draft: number }>; bySub: Map<string, number> }> {
   const r = await db
     .prepare(
       `SELECT COALESCE(section, 'blog') AS section, category,
               COUNT(*) AS total,
-              SUM(CASE WHEN status = 'published' AND published_at IS NOT NULL AND published_at <= datetime('now') THEN 1 ELSE 0 END) AS live
+              SUM(CASE WHEN status = 'published' AND published_at IS NOT NULL AND published_at <= datetime('now') THEN 1 ELSE 0 END) AS live,
+              SUM(CASE WHEN status = 'published' AND published_at > datetime('now') THEN 1 ELSE 0 END) AS scheduled,
+              SUM(CASE WHEN status != 'published' THEN 1 ELSE 0 END) AS draft
        FROM blog_posts GROUP BY COALESCE(section, 'blog'), category`
     )
-    .all<{ section: string; category: string | null; total: number; live: number }>();
-  const bySection = new Map<string, { total: number; live: number }>();
+    .all<{ section: string; category: string | null; total: number; live: number; scheduled: number; draft: number }>();
+  const bySection = new Map<string, { total: number; live: number; scheduled: number; draft: number }>();
   const bySub = new Map<string, number>();
   for (const row of r.results ?? []) {
-    const cur = bySection.get(row.section) ?? { total: 0, live: 0 };
+    const cur = bySection.get(row.section) ?? { total: 0, live: 0, scheduled: 0, draft: 0 };
     cur.total += row.total;
     cur.live += row.live ?? 0;
+    cur.scheduled += row.scheduled ?? 0;
+    cur.draft += row.draft ?? 0;
     bySection.set(row.section, cur);
     if (row.category) bySub.set(row.category, (bySub.get(row.category) ?? 0) + row.total);
   }
