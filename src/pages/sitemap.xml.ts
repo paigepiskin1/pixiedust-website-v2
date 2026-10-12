@@ -78,7 +78,30 @@ export async function GET({ locals }: APIContext) {
     // Same rule as the blog: a sitemap missing the help centre beats a 500.
   }
 
-  const all: Entry[] = [...PAGES, ...posts, ...help];
+  // Content collections: each section's index page plus every live item.
+  // allLiveItems already drops drafts, scheduled-for-later and external-only
+  // entries — the last of those have no page of ours to index.
+  let sections: Entry[] = [];
+  try {
+    const db = (locals as any)?.runtime?.env?.DB;
+    if (db) {
+      const { listCollections, allLiveItems, collectionHref, itemHref, isoDate } = await import("../lib/collections");
+      const [cols, items] = await Promise.all([listCollections(db), allLiveItems(db)]);
+      sections = [
+        ...cols.map((c) => ({ loc: collectionHref(c), priority: "0.6", changefreq: "weekly" })),
+        ...items.map(({ collection, item }) => ({
+          loc: itemHref(collection, item),
+          priority: "0.6",
+          changefreq: "monthly",
+          lastmod: (isoDate(item.updated_at) || "").split("T")[0] || now,
+        })),
+      ];
+    }
+  } catch {
+    // Same rule as above: a smaller sitemap beats a 500.
+  }
+
+  const all: Entry[] = [...PAGES, ...posts, ...help, ...sections];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

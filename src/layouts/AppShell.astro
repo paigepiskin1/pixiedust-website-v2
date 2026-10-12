@@ -8,6 +8,7 @@ import FirstVisitSignup from "../components/FirstVisitSignup.astro";
 import type { WelcomeSlide } from "../components/FirstVisitSignup.astro";
 import { getToolCards } from "../lib/tool-cards";
 import { getTemplate } from "../lib/templates";
+import { listCollections } from "../lib/collections";
 
 interface Props {
   title?: string;
@@ -35,6 +36,15 @@ const autoNoindex =
 // first paint (no flash of the logged-out default on navigation).
 const user = Astro.locals.user ?? null;
 const credits = user?.credits ?? Astro.props.credits ?? 47;
+
+// Footer sections come from the database, so adding one in the admin links it
+// here without a deploy.
+let footerSections: { slug: string; title: string }[] = [];
+try {
+  footerSections = (await listCollections(Astro.locals.runtime.env.DB, true)).map((c) => ({ slug: c.slug, title: c.title }));
+} catch {
+  // A missing table must not take every page down.
+}
 
 // Welcome popup slideshow for logged-out visitors — live homepage covers.
 let welcomeSlides: WelcomeSlide[] = [];
@@ -86,6 +96,7 @@ if (!user) {
           <span class="font-mono" style="font-size:10.5px;color:var(--pd-ink4);letter-spacing:0.3px;">© PixyDust</span>
           <nav class="pd-footer-nav flex flex-wrap items-center gap-x-4 gap-y-1.5" style="font-size:11.5px;">
             <a href="/about">About</a>
+            {footerSections.map((f) => <a href={`/${f.slug}`}>{f.title}</a>)}
             <a href="/support">Support</a>
             <a href="/brand">Brand</a>
             <a href="/legal/terms">Terms</a>
