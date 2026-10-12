@@ -30,6 +30,16 @@ try {
 if (!post) return Astro.redirect("/blog", 302);
 
 const related = await relatedPosts(db, post, 3).catch(() => []);
+// A post in one of the six sections is addressed as /<section>/<slug>, so
+// /blog/<slug> is not its home — send crawlers and readers to the one URL
+// rather than serving the same article at two.
+{
+  const { sectionCategories } = await import("../../lib/collections");
+  const sections = await sectionCategories(db);
+  const section = post.category ? sections.get(post.category) : undefined;
+  if (section) return Astro.redirect(`/${section.slug}/${post.slug}`, 301);
+}
+
 const image = thumbnailFor(post);
 const description = excerptFor(post);
 const published = isoDate(post.published_at);

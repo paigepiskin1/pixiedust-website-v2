@@ -50,7 +50,7 @@ export async function GET({ locals }: APIContext) {
     if (db) {
       const { listPublished, isoDate } = await import("../lib/blog");
       posts = (await listPublished(db, 500)).map((p) => ({
-        loc: `/blog/${p.slug}`,
+        loc: `/blog/${p.slug}`,  // listPublished already excludes section posts
         priority: "0.7",
         changefreq: "monthly",
         lastmod: (isoDate(p.updated_at) || "").split("T")[0] || now,
@@ -85,17 +85,25 @@ export async function GET({ locals }: APIContext) {
   try {
     const db = (locals as any)?.runtime?.env?.DB;
     if (db) {
-      const { listCollections, allLiveItems, collectionHref, itemHref, isoDate } = await import("../lib/collections");
-      const [cols, items] = await Promise.all([listCollections(db), allLiveItems(db)]);
-      sections = [
-        ...cols.map((c) => ({ loc: collectionHref(c), priority: "0.6", changefreq: "weekly" })),
-        ...items.map(({ collection, item }) => ({
-          loc: itemHref(collection, item),
-          priority: "0.6",
-          changefreq: "monthly",
-          lastmod: (isoDate(item.updated_at) || "").split("T")[0] || now,
-        })),
-      ];
+      const { listCollections, collectionHref, isoDate } = await import("../lib/collections");
+      // Section index pages, plus every live post addressed under a section.
+      const { listPublishedPageByCategory } = await import("../lib/blog");
+      const cols = await listCollections(db);
+      const entries: Entry[] = [];
+      for (const c of cols) {
+        entries.push({ loc: collectionHref(c), priority: "0.6", changefreq: "weekly" });
+        if (c.url_mode !== "section") continue;
+        const { items } = await listPublishedPageByCategory(db, c.id, 1, 500);
+        for (const p of items) {
+          entries.push({
+            loc: `/${c.slug}/${p.slug}`,
+            priority: "0.6",
+            changefreq: "monthly",
+            lastmod: (isoDate(p.updated_at) || "").split("T")[0] || now,
+          });
+        }
+      }
+      sections = entries;
     }
   } catch {
     // Same rule as above: a smaller sitemap beats a 500.

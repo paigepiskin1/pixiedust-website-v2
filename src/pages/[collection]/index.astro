@@ -6,9 +6,8 @@ export const prerender = false;
 import AppShell from "../../layouts/AppShell.astro";
 import PageHeader from "../../components/ui/PageHeader.astro";
 import Pagination from "../../components/ui/Pagination.astro";
-import {
-  getCollection, listItems, linkFor, imageFor, summaryFor, tagsOf, displayDate, isoDate,
-} from "../../lib/collections";
+import { getCollection } from "../../lib/collections";
+import { listPublishedPageByCategory, thumbnailFor, excerptFor, displayDate, isoDate, tagsOf } from "../../lib/blog";
 
 const SITE = "https://pixydust.com";
 const db = Astro.locals.runtime.env.DB;
@@ -19,9 +18,11 @@ const collection = await getCollection(db, slug);
 // section for any arbitrary path.
 if (!collection) return new Response(null, { status: 404 });
 
+// A category page lists blog posts in that category. The six agreed sections
+// address their posts as /<section>/<slug>; see url_mode.
 const PER_PAGE = 12;
 const requested = Number(Astro.url.searchParams.get("page") ?? "1");
-const paged = await listItems(db, collection.id, Number.isFinite(requested) ? requested : 1, PER_PAGE);
+const paged = await listPublishedPageByCategory(db, collection.id, Number.isFinite(requested) ? requested : 1, PER_PAGE);
 
 const base = `/${collection.slug}`;
 const canonicalPath = paged.page === 1 ? base : `${base}?page=${paged.page}`;
@@ -31,20 +32,18 @@ if (rawPage !== null && Astro.url.pathname + Astro.url.search !== canonicalPath)
 }
 const pageUrl = (n: number) => (n <= 1 ? `${SITE}${base}` : `${SITE}${base}?page=${n}`);
 
-const cards = paged.items.map((i) => {
-  const link = linkFor(collection, i);
-  return {
-    title: i.title,
-    href: link.href,
-    external: link.external,
-    image: imageFor(i),
-    summary: summaryFor(i, 120),
-    tags: tagsOf(i).slice(0, 2),
-    date: displayDate(i.published_at),
-    iso: isoDate(i.published_at),
-    featured: i.featured === 1,
-  };
-});
+const prefix = collection.url_mode === "section" ? `/${collection.slug}` : "/blog";
+const cards = paged.items.map((i) => ({
+  title: i.title,
+  href: `${prefix}/${i.slug}`,
+  external: false,
+  image: thumbnailFor(i),
+  summary: excerptFor(i, 120),
+  tags: tagsOf(i).slice(0, 2),
+  date: displayDate(i.published_at),
+  iso: isoDate(i.published_at),
+  featured: false,
+}));
 
 const jsonLd = JSON.stringify({
   "@type": "CollectionPage",

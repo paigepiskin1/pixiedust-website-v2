@@ -165,19 +165,53 @@ export interface Page<T> {
  *  with what page 3 actually contains. `page` is clamped into range rather than
  *  404ing: ?page=99 lands on the last page, which is friendlier to a stale link
  *  and stops a crawler manufacturing endless empty pages. */
+/** Categories whose posts live under their own path rather than /blog. The
+ *  blog index excludes them: a section's posts belong on the section page, and
+ *  listing them here too would put the same article in two places. */
+const NOT_IN_SECTION = `category IS NULL OR category NOT IN (SELECT id FROM collections WHERE url_mode = 'section')`;
+
 export async function listPublishedPage(db: D1Database, page = 1, perPage = 12): Promise<Page<BlogPost>> {
-  const row = await db.prepare(`SELECT COUNT(*) AS n FROM blog_posts WHERE ${LIVE}`).first<{ n: number }>();
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM blog_posts WHERE ${LIVE} AND (${NOT_IN_SECTION})`)
+    .first<{ n: number }>();
   const total = row?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / perPage));
   const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
   const r = await db
     .prepare(
       `SELECT * FROM blog_posts
-       WHERE ${LIVE}
+       WHERE ${LIVE} AND (${NOT_IN_SECTION})
        ORDER BY published_at DESC, id DESC
        LIMIT ? OFFSET ?`
     )
     .bind(perPage, (current - 1) * perPage)
+    .all<BlogPost>();
+  return { items: r.results ?? [], page: current, perPage, total, pages };
+}
+
+/** One page of live posts within a category — what a category or section
+ *  index page lists. Same clamping and counting rules as listPublishedPage. */
+export async function listPublishedPageByCategory(
+  db: D1Database,
+  category: string,
+  page = 1,
+  perPage = 12
+): Promise<Page<BlogPost>> {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM blog_posts WHERE category = ? AND ${LIVE}`)
+    .bind(category)
+    .first<{ n: number }>();
+  const total = row?.n ?? 0;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
+  const r = await db
+    .prepare(
+      `SELECT * FROM blog_posts
+       WHERE category = ? AND ${LIVE}
+       ORDER BY published_at DESC, id DESC
+       LIMIT ? OFFSET ?`
+    )
+    .bind(category, perPage, (current - 1) * perPage)
     .all<BlogPost>();
   return { items: r.results ?? [], page: current, perPage, total, pages };
 }

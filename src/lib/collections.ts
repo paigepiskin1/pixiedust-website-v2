@@ -17,6 +17,10 @@ export interface Collection {
   sort_order: number;
   status: "draft" | "published";
   in_footer: number;
+  /** 'section' -> posts live at /<slug>/<post>; 'blog' -> /blog/<post>. Per
+   *  category because the live posts at /blog/<slug> are indexed and must not
+   *  move, while the six agreed sections were specified as nested. */
+  url_mode: "section" | "blog";
 }
 
 export interface CollectionItem {
@@ -92,6 +96,24 @@ export function imageFor(i: CollectionItem): string | null {
 export { isoDate, displayDate, textOf };
 
 // ── public reads ───────────────────────────────────────────────────────────
+
+/** Where a post in this category lives. */
+export function postHref(category: Collection | null | undefined, slug: string): string {
+  return category && category.url_mode === "section" ? `/${category.slug}/${slug}` : `/blog/${slug}`;
+}
+
+export async function getCollectionById(db: D1Database, id: string): Promise<Collection | null> {
+  return (await db.prepare("SELECT * FROM collections WHERE id = ?").bind(id).first<Collection>()) ?? null;
+}
+
+/** Categories whose posts use nested URLs, keyed by id — used to resolve a
+ *  post's canonical path without a query per post. */
+export async function sectionCategories(db: D1Database): Promise<Map<string, Collection>> {
+  const r = await db
+    .prepare("SELECT * FROM collections WHERE url_mode = 'section' AND status = 'published'")
+    .all<Collection>();
+  return new Map((r.results ?? []).map((c) => [c.id, c]));
+}
 
 export async function listCollections(db: D1Database, footerOnly = false): Promise<Collection[]> {
   const r = await db
