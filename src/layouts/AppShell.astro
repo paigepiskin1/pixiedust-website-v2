@@ -17,8 +17,11 @@ interface Props {
   noindex?: boolean;
   jsonLd?: string;
   credits?: number;
+  canonical?: string;
+  prevUrl?: string;
+  nextUrl?: string;
 }
-const { title, description, ogImage, ogType, jsonLd } = Astro.props;
+const { title, description, ogImage, ogType, jsonLd, canonical, prevUrl, nextUrl } = Astro.props;
 
 // Auto-noindex private/gated sections — defence in depth alongside robots.txt
 const path = Astro.url.pathname;
@@ -68,7 +71,7 @@ if (!user) {
 }
 ---
 
-<Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd}>
+<Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd} canonical={canonical} prevUrl={prevUrl} nextUrl={nextUrl}>
   <Fragment slot="head"><slot name="head" /></Fragment>
   <script is:inline set:html={`document.documentElement.setAttribute('data-auth','${user ? "in" : "out"}');${user ? "document.documentElement.setAttribute('data-plan','free');" : ""}`}></script>
   <div class="flex min-h-screen">

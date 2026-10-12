@@ -151,6 +151,37 @@ export async function listPublished(db: D1Database, limit = 100): Promise<BlogPo
   return r.results ?? [];
 }
 
+export interface Page<T> {
+  items: T[];
+  page: number;
+  perPage: number;
+  total: number;
+  pages: number;
+}
+
+/** One page of live posts, newest first.
+ *
+ *  Counts and selects in the same request so "page 3 of 7" can never disagree
+ *  with what page 3 actually contains. `page` is clamped into range rather than
+ *  404ing: ?page=99 lands on the last page, which is friendlier to a stale link
+ *  and stops a crawler manufacturing endless empty pages. */
+export async function listPublishedPage(db: D1Database, page = 1, perPage = 12): Promise<Page<BlogPost>> {
+  const row = await db.prepare(`SELECT COUNT(*) AS n FROM blog_posts WHERE ${LIVE}`).first<{ n: number }>();
+  const total = row?.n ?? 0;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
+  const r = await db
+    .prepare(
+      `SELECT * FROM blog_posts
+       WHERE ${LIVE}
+       ORDER BY published_at DESC, id DESC
+       LIMIT ? OFFSET ?`
+    )
+    .bind(perPage, (current - 1) * perPage)
+    .all<BlogPost>();
+  return { items: r.results ?? [], page: current, perPage, total, pages };
+}
+
 export async function getPublishedBySlug(db: D1Database, slug: string): Promise<BlogPost | null> {
   return (
     (await db

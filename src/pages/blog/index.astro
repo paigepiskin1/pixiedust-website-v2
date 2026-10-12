@@ -2,17 +2,34 @@
 export const prerender = false;
 import AppShell from "../../layouts/AppShell.astro";
 import PageHeader from "../../components/ui/PageHeader.astro";
-import { listPublished, thumbnailFor, excerptFor, displayDate, isoDate, readingMinutes, tagsOf, BLOG_AUTHOR_FALLBACK } from "../../lib/blog";
+import Pagination from "../../components/ui/Pagination.astro";
+import { listPublishedPage, thumbnailFor, excerptFor, displayDate, isoDate, readingMinutes, tagsOf, BLOG_AUTHOR_FALLBACK } from "../../lib/blog";
 
 const SITE = "https://pixydust.com";
 const db = Astro.locals.runtime.env.DB;
 
-let posts: Awaited<ReturnType<typeof listPublished>> = [];
+const PER_PAGE = 12;
+const requested = Number(Astro.url.searchParams.get("page") ?? "1");
+
+let paged = { items: [] as any[], page: 1, perPage: PER_PAGE, total: 0, pages: 1 };
 try {
-  posts = await listPublished(db, 60);
+  paged = await listPublishedPage(db, Number.isFinite(requested) ? requested : 1, PER_PAGE);
 } catch {
   // Blog table missing (pre-migration) must not take the page down.
 }
+const posts = paged.items;
+
+// listPublishedPage clamps anything out of range, so redirect to the URL the
+// reader actually landed on rather than serving page 3 at ?page=99. This also
+// catches ?page=0, ?page=abc, ?page=-3 and the redundant ?page=1, each of
+// which would otherwise be a second URL serving page one's content.
+const rawPage = Astro.url.searchParams.get("page");
+const canonicalPath = paged.page === 1 ? "/blog" : `/blog?page=${paged.page}`;
+if (rawPage !== null && Astro.url.pathname + Astro.url.search !== canonicalPath) {
+  return Astro.redirect(canonicalPath, 302);
+}
+
+const pageUrl = (n: number) => (n <= 1 ? `${SITE}/blog` : `${SITE}/blog?page=${n}`);
 
 const cards = posts.map((p) => ({
   slug: p.slug,
@@ -31,7 +48,7 @@ const cards = posts.map((p) => ({
 const jsonLd = JSON.stringify({
   "@type": "Blog",
   "@id": `${SITE}/blog#blog`,
-  url: `${SITE}/blog`,
+  url: pageUrl(paged.page),
   name: "PixyDust Blog",
   description: "Guides, feature news and creative walkthroughs for AI image and video generation.",
   publisher: { "@id": `${SITE}/#organization` },
@@ -46,10 +63,13 @@ const jsonLd = JSON.stringify({
 ---
 
 <AppShell
-  title="Blog — PixyDust"
+  title={paged.page > 1 ? `Blog — page ${paged.page} of ${paged.pages} — PixyDust` : "Blog — PixyDust"}
   description="Guides, feature news and creative walkthroughs for AI image and video generation with PixyDust."
   ogImage={cards[0]?.image ?? undefined}
   jsonLd={jsonLd}
+  canonical={pageUrl(paged.page)}
+  prevUrl={paged.page > 1 ? pageUrl(paged.page - 1) : undefined}
+  nextUrl={paged.page < paged.pages ? pageUrl(paged.page + 1) : undefined}
   credits={Astro.locals.user?.credits ?? 47}
 >
   <div class="mx-auto w-full" style="max-width:1180px;padding:28px;">
@@ -71,8 +91,8 @@ const jsonLd = JSON.stringify({
         <div class="grid gap-5" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">
           {cards.map((c, i) => (
             <article
-              class="flex flex-col overflow-hidden rounded-2xl"
-              style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);"
+              class="pd-reveal flex flex-col overflow-hidden rounded-2xl"
+              style={`--i:${i};background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);`}
             >
               <a href={`/blog/${c.slug}`} style="text-decoration:none;display:block;">
                 {c.image ? (
@@ -117,5 +137,14 @@ const jsonLd = JSON.stringify({
         </div>
       )
     }
+
+    <Pagination
+      page={paged.page}
+      pages={paged.pages}
+      total={paged.total}
+      perPage={paged.perPage}
+      base="/blog"
+      noun="articles"
+    />
   </div>
 </AppShell>

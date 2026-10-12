@@ -14,6 +14,14 @@ interface Props {
   jsonLd?: string;
   /** Comma-separated meta keywords. Defaults to the brand set. */
   keywords?: string;
+  /** Absolute URL overriding the derived canonical. Needed where the query
+   *  string is part of the page's identity — a paginated series must
+   *  self-canonicalise, since pointing every page at page 1 tells search
+   *  engines the deeper pages are duplicates and drops their links. */
+  canonical?: string;
+  /** Absolute URLs for <link rel="prev"/"next"> on a paginated series. */
+  prevUrl?: string;
+  nextUrl?: string;
 }
 
 const {
@@ -24,6 +32,9 @@ const {
   noindex = false,
   jsonLd,
   keywords = "PixyDust, Pixy Dust, PixieDust, Pixie Dust, AI Creative Suite, AI Creative Tools, AI Creative Platform, AR Filters, AR Lenses, AI Image Generator, Image Generator, AI Video Generator, Video Generator, AI Image Editor, Image Editor, AI Video Editor, Video Editor, AI Content Creation, Generative AI Tools",
+  canonical,
+  prevUrl,
+  nextUrl,
 } = Astro.props;
 
 const SITE = "https://pixydust.com";
@@ -32,7 +43,7 @@ const SITE = "https://pixydust.com";
 // "//" is protocol-relative, so new URL("//trending", SITE) yields
 // "https://trending/" — a canonical pointing at someone else's domain.
 const canonicalPath = "/" + Astro.url.pathname.split("/").filter(Boolean).join("/");
-const canonicalURL = new URL(canonicalPath, SITE).href;
+const canonicalURL = canonical ?? new URL(canonicalPath, SITE).href;
 const resolvedOgImage = ogImage ?? `${SITE}/og-default.png`;
 
 // Base WebSite + WebApplication JSON-LD — always present on every page
@@ -113,6 +124,8 @@ const baseJsonLd = {
         smaller engines and internal tools still read it, and it costs nothing. */}
     <meta name="keywords" content={keywords} />
     <link rel="canonical" href={canonicalURL} />
+    {prevUrl && <link rel="prev" href={prevUrl} />}
+    {nextUrl && <link rel="next" href={nextUrl} />}
     {noindex && <meta name="robots" content="noindex,nofollow" />}
 
     <!-- Open Graph -->
