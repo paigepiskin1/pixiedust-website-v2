@@ -2,7 +2,8 @@
 export const prerender = false;
 import AdminShell from "../../../../layouts/AdminShell.astro";
 import { isAdmin } from "../../../../lib/admin";
-import { getById, tagsOf, isoDate, BLOG_AUTHOR_FALLBACK } from "../../../../lib/blog";
+import { getById, listAll, tagsOf, isoDate, relatedIdsOf, BLOG_AUTHOR_FALLBACK } from "../../../../lib/blog";
+import { CATEGORIES } from "../../../../lib/blog-taxonomy";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
 
@@ -10,6 +11,13 @@ const db = Astro.locals.runtime.env.DB;
 const id = Number(Astro.params.id);
 const post = Number.isFinite(id) ? await getById(db, id) : null;
 if (!post) return Astro.redirect("/admin/blog");
+
+// Candidates for the manual related-article override. Every post except this
+// one — including drafts, so an editor can line up a recommendation before the
+// target goes live; relatedPosts() skips anything unpublished at render time.
+const allPosts = (await listAll(db))
+  .filter((p) => p.id !== post.id)
+  .map((p) => ({ id: p.id, title: p.title }));
 
 const initial = {
   id: post.id,
@@ -24,6 +32,9 @@ const initial = {
   status: post.status,
   // ISO (UTC) or "" — the browser converts to and from the author's local zone.
   publishedAt: isoDate(post.published_at) ?? "",
+  category: post.category ?? "",
+  related: relatedIdsOf(post),
+  allPosts,
 };
 ---
 
@@ -158,6 +169,31 @@ const initial = {
           <input id="pd-tags" type="text" value={initial.tags.join(", ")} placeholder="tutorial, video"
             class="mt-1 w-full rounded-lg text-ink"
             style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;" />
+
+          <div class="mt-3 flex items-center justify-between">
+            <label class="block text-ink-3" style="font-size:11px;">Primary category</label>
+            <button type="button" id="pd-suggest" class="rounded-md text-ink-3"
+              style="padding:3px 7px;font-size:10px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">Suggest</button>
+          </div>
+          <select id="pd-category" class="mt-1 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;">
+            <option value="">— none —</option>
+            {CATEGORIES.map((c) => <option value={c.id} selected={post.category === c.id}>{c.label}</option>)}
+          </select>
+          <p class="mt-1 text-ink-4" style="font-size:10.5px;line-height:1.35;">
+            Drives Related articles. Suggest re-reads the title, excerpt and body.
+          </p>
+
+          <label class="mt-3 block text-ink-3" style="font-size:11px;">Related articles (optional override)</label>
+          <p class="mt-0.5 text-ink-4" style="font-size:10.5px;line-height:1.35;">
+            Up to 3, in order. Leave empty to pick automatically by category and tags.
+          </p>
+          <div id="pd-related-list" class="mt-1.5 flex flex-col gap-1"></div>
+          <select id="pd-related-add" class="mt-1.5 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;">
+            <option value="">+ add an article…</option>
+            {allPosts.map((p) => <option value={p.id}>{p.title}</option>)}
+          </select>
 
           <label class="mt-3 block text-ink-3" style="font-size:11px;">Author</label>
           <input id="pd-author" type="text" value={initial.author} placeholder={BLOG_AUTHOR_FALLBACK}
@@ -498,6 +534,67 @@ const initial = {
     });
     $("pd-thumb-clear").addEventListener("click", () => { thumbUrl = ""; renderThumb(); markDirty(); });
 
+    // ── category, tags and related overrides ──────────────────────────────
+    const categoryEl = $<HTMLSelectElement>("pd-category");
+    const relatedAddEl = $<HTMLSelectElement>("pd-related-add");
+    const relatedListEl = $<HTMLDivElement>("pd-related-list");
+    const titleById = new Map<number, string>((data.allPosts || []).map((p: any) => [p.id, p.title]));
+    let relatedIds: number[] = Array.isArray(data.related) ? [...data.related] : [];
+
+    function renderRelated() {
+      relatedListEl.innerHTML = "";
+      relatedIds.forEach((id, i) => {
+        const row = document.createElement("div");
+        row.className = "flex items-center gap-1.5 rounded-lg";
+        row.style.cssText = "padding:5px 7px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);";
+        const n = document.createElement("span");
+        n.className = "font-mono";
+        n.style.cssText = "font-size:9.5px;color:var(--pd-ink4);min-width:12px;";
+        n.textContent = String(i + 1);
+        const t = document.createElement("span");
+        t.className = "text-ink-2";
+        t.style.cssText = "font-size:11px;line-height:1.3;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+        t.textContent = titleById.get(id) || `#${id}`;
+        const up = document.createElement("button");
+        up.type = "button"; up.textContent = "↑";
+        up.style.cssText = "background:none;border:0;color:var(--pd-ink3);cursor:pointer;font-size:11px;padding:0 3px;";
+        up.addEventListener("click", () => {
+          if (i === 0) return;
+          [relatedIds[i - 1], relatedIds[i]] = [relatedIds[i], relatedIds[i - 1]];
+          markDirty(); renderRelated();
+        });
+        const rm = document.createElement("button");
+        rm.type = "button"; rm.textContent = "×";
+        rm.style.cssText = "background:none;border:0;color:var(--pd-pink);cursor:pointer;font-size:13px;padding:0 3px;";
+        rm.addEventListener("click", () => {
+          relatedIds = relatedIds.filter((x) => x !== id);
+          markDirty(); renderRelated();
+        });
+        row.append(n, t, up, rm);
+        relatedListEl.appendChild(row);
+      });
+      // Three is the display limit, so offering a fourth would be a lie.
+      relatedAddEl.style.display = relatedIds.length >= 3 ? "none" : "";
+    }
+
+    relatedAddEl.addEventListener("change", () => {
+      const id = Number(relatedAddEl.value);
+      relatedAddEl.value = "";
+      if (!Number.isFinite(id) || !id || relatedIds.includes(id) || relatedIds.length >= 3) return;
+      relatedIds.push(id);
+      markDirty(); renderRelated();
+    });
+    categoryEl.addEventListener("change", markDirty);
+
+    // Ask the server to re-derive category and tags from the current text. The
+    // classifier lives server-side so the admin, the save path and the backfill
+    // script cannot drift apart.
+    $("pd-suggest").addEventListener("click", async () => {
+      stateEl.textContent = "Classifying…";
+      const ok = await save(undefined, { autoClassify: true });
+      stateEl.textContent = ok ? "Suggested — review before saving" : "Could not classify";
+    });
+
     // ── scheduling ────────────────────────────────────────────────────────
     // The control is a datetime-local, which has no timezone, so it is read and
     // written in the author's local zone and converted to UTC at the boundary.
@@ -580,7 +677,7 @@ const initial = {
       return copy.innerHTML;
     }
 
-    async function save(nextStatus?: string) {
+    async function save(nextStatus?: string, opts: { autoClassify?: boolean } = {}) {
       const payload = {
         action: "save",
         id: data.id,
@@ -594,6 +691,9 @@ const initial = {
         tags: tagsEl.value.split(",").map((t) => t.trim()).filter(Boolean),
         status: nextStatus ?? status,
         publishedAt: fromLocalInput(publishedAtEl.value),
+        category: categoryEl.value,
+        related: relatedIds,
+        autoClassify: !!opts.autoClassify,
       };
       stateEl.textContent = "Saving…";
       try {
@@ -615,6 +715,9 @@ const initial = {
         if (j.publishedAt !== undefined) {
           publishedAtEl.value = toLocalInput(j.publishedAt ? String(j.publishedAt).replace(" ", "T") + "Z" : "");
         }
+        if (j.category !== undefined) categoryEl.value = j.category || "";
+        if (Array.isArray(j.tags)) tagsEl.value = j.tags.join(", ");
+        if (Array.isArray(j.related)) { relatedIds = j.related; renderRelated(); }
         $<HTMLAnchorElement>("pd-view").href = `/blog/${j.slug}`;
         dirty = false;
         stateEl.textContent = `Saved ${new Date().toLocaleTimeString()}`;
@@ -667,6 +770,6 @@ const initial = {
     });
     window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 
-    renderThumb(); renderSchedule(); renderStatus(); renderSeo();
+    renderThumb(); renderRelated(); renderSchedule(); renderStatus(); renderSeo();
   </script>
 </AdminShell>

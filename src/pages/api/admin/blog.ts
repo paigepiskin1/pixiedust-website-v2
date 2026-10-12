@@ -1,7 +1,8 @@
 export const prerender = false;
 import type { APIContext } from "astro";
 import { adminActor, auditAdmin } from "../../../lib/admin";
-import { uniqueSlug, slugify, getById, type BlogPost } from "../../../lib/blog";
+import { uniqueSlug, slugify, getById, textOf, relatedIdsOf, type BlogPost } from "../../../lib/blog";
+import { classify, CATEGORY_IDS } from "../../../lib/blog-taxonomy";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -22,6 +23,12 @@ interface SaveBody {
   /** ISO-8601 (or 'YYYY-MM-DD HH:MM:SS') publish time, UTC. A future value
    *  schedules the post. "" clears it back to "stamp on next publish". */
   publishedAt?: string | null;
+  /** Primary category id. "" clears it so the classifier can fill it again. */
+  category?: string | null;
+  /** Ordered manual related-article ids, max 3. */
+  related?: number[];
+  /** Ask the server to (re)derive category and tags from the text. */
+  autoClassify?: boolean;
 }
 
 /** Normalise a client-supplied publish time to D1's 'YYYY-MM-DD HH:MM:SS' UTC.
@@ -106,35 +113,65 @@ export async function POST({ request, locals }: APIContext) {
             existing.published_at ?? new Date().toISOString().slice(0, 19).replace("T", " ")
           : existing.published_at;
 
-    const tags = Array.isArray(body.tags)
+    const contentHtml = body.contentHtml ?? existing.content_html;
+    const excerptText = (body.excerpt ?? existing.excerpt ?? "").trim();
+
+    let tags = Array.isArray(body.tags)
       ? body.tags.map((t) => String(t).trim()).filter(Boolean).slice(0, 8)
       : JSON.parse(existing.tags_json || "[]");
+    let category = body.category !== undefined ? (body.category || null) : existing.category;
+
+    // Classify from the text when asked, or whenever a post would otherwise be
+    // saved with nothing to match on. Recommendations are only as good as the
+    // metadata, and an untagged post is invisible to every other article's
+    // related list — so the default is "always classified", and an editor's
+    // explicit values always win.
+    if (body.autoClassify || !category || tags.length === 0) {
+      const guess = classify(title, excerptText, textOf(contentHtml));
+      if (body.autoClassify) {
+        category = guess.category ?? category;
+        tags = guess.tags.length ? guess.tags : tags;
+      } else {
+        if (!category) category = guess.category;
+        if (tags.length === 0) tags = guess.tags;
+      }
+    }
+    if (category && !CATEGORY_IDS.includes(category)) category = null;
+
+    // Manual related picks: ids only, de-duplicated, never self-referential,
+    // capped at three.
+    const related = Array.isArray(body.related)
+      ? [...new Set(body.related.map(Number).filter((n) => Number.isFinite(n) && n !== existing.id))].slice(0, 3)
+      : relatedIdsOf(existing);
 
     await db
       .prepare(
         `UPDATE blog_posts
          SET slug = ?, title = ?, excerpt = ?, content_html = ?, thumbnail_url = ?, thumbnail_alt = ?,
-             author = ?, tags_json = ?, status = ?, published_at = ?, updated_at = datetime('now')
+             author = ?, tags_json = ?, status = ?, published_at = ?, category = ?, related_json = ?,
+             updated_at = datetime('now')
          WHERE id = ?`
       )
       .bind(
         slug,
         title,
-        (body.excerpt ?? existing.excerpt ?? "").trim() || null,
-        body.contentHtml ?? existing.content_html,
+        excerptText || null,
+        contentHtml,
         (body.thumbnailUrl ?? existing.thumbnail_url ?? "").trim() || null,
         (body.thumbnailAlt ?? existing.thumbnail_alt ?? "").trim() || null,
         (body.author ?? existing.author ?? "").trim() || null,
         JSON.stringify(tags),
         status,
         publishedAt,
+        category,
+        JSON.stringify(related),
         existing.id
       )
       .run();
 
     const scheduled = status === "published" && !!publishedAt && publishedAt > new Date().toISOString().slice(0, 19).replace("T", " ");
     await auditAdmin(db, actor, "save_blog_post", "blog_posts", String(existing.id), { slug, status, publishedAt, scheduled });
-    return json({ ok: true, id: existing.id, slug, status, publishedAt, scheduled });
+    return json({ ok: true, id: existing.id, slug, status, publishedAt, scheduled, category, tags, related });
   } catch (err) {
     return json({ error: `Blog save failed: ${(err as Error)?.message || String(err)}` }, 500);
   }

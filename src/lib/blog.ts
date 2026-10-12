@@ -16,6 +16,21 @@ export interface BlogPost {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Primary category id from blog-taxonomy. Null until classified. */
+  category: string | null;
+  /** Editor's ordered override: JSON array of blog_posts.id. */
+  related_json: string;
+}
+
+/** Manual related-article picks, as ids. Stored as ids rather than slugs so a
+ *  retitled or re-permalinked post keeps its incoming recommendations. */
+export function relatedIdsOf(post: Pick<BlogPost, "related_json">): number[] {
+  try {
+    const v = JSON.parse(post.related_json || "[]");
+    return Array.isArray(v) ? v.map(Number).filter((n) => Number.isFinite(n)) : [];
+  } catch {
+    return [];
+  }
 }
 
 export const BLOG_AUTHOR_FALLBACK = "PixyDust";
@@ -171,13 +186,60 @@ export async function uniqueSlug(db: D1Database, desired: string, ignoreId?: num
   return `${base}-${Date.now()}`;
 }
 
-/** Posts to show under an article. Prefers shared tags, fills up with recent. */
+/** Articles to recommend under a post, most relevant first.
+ *
+ *  Order of precedence:
+ *    1. The editor's manual picks, in the order they chose.
+ *    2. Same primary category, then by number of shared tags.
+ *    3. Shared tags alone, for cross-category matches.
+ *
+ *  Publication date only ever breaks a tie between equally relevant posts — it
+ *  is not itself a reason to recommend something. An article with no relevant
+ *  neighbours returns fewer than `limit`, or none at all, rather than padding
+ *  with whatever is newest. Showing three unrelated posts is worse than showing
+ *  one related one, and worse than showing nothing.
+ *
+ *  Candidates come from listPublished, so drafts, scheduled-for-later and
+ *  deleted posts are already excluded, and every card reflects the target's
+ *  current title and slug because it is read fresh on each request. */
 export async function relatedPosts(db: D1Database, post: BlogPost, limit = 3): Promise<BlogPost[]> {
-  const others = (await listPublished(db, 30)).filter((p) => p.id !== post.id);
-  const tags = new Set(tagsOf(post).map((t) => t.toLowerCase()));
-  if (!tags.size) return others.slice(0, limit);
-  const scored = others
-    .map((p) => ({ p, score: tagsOf(p).filter((t) => tags.has(t.toLowerCase())).length }))
-    .sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.p);
+  // A generous pool: relevance, not recency, decides what survives.
+  const pool = (await listPublished(db, 500)).filter((p) => p.id !== post.id);
+  const byId = new Map(pool.map((p) => [p.id, p]));
+
+  const picked: BlogPost[] = [];
+  const seen = new Set<number>([post.id]);
+  const take = (p: BlogPost | undefined) => {
+    if (!p || seen.has(p.id) || picked.length >= limit) return;
+    seen.add(p.id);
+    picked.push(p);
+  };
+
+  // 1. Manual overrides. Silently skipped if unpublished or deleted — the
+  //    editor's intent was "show this", not "show a gap".
+  for (const id of relatedIdsOf(post)) take(byId.get(id));
+  if (picked.length >= limit) return picked;
+
+  // 2+3. Automatic relevance.
+  const myTags = new Set(tagsOf(post).map((t) => t.toLowerCase()));
+  const scored = pool
+    .filter((p) => !seen.has(p.id))
+    .map((p) => {
+      const shared = tagsOf(p).filter((t) => myTags.has(t.toLowerCase())).length;
+      const sameCategory = !!post.category && p.category === post.category;
+      // Category dominates: any same-category post outranks a cross-category
+      // one, however many tags the latter happens to share.
+      const score = (sameCategory ? 100 : 0) + shared * 10;
+      return { p, score };
+    })
+    .filter((s) => s.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const at = a.p.published_at || "";
+      const bt = b.p.published_at || "";
+      return bt.localeCompare(at); // newer first, tie-break only
+    });
+
+  for (const s of scored) take(s.p);
+  return picked;
 }
