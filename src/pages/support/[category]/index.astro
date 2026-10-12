@@ -2,11 +2,12 @@
 export const prerender = false;
 import AppShell from "../../../layouts/AppShell.astro";
 import HelpIcon from "../../../components/help/HelpIcon.astro";
-import { getCategory, articleHref, HELP_SUPPORT_EMAIL } from "../../../lib/help";
+import { getCategory, articleHref, HELP_SUPPORT_EMAIL } from "../../../lib/help-db";
 
+const db = Astro.locals.runtime.env.DB;
 const user = Astro.locals.user;
 const { category: categoryId } = Astro.params;
-const category = categoryId ? getCategory(categoryId) : undefined;
+const category = categoryId ? await getCategory(db, categoryId) : undefined;
 if (!category) return Astro.redirect("/support");
 ---
 

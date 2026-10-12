@@ -60,24 +60,20 @@ export async function GET({ locals }: APIContext) {
     // A sitemap missing the blog beats a sitemap that 500s.
   }
 
-  // Help Centre. The content is static (src/lib/help.ts), not database-backed,
-  // so every category and article is known at request time and none of it can
-  // be a draft — unlike the blog above, there is nothing to filter out.
+  // Help Centre, now database-backed and editable in the admin. listCategories
+  // and allArticles return published rows only, so an unfinished article is
+  // never advertised — the same rule the blog above follows.
   let help: Entry[] = [];
   try {
-    const { HELP_CATEGORIES, allArticles, categoryHref, articleHref } = await import("../lib/help");
-    help = [
-      ...HELP_CATEGORIES.map((c) => ({
-        loc: categoryHref(c.id),
-        priority: "0.5",
-        changefreq: "monthly",
-      })),
-      ...allArticles().map((a) => ({
-        loc: articleHref(a.categoryId, a.slug),
-        priority: "0.5",
-        changefreq: "monthly",
-      })),
-    ];
+    const db = (locals as any)?.runtime?.env?.DB;
+    if (db) {
+      const { listCategories, allArticles, categoryHref, articleHref } = await import("../lib/help-db");
+      const [cats, arts] = await Promise.all([listCategories(db), allArticles(db)]);
+      help = [
+        ...cats.map((c) => ({ loc: categoryHref(c.id), priority: "0.5", changefreq: "monthly" })),
+        ...arts.map((a) => ({ loc: articleHref(a.categoryId, a.slug), priority: "0.5", changefreq: "monthly" })),
+      ];
+    }
   } catch {
     // Same rule as the blog: a sitemap missing the help centre beats a 500.
   }

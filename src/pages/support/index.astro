@@ -3,17 +3,19 @@ export const prerender = false;
 import AppShell from "../../layouts/AppShell.astro";
 import HelpIcon from "../../components/help/HelpIcon.astro";
 import {
-  HELP_CATEGORIES,
+  listCategories,
   popularArticles,
   allArticles,
   categoryHref,
   articleHref,
   HELP_SUPPORT_EMAIL,
-} from "../../lib/help";
+} from "../../lib/help-db";
 
+const db = Astro.locals.runtime.env.DB;
 const user = Astro.locals.user;
-const popular = popularArticles();
-const searchIndex = allArticles().map((a) => ({
+const HELP_CATEGORIES = await listCategories(db);
+const popular = await popularArticles(db);
+const searchIndex = (await allArticles(db)).map((a) => ({
   t: a.title,
   s: a.summary,
   c: a.categoryTitle,
