@@ -3,12 +3,12 @@ import Base from "./Base.astro";
 import Sidebar from "../components/shell/Sidebar.astro";
 import Topbar from "../components/shell/Topbar.astro";
 import MobileDrawer from "../components/shell/MobileDrawer.astro";
+import SiteFooter from "../components/shell/SiteFooter.astro";
 import Toast from "../components/ui/Toast.astro";
 import FirstVisitSignup from "../components/FirstVisitSignup.astro";
 import type { WelcomeSlide } from "../components/FirstVisitSignup.astro";
 import { getToolCards } from "../lib/tool-cards";
 import { getTemplate } from "../lib/templates";
-import { listCollections } from "../lib/collections";
 
 interface Props {
   title?: string;
@@ -37,14 +37,6 @@ const autoNoindex =
 const user = Astro.locals.user ?? null;
 const credits = user?.credits ?? Astro.props.credits ?? 47;
 
-// Footer sections come from the database, so adding one in the admin links it
-// here without a deploy.
-let footerSections: { slug: string; title: string }[] = [];
-try {
-  footerSections = (await listCollections(Astro.locals.runtime.env.DB, true)).map((c) => ({ slug: c.slug, title: c.title }));
-} catch {
-  // A missing table must not take every page down.
-}
 
 // Welcome popup slideshow for logged-out visitors — live homepage covers.
 let welcomeSlides: WelcomeSlide[] = [];
@@ -91,21 +83,7 @@ if (!user) {
       <main class="flex-1">
         <slot />
       </main>
-      <footer style="border-top:0.5px solid var(--pd-hairline);padding:18px 28px;">
-        <div class="mx-auto flex flex-wrap items-center justify-between gap-3" style="max-width:1480px;">
-          <span class="font-mono" style="font-size:10.5px;color:var(--pd-ink4);letter-spacing:0.3px;">© PixyDust</span>
-          <nav class="pd-footer-nav flex flex-wrap items-center gap-x-4 gap-y-1.5" style="font-size:11.5px;">
-            <a href="/about">About</a>
-            {footerSections.map((f) => <a href={`/${f.slug}`}>{f.title}</a>)}
-            <a href="/support">Support</a>
-            <a href="/brand">Brand</a>
-            <a href="/legal/terms">Terms</a>
-            <a href="/legal/privacy">Privacy</a>
-            <a href="/legal/acceptable-use">Acceptable use</a>
-            <a href="/feedback">Feedback</a>
-          </nav>
-        </div>
-      </footer>
+      <SiteFooter signedIn={!!user} />
     </div>
   </div>
   <MobileDrawer credits={credits} user={user} />
