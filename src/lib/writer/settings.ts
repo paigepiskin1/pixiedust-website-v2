@@ -53,7 +53,7 @@ export const DEFAULTS: WriterSettings = {
     input: { size: "custom", width: 2400, height: 1260, max_images: 1, sequential_image_generation: "disabled" },
     costUsd: 0.03,
     guidelines:
-      "Original editorial image for the PixyDust blog. One coherent scene, photographic or clean 3D, wide composition with the subject near the center so it survives a 1.91:1 crop. Dark, deep backgrounds with blue and cyan accent light where it suits the subject. No text, letters, numbers, logos, watermarks, signage, app screens, phone interfaces, user interfaces, collages, grids or split panels.",
+      "Original editorial photograph for the PixyDust blog: realistic, natural-looking photography, not illustration, cartoon or 3D render. One coherent scene, wide composition with the subject near the center so it survives a 1.91:1 crop. Where it suits the subject, deep backgrounds with blue and cyan accent light. Any people are ordinary, non-famous adults. No text, letters, numbers, logos, watermarks, signage, app screens, phone interfaces, user interfaces, collages, grids or split panels.",
   },
   limits: { perArticleUsd: 3, monthlyUsd: 30 },
   sourceDomains: ["pixydust.com", "pixiedustapp.com"],

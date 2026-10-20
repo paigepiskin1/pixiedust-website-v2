@@ -225,7 +225,8 @@ const subs = (await adminListAll(db)).filter((s) => s.parent_id === job.brief.se
         ${imgUrl ? `<img src="${esc(imgUrl)}?width=600" style="width:100%;border-radius:10px;aspect-ratio:1200/630;object-fit:cover;" alt="" />
           <div class="wr-hint wr-mono" style="margin-top:6px;">${esc(img.filename)} · 1200×630 JPEG · ${Math.round((img.bytes || 0) / 1024)} KB${img.moderation ? ` · moderation ${img.moderation.safe ? "passed" : "flagged"}` : ""}</div>`
         : `<p class="wr-muted">${job.stages.image.state === "waiting" ? "Generating…" : job.stages.image.state === "failed" ? esc(job.stages.image.error) : "Not generated yet."}</p>`}
-        ${field("alt", "Alt text", e.alt ?? img?.alt ?? d.image.alt, { max: 125 })}
+        ${field("alt", "Alt text", e.alt ?? img?.alt ?? d.image.alt, { max: 125, hint: "Describe what the picture actually shows." })}
+        ${field("concept", "Image description", e.concept ?? d.image.concept, { area: true, hint: "Used for the next generated image, with the visual guidelines from Settings. Save field edits, then Generate a new image." })}
         <details class="wr-more" style="margin:6px 0 10px;"><summary>Prompt and provenance</summary>
           <div class="wr-hint" style="margin-top:6px;">${img ? `${esc(img.kind === "upload" ? "Uploaded screenshot" : `${img.provider} · ${img.model}`)}${img.providerJobId ? ` · job ${esc(img.providerJobId)}` : ""}<br/>Created ${esc(img.createdAt)}<br/>${img.originalUrl ? `Original: <a href="${esc(img.originalUrl)}" target="_blank" style="color:var(--pd-lilac);">file</a><br/>` : ""}Prompt: ${esc(img.prompt || "(none)")}` : `Concept: ${esc(d.image.concept)}`}
           ${img?.previous?.length ? `<br/>Earlier images: ${img.previous.map((p: any, i: number) => p.url ? `<a href="${esc(p.url)}" target="_blank" style="color:var(--pd-lilac);">#${i + 1}</a>` : "").join(" ")}` : ""}</div></details>

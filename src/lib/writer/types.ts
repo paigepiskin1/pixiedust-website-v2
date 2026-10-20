@@ -157,5 +157,7 @@ export interface ReviewEdits {
   tags?: string[];
   category?: string | null;
   alt?: string;
+  /** Image description the next generation uses instead of the writer's. */
+  concept?: string;
   related?: number[];
 }

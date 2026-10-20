@@ -89,7 +89,7 @@ SEO
 - category_hint: the CATEGORIES id that fits best, or "" if none does.
 
 IMAGE
-- image.concept: one or two sentences describing an original scene for the header image. No text, no logos, no screens or app interfaces, no collage, no real or famous people.
+- image.concept: one or two sentences describing an original, realistic photograph for the header image. Keep it simple enough for an image model to get right: one main subject, and nothing that depends on two depictions matching (such as a person holding photos of themselves). No text, no logos, no screens or app interfaces, no collage, no real or famous people.
 - image.alt: what the picture shows, under 125 characters, without "image of".
 - image.filename: 3 to 6 lowercase words joined by hyphens.
 

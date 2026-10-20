@@ -628,7 +628,14 @@ async function runLinks(env: WriterEnv, job: Job, s: WriterSettings): Promise<St
   }));
   // Anything that fails validation now is dropped at once with its reason, so
   // the reviewer only chooses among links that can actually be saved.
-  const checked = resolveLinks(raw, job.draft, live, selfId).map((l) => (l.problem ? { ...l, state: "removed" as const } : l));
+  // The model sometimes returns a candidate it has itself judged poor ("Weak",
+  // "Placeholder rejected") despite being told to leave those out.
+  const selfRejected = /\b(weak|reject(ed)?|placeholder|poor fit|not ideal|tenuous)\b/i;
+  const checked = resolveLinks(raw, job.draft, live, selfId).map((l) =>
+    l.problem ? { ...l, state: "removed" as const }
+      : selfRejected.test(l.reason) ? { ...l, state: "removed" as const, problem: "the suggester marked it weak" }
+        : l
+  );
   const seen = new Set<string>();
   job.links = checked.map((l) => {
     if (l.state !== "suggested") return l;
@@ -646,7 +653,7 @@ async function runImage(env: WriterEnv, job: Job, s: WriterSettings, actor: stri
   const img = job.image;
   // Submit.
   if (!img || img.url || !img.providerJobId) {
-    const prompt = `${job.draft.image.concept} ${s.image.guidelines}`.trim();
+    const prompt = `${job.edits.concept?.trim() || job.draft.image.concept} ${s.image.guidelines}`.trim();
     const providerJobId = await submitImage(env.SYNCNODE_API_KEY, s.image.provider, s.image.model, prompt, s.image.input);
     const previous = img?.url ? [...(img.previous ?? []), { ...img, previous: undefined }].slice(-5) : img?.previous;
     job.image = {
@@ -851,6 +858,7 @@ export async function saveEdits(env: WriterEnv, jobId: string, input: any, actor
   str("meta_description", 320);
   str("excerpt", 400);
   str("alt", 200);
+  str("concept", 600);
   if (typeof input?.slug === "string") e.slug = slugify(input.slug);
   if (Array.isArray(input?.tags)) e.tags = input.tags.map((t: unknown) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 8);
   if (input?.category !== undefined) e.category = input.category ? String(input.category) : null;
