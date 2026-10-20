@@ -15,6 +15,9 @@ interface SaveBody {
   title?: string;
   slug?: string;
   excerpt?: string;
+  /** Search-result title and description. "" clears back to the fallback. */
+  seoTitle?: string;
+  metaDescription?: string;
   contentHtml?: string;
   thumbnailUrl?: string;
   thumbnailAlt?: string;
@@ -134,6 +137,8 @@ export async function POST({ request, locals }: APIContext) {
 
     const contentHtml = body.contentHtml ?? existing.content_html;
     const excerptText = (body.excerpt ?? existing.excerpt ?? "").trim();
+    const seoTitle = (body.seoTitle ?? existing.seo_title ?? "").trim().slice(0, 120) || null;
+    const metaDescription = (body.metaDescription ?? existing.meta_description ?? "").trim().slice(0, 320) || null;
 
     let tags = Array.isArray(body.tags)
       ? body.tags.map((t) => String(t).trim()).filter(Boolean).slice(0, 8)
@@ -178,7 +183,7 @@ export async function POST({ request, locals }: APIContext) {
     await db
       .prepare(
         `UPDATE blog_posts
-         SET slug = ?, title = ?, excerpt = ?, content_html = ?, thumbnail_url = ?, thumbnail_alt = ?,
+         SET slug = ?, title = ?, excerpt = ?, seo_title = ?, meta_description = ?, content_html = ?, thumbnail_url = ?, thumbnail_alt = ?,
              author = ?, tags_json = ?, status = ?, published_at = ?, section = ?, category = ?, related_json = ?,
              updated_at = datetime('now')
          WHERE id = ?`
@@ -187,6 +192,8 @@ export async function POST({ request, locals }: APIContext) {
         slug,
         title,
         excerptText || null,
+        seoTitle,
+        metaDescription,
         contentHtml,
         (body.thumbnailUrl ?? existing.thumbnail_url ?? "").trim() || null,
         (body.thumbnailAlt ?? existing.thumbnail_alt ?? "").trim() || null,

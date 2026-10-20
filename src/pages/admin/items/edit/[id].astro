@@ -30,6 +30,8 @@ const initial = {
   slug: post.slug,
   title: post.title,
   excerpt: post.excerpt ?? "",
+  seoTitle: post.seo_title ?? "",
+  metaDescription: post.meta_description ?? "",
   contentHtml: post.content_html ?? "",
   thumbnailUrl: post.thumbnail_url ?? "",
   thumbnailAlt: post.thumbnail_alt ?? "",
@@ -165,12 +167,25 @@ const initial = {
         <!-- SEO -->
         <section class="rounded-xl" style="padding:14px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
           <div class="font-semibold text-ink" style="font-size:12.5px;">SEO</div>
-          <label class="mt-2 block text-ink-3" style="font-size:11px;">Meta description</label>
-          <textarea id="pd-excerpt" rows="3" placeholder="One or two sentences for search results."
+          <label class="mt-2 block text-ink-3" style="font-size:11px;">SEO title <span class="text-ink-4">· optional, else the title</span></label>
+          <input id="pd-seo-title-in" type="text" value={initial.seoTitle} placeholder="Title shown in search results"
+            class="mt-1 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:12px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;" />
+          <div class="mt-1 flex justify-end text-ink-4" style="font-size:10.5px;"><span id="pd-seo-title-count"></span></div>
+          <label class="mt-2 block text-ink-3" style="font-size:11px;">Meta description <span class="text-ink-4">· optional, else the excerpt</span></label>
+          <textarea id="pd-meta-in" rows="3" placeholder="One or two sentences for search results."
+            class="mt-1 w-full rounded-lg text-ink"
+            style="padding:8px 9px;font-size:12px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;resize:vertical;">{initial.metaDescription}</textarea>
+          <div class="mt-1 flex justify-between text-ink-4" style="font-size:10.5px;">
+            <span>Ideal 120–155 characters</span>
+            <span id="pd-meta-count"></span>
+          </div>
+          <label class="mt-2 block text-ink-3" style="font-size:11px;">Excerpt <span class="text-ink-4">· shown on cards</span></label>
+          <textarea id="pd-excerpt" rows="3" placeholder="One or two sentences for cards and listings."
             class="mt-1 w-full rounded-lg text-ink"
             style="padding:8px 9px;font-size:12px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;resize:vertical;">{initial.excerpt}</textarea>
           <div class="mt-1 flex justify-between text-ink-4" style="font-size:10.5px;">
-            <span id="pd-excerpt-hint">Ideal 120–155 characters</span>
+            <span id="pd-excerpt-hint">Used for search too when there is no meta description</span>
             <span id="pd-excerpt-count"></span>
           </div>
 
@@ -341,20 +356,29 @@ const initial = {
       const img = editor.querySelector("img");
       return img?.getAttribute("src") || "";
     }
+    const seoTitleIn = $<HTMLInputElement>("pd-seo-title-in");
+    const metaIn = $<HTMLTextAreaElement>("pd-meta-in");
     function renderSeo() {
-      const t = (titleEl.value || "Untitled post") + " — PixyDust";
+      const t = (seoTitleIn.value.trim() || titleEl.value || "Untitled post") + " — PixyDust";
       const plain = (editor.innerText || "").replace(/\s+/g, " ").trim();
-      const d = excerptEl.value.trim() || plain.slice(0, 155);
+      const d = metaIn.value.trim() || excerptEl.value.trim() || plain.slice(0, 155);
+      const mn = metaIn.value.length;
+      $("pd-meta-count").textContent = mn ? `${mn}` : "";
+      $("pd-meta-count").style.color = mn === 0 ? "" : mn < 120 || mn > 160 ? "var(--pd-amber)" : "var(--pd-mint)";
+      const tn = seoTitleIn.value.length;
+      $("pd-seo-title-count").textContent = tn ? `${tn} / 60` : "";
+      $("pd-seo-title-count").style.color = tn > 60 ? "var(--pd-amber)" : "";
       $("pd-seo-url").textContent = `https://pixydust.com/${sectionSlugOf()}/${slugEl.value || "…"}`;
       $("pd-seo-title").textContent = t.length > 60 ? t.slice(0, 59) + "…" : t;
       $("pd-seo-desc").textContent = d.length > 155 ? d.slice(0, 154) + "…" : d;
       const n = excerptEl.value.length;
       $("pd-excerpt-count").textContent = `${n}`;
-      $("pd-excerpt-count").style.color = n === 0 ? "" : n < 120 || n > 155 ? "var(--pd-amber)" : "var(--pd-mint)";
       const words = plain ? plain.split(/\s+/).length : 0;
       $("pd-wordcount").textContent = `${words} words · ${Math.max(1, Math.round(words / 225))} min`;
     }
     excerptEl.addEventListener("input", () => { markDirty(); renderSeo(); });
+    seoTitleIn.addEventListener("input", () => { markDirty(); renderSeo(); });
+    metaIn.addEventListener("input", () => { markDirty(); renderSeo(); });
     editor.addEventListener("input", () => { markDirty(); renderSeo(); });
     [tagsEl, authorEl, thumbAltEl].forEach((el) => el.addEventListener("input", markDirty));
 
@@ -811,6 +835,8 @@ const initial = {
         title: titleEl.value,
         slug: slugEl.value,
         excerpt: excerptEl.value,
+        seoTitle: seoTitleIn.value,
+        metaDescription: metaIn.value,
         contentHtml: cleanBody(),
         thumbnailUrl: thumbUrl,
         thumbnailAlt: thumbAltEl.value,

@@ -23,13 +23,15 @@ const user = Astro.locals.user;
         <span class="font-mono uppercase" style="font-size:9.5px;color:var(--pd-lilac);letter-spacing:1px;border:0.5px solid color-mix(in srgb, var(--pd-lilac) 40%, transparent);border-radius:999px;padding:2px 8px;">Admin</span>
       </a>
 
-      <nav class="ml-4 hidden items-center gap-1 md:flex">
+      <!-- The nav scrolls inside itself when the window is too narrow for every
+           item, rather than pushing the whole page wider than the screen. -->
+      <nav class="ml-4 hidden min-w-0 items-center gap-1 md:flex" style="overflow-x:auto;scrollbar-width:none;">
         {
           ADMIN_NAV.map((n) => (
             <a
               href={n.href}
               class="rounded-lg font-semibold"
-              style={`padding:7px 12px;font-size:12.5px;letter-spacing:-0.05px;color:var(${n.k === tab ? "--pd-ink" : "--pd-ink2"});background:${n.k === tab ? "var(--pd-bg2)" : "transparent"};`}
+              style={`white-space:nowrap;flex:none;padding:7px 12px;font-size:12.5px;letter-spacing:-0.05px;color:var(${n.k === tab ? "--pd-ink" : "--pd-ink2"});background:${n.k === tab ? "var(--pd-bg2)" : "transparent"};`}
             >
               {n.name}
             </a>
@@ -37,7 +39,7 @@ const user = Astro.locals.user;
         }
       </nav>
 
-      <div class="ml-auto flex items-center gap-3">
+      <div class="ml-auto flex flex-none items-center gap-3">
         <a href="/" class="font-mono uppercase" style="font-size:10px;color:var(--pd-ink3);letter-spacing:0.5px;">← Back to app</a>
         <span class="font-mono" style="font-size:11px;color:var(--pd-ink3);">{user?.name ?? user?.email}</span>
       </div>

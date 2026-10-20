@@ -5,6 +5,7 @@ export const ADMIN_NAV = [
   { k: "dashboard",     name: "Dashboard",     href: "/admin" },
   { k: "items",         name: "Items",         href: "/admin/items" },
   { k: "sections",      name: "Item Sections", href: "/admin/sections" },
+  { k: "writer",        name: "AI Writer",     href: "/admin/writer" },
   { k: "help",          name: "Help Center",   href: "/admin/help" },
   { k: "templates",     name: "Templates",     href: "/admin/templates" },
   { k: "tools",         name: "Homepage",      href: "/admin/tools" },

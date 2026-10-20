@@ -10,9 +10,11 @@ import {
   getPublishedBySlug, relatedPosts, thumbnailFor, firstImageIn, excerptFor, displayDate, isoDate,
   readingMinutes, tagsOf, BLOG_AUTHOR_FALLBACK,
 } from "../../lib/blog";
+import { cdnSrcset } from "../../lib/writer/image";
 
 const SITE = "https://pixydust.com";
 const db = Astro.locals.runtime.env.DB;
+const PULL_ZONE = Astro.locals.runtime.env.BUNNY_PULL_ZONE_URL || "https://pixiecdn.b-cdn.net";
 const { collection: sectionSlug, item: itemSlug } = Astro.params;
 
 const section = sectionSlug ? await getSectionBySlug(db, sectionSlug) : null;
@@ -35,7 +37,11 @@ const subs = await listSubcategories(db, section.id);
 const sub = post.category ? subs.find((s) => s.id === post.category) ?? null : null;
 
 const image = thumbnailFor(post);
-const description = excerptFor(post);
+// The search snippet: an explicit meta description when the item has one,
+// else the excerpt / opening of the body as before.
+const description = (post.meta_description || "").trim() || excerptFor(post);
+// The <title>: an explicit SEO title when set. The page H1 stays the title.
+const docTitle = (post.seo_title || "").trim() || post.title;
 const published = isoDate(post.published_at);
 const modified = isoDate(post.updated_at) || published;
 const author = post.author || BLOG_AUTHOR_FALLBACK;
@@ -85,7 +91,7 @@ const jsonLd = JSON.stringify([
 ---
 
 <AppShell
-  title={`${post.title} — PixyDust`}
+  title={`${docTitle} — PixyDust`}
   description={description}
   ogImage={image ?? undefined}
   ogType="article"
@@ -137,7 +143,8 @@ const jsonLd = JSON.stringify([
       </header>
 
       {heroImage && (
-        <img src={heroImage} alt={post.thumbnail_alt || post.title} width="1200" height={layout === "gallery" ? "900" : "675"}
+        <img src={heroImage} srcset={cdnSrcset(heroImage, PULL_ZONE)} sizes="(max-width: 760px) 100vw, 712px"
+          alt={post.thumbnail_alt || post.title} width="1200" height={layout === "gallery" ? "900" : "675"}
           decoding="async" class="mt-7 rounded-2xl"
           style={`display:block;width:100%;aspect-ratio:${layout === "gallery" ? "4/3" : "16/9"};object-fit:cover;background:var(--pd-bg3);border:0.5px solid var(--pd-hairline);`} />
       )}
@@ -155,7 +162,8 @@ const jsonLd = JSON.stringify([
               <a href={itemHref(sections, r)} class="overflow-hidden rounded-xl"
                 style="display:block;text-decoration:none;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
                 {rImg ? (
-                  <img src={rImg} alt={r.title} width="400" height="225" loading="lazy" decoding="async"
+                  <img src={rImg} srcset={cdnSrcset(rImg, PULL_ZONE, [400, 800])} sizes="(max-width: 760px) 100vw, 240px"
+                    alt={r.title} width="400" height="225" loading="lazy" decoding="async"
                     style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--pd-bg3);" />
                 ) : (
                   <div style="width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,color-mix(in srgb,var(--pd-lilac) 26%,transparent),var(--pd-bg3));" />

@@ -23,6 +23,12 @@ export interface BlogPost {
   category: string | null;
   /** Editor's ordered override: JSON array of blog_posts.id. */
   related_json: string;
+  /** Search-result title; null falls back to the title. */
+  seo_title?: string | null;
+  /** Search-result description; null falls back to the excerpt. */
+  meta_description?: string | null;
+  /** AI Writer job the item was drafted by. Admin metadata, never rendered. */
+  ai_job_id?: string | null;
 }
 
 /** Manual related-article picks, as ids. Stored as ids rather than slugs so a
