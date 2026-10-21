@@ -1,0 +1,64 @@
+---
+// Sub-navigation and shared styles for the AI Writer admin pages.
+interface Props {
+  active: "new" | "queue" | "jobs" | "facts" | "settings" | "job";
+}
+const { active } = Astro.props;
+const TABS = [
+  { k: "new", name: "New article", href: "/admin/writer" },
+  { k: "queue", name: "Topic queue", href: "/admin/writer?tab=queue" },
+  { k: "jobs", name: "Jobs", href: "/admin/writer?tab=jobs" },
+  { k: "facts", name: "Fact sheet", href: "/admin/writer/facts" },
+  { k: "settings", name: "Settings & usage", href: "/admin/writer/settings" },
+];
+---
+
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h1 class="font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.6px;">AI Writer</h1>
+    <p class="mt-1 text-ink-3" style="font-size:13px;max-width:640px;line-height:1.5;">
+      Drafts grounded in the fact sheet, written by Claude Opus through SyncNode. Nothing is published from here:
+      saved articles land in <a href="/admin/items?status=draft" style="color:var(--pd-lilac);">Items → Drafts</a> for an admin to review and publish.
+    </p>
+  </div>
+</div>
+<nav class="mb-6 flex flex-wrap gap-1.5" aria-label="AI Writer">
+  {TABS.map((t) => (
+    <a href={t.href} class="rounded-lg"
+      style={`padding:7px 12px;font-size:12.5px;text-decoration:none;border:0.5px solid ${t.k === active ? "var(--pd-hairline3)" : "var(--pd-hairline)"};background:${t.k === active ? "var(--pd-bg2)" : "transparent"};color:var(${t.k === active ? "--pd-ink" : "--pd-ink2"});`}>{t.name}</a>
+  ))}
+</nav>
+
+<style is:global>
+  .wr-card { background: var(--pd-bg2); border: 0.5px solid var(--pd-hairline); border-radius: 16px; padding: 16px 18px; }
+  .wr-h { font-family: var(--font-display, inherit); font-weight: 600; font-size: 14.5px; color: var(--pd-ink); letter-spacing: -0.2px; margin: 0 0 10px; }
+  .wr-label { display: block; font-size: 11.5px; color: var(--pd-ink3); margin: 0 0 5px; }
+  .wr-hint { font-size: 11px; color: var(--pd-ink4); margin-top: 4px; line-height: 1.45; }
+  .wr-input, .wr-select, .wr-textarea {
+    width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 13px; color: var(--pd-ink);
+    background: var(--pd-bg); border: 0.5px solid var(--pd-hairline2); border-radius: 9px; outline: none; font-family: inherit;
+  }
+  .wr-textarea { resize: vertical; line-height: 1.5; }
+  .wr-input:focus, .wr-select:focus, .wr-textarea:focus { border-color: var(--pd-lilac); }
+  .wr-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; font-size: 12.5px; font-weight: 600; border-radius: 10px;
+    border: 0.5px solid var(--pd-hairline2); background: var(--pd-bg); color: var(--pd-ink); cursor: pointer; text-decoration: none; white-space: nowrap;
+  }
+  .wr-btn:hover { border-color: var(--pd-hairline3); }
+  .wr-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+  .wr-btn-primary { background: var(--pd-lilac); color: #0A0A0B; border-color: transparent; }
+  .wr-btn-danger { color: var(--pd-pink); }
+  .wr-btn-sm { padding: 5px 9px; font-size: 11.5px; border-radius: 8px; }
+  .wr-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: 0.6px; text-transform: uppercase; font-family: var(--font-mono, monospace);
+    padding: 2px 8px; border-radius: 999px; border: 0.5px solid currentColor; }
+  .wr-tone-ok { color: var(--pd-mint); } .wr-tone-warn { color: var(--pd-amber); } .wr-tone-bad { color: var(--pd-pink); } .wr-tone-dim { color: var(--pd-ink4); } .wr-tone-run { color: var(--pd-lilac); }
+  .wr-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .wr-card { min-width: 0; overflow-wrap: anywhere; }
+  @media (max-width: 640px) { .wr-card { padding: 13px 12px; } .wr-table th, .wr-table td { padding: 6px 5px; } }
+  @media (max-width: 760px) { .wr-grid2 { grid-template-columns: 1fr; } }
+  .wr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .wr-table th { text-align: left; font-weight: 500; color: var(--pd-ink4); font-size: 10.5px; padding: 6px 8px; border-bottom: 0.5px solid var(--pd-hairline); }
+  .wr-table td { padding: 7px 8px; border-bottom: 0.5px solid var(--pd-hairline); color: var(--pd-ink2); vertical-align: top; overflow-wrap: anywhere; }
+  .wr-mono { font-family: var(--font-mono, monospace); font-size: 11px; }
+  .wr-muted { color: var(--pd-ink3); font-size: 12.5px; line-height: 1.5; }
+</style>

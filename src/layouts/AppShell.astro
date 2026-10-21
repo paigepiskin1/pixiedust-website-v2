@@ -3,6 +3,7 @@ import Base from "./Base.astro";
 import Sidebar from "../components/shell/Sidebar.astro";
 import Topbar from "../components/shell/Topbar.astro";
 import MobileDrawer from "../components/shell/MobileDrawer.astro";
+import SiteFooter from "../components/shell/SiteFooter.astro";
 import Toast from "../components/ui/Toast.astro";
 import FirstVisitSignup from "../components/FirstVisitSignup.astro";
 import type { WelcomeSlide } from "../components/FirstVisitSignup.astro";
@@ -17,8 +18,11 @@ interface Props {
   noindex?: boolean;
   jsonLd?: string;
   credits?: number;
+  canonical?: string;
+  prevUrl?: string;
+  nextUrl?: string;
 }
-const { title, description, ogImage, ogType, jsonLd } = Astro.props;
+const { title, description, ogImage, ogType, jsonLd, canonical, prevUrl, nextUrl } = Astro.props;
 
 // Auto-noindex private/gated sections — defence in depth alongside robots.txt
 const path = Astro.url.pathname;
@@ -32,6 +36,7 @@ const autoNoindex =
 // first paint (no flash of the logged-out default on navigation).
 const user = Astro.locals.user ?? null;
 const credits = user?.credits ?? Astro.props.credits ?? 47;
+
 
 // Welcome popup slideshow for logged-out visitors — live homepage covers.
 let welcomeSlides: WelcomeSlide[] = [];
@@ -68,7 +73,8 @@ if (!user) {
 }
 ---
 
-<Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd}>
+<Base title={title} description={description} ogImage={ogImage} ogType={ogType} noindex={autoNoindex} jsonLd={jsonLd} canonical={canonical} prevUrl={prevUrl} nextUrl={nextUrl}>
+  <Fragment slot="head"><slot name="head" /></Fragment>
   <script is:inline set:html={`document.documentElement.setAttribute('data-auth','${user ? "in" : "out"}');${user ? "document.documentElement.setAttribute('data-plan','free');" : ""}`}></script>
   <div class="flex min-h-screen">
     <Sidebar credits={credits} user={user} />
@@ -77,18 +83,7 @@ if (!user) {
       <main class="flex-1">
         <slot />
       </main>
-      <footer style="border-top:0.5px solid var(--pd-hairline);padding:18px 28px;">
-        <div class="mx-auto flex flex-wrap items-center justify-between gap-3" style="max-width:1480px;">
-          <span class="font-mono" style="font-size:10.5px;color:var(--pd-ink4);letter-spacing:0.3px;">© PixieDust</span>
-          <nav class="pd-footer-nav flex flex-wrap items-center gap-x-4 gap-y-1.5" style="font-size:11.5px;">
-            <a href="/brand">Brand</a>
-            <a href="/legal/terms">Terms</a>
-            <a href="/legal/privacy">Privacy</a>
-            <a href="/legal/acceptable-use">Acceptable use</a>
-            <a href="/feedback">Feedback</a>
-          </nav>
-        </div>
-      </footer>
+      <SiteFooter signedIn={!!user} />
     </div>
   </div>
   <MobileDrawer credits={credits} user={user} />

@@ -1,0 +1,406 @@
+---
+// AI Writer job: progress, preview and review. The page drives the job one
+// stage at a time while it's open; close it and the job waits where it is.
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import WriterNav from "../../../components/admin/WriterNav.astro";
+import { isAdmin } from "../../../lib/admin";
+import { getJob } from "../../../lib/writer/jobs";
+import { adminListAll } from "../../../lib/sections";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+const db = Astro.locals.runtime.env.DB;
+const job = Astro.params.id ? await getJob(db, Astro.params.id) : null;
+if (!job) return Astro.redirect("/admin/writer?tab=jobs");
+const subs = (await adminListAll(db)).filter((s) => s.parent_id === job.brief.section).map((s) => ({ id: s.id, title: s.title }));
+---
+
+<AdminShell title="AI Writer job — PixyDust Admin" tab="writer">
+  <div class="mx-auto w-full" style="max-width:1240px;padding:28px;">
+    <WriterNav active="job" />
+    <div id="wr-app" data-id={job.id} data-subs={JSON.stringify(subs)}>
+      <div class="wr-card wr-muted">Loading…</div>
+    </div>
+  </div>
+
+  <style is:global>
+    .wr-stages { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+    @media (max-width: 900px) { .wr-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .wr-layout > * { min-width: 0; }
+    .wr-stage { border-radius: 12px; padding: 10px 11px; background: var(--pd-bg); border: 0.5px solid var(--pd-hairline2); min-height: 74px; }
+    .wr-stage b { display: block; font-size: 12px; color: var(--pd-ink); margin-bottom: 3px; }
+    .wr-stage .st { font-size: 10.5px; font-family: var(--font-mono, monospace); text-transform: uppercase; letter-spacing: 0.5px; }
+    .wr-stage .nt { font-size: 10.5px; color: var(--pd-ink4); margin-top: 4px; line-height: 1.35; }
+    .wr-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+    @media (max-width: 1000px) { .wr-layout { grid-template-columns: minmax(0, 1fr); } }
+    .wr-article { background: var(--pd-bg); border-radius: 14px; padding: 22px 24px; border: 0.5px solid var(--pd-hairline); }
+    .wr-article h1 { font-size: 26px; line-height: 1.2; letter-spacing: -0.6px; color: var(--pd-ink); margin: 0 0 14px; font-weight: 650; }
+    .wr-article h2 { font-size: 19px; color: var(--pd-ink); margin: 26px 0 8px; letter-spacing: -0.3px; }
+    .wr-article h3 { font-size: 15.5px; color: var(--pd-ink); margin: 18px 0 6px; }
+    .wr-article p, .wr-article li { font-size: 14.5px; line-height: 1.7; color: var(--pd-ink2); }
+    .wr-article p { margin: 0 0 12px; }
+    .wr-article ul, .wr-article ol { margin: 0 0 12px; padding-left: 22px; }
+    .wr-article a { color: var(--pd-lilac); }
+    .wr-article img.hero { width: 100%; aspect-ratio: 1200 / 630; object-fit: cover; border-radius: 12px; margin: 0 0 16px; }
+    .wr-issue { display: flex; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid var(--pd-hairline); font-size: 12px; color: var(--pd-ink2); line-height: 1.45; }
+    .wr-issue:last-child { border-bottom: none; }
+    .wr-count { font-size: 10.5px; color: var(--pd-ink4); float: right; }
+    .wr-count.bad { color: var(--pd-amber); }
+    details.wr-more > summary { cursor: pointer; font-size: 12.5px; color: var(--pd-ink2); list-style: none; }
+    details.wr-more > summary::-webkit-details-marker { display: none; }
+  </style>
+
+  <script>
+    const app = document.getElementById("wr-app")!;
+    const JOB_ID = app.dataset.id!;
+    const SUBS: { id: string; title: string }[] = JSON.parse(app.dataset.subs || "[]");
+    const toast = (m: string) => (window as any).pdToast?.(m) ?? alert(m);
+    const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+    const money = (n: number) => `$${(n || 0).toFixed(n && n < 0.1 ? 3 : 2)}`;
+    const STAGES = [
+      ["research", "Research", "Fact sheet + sources"],
+      ["write", "Write", "Claude Opus draft"],
+      ["audit", "Fact check", "Claims, style, brand"],
+      ["revise", "Revise", "Fix what the check found"],
+      ["links", "Links", "Internal link suggestions"],
+      ["image", "Image", "1200×630 header"],
+    ] as const;
+    const STATE_TONE: Record<string, string> = { done: "wr-tone-ok", skipped: "wr-tone-dim", running: "wr-tone-run", waiting: "wr-tone-run", failed: "wr-tone-bad", pending: "wr-tone-dim" };
+
+    let data: any = null;
+    let log: any = null;
+    let auto = true;
+    let busy = false;
+    let showLog = false;
+
+    async function get(withLog = false) {
+      const r = await fetch(`/api/admin/writer?job=${JOB_ID}${withLog ? "&log=1" : ""}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Could not load the job.");
+      return j;
+    }
+    async function post(payload: any) {
+      const r = await fetch("/api/admin/writer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: JOB_ID, ...payload }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const err: any = new Error(j.error || `Request failed (${r.status})`);
+        err.status = r.status;
+        err.detail = j.detail;
+        throw err;
+      }
+      return j;
+    }
+
+    const nextRunnable = (job: any) => {
+      for (const [k] of STAGES) {
+        const st = job.stages[k].state;
+        if (st === "pending" || st === "waiting") return k;
+        if (st === "failed" || st === "running") return null;
+      }
+      return null;
+    };
+
+    // Drive the job: one stage per request, until nothing is left or a stage fails.
+    async function drive() {
+      if (busy) return;
+      busy = true;
+      try {
+        while (auto && data && data.job.status !== "cancelled" && nextRunnable(data.job)) {
+          render();
+          try {
+            const r = await post({ action: "run" });
+            data = { job: r.job, review: r.review };
+            if (data.job.stages.image.state === "waiting") await new Promise((s) => setTimeout(s, 4000));
+          } catch (e: any) {
+            if (e.status === 409) {
+              // Another tab is running a stage. Wait and look again.
+              await new Promise((s) => setTimeout(s, 5000));
+              data = await get();
+              continue;
+            }
+            toast(e.message);
+            break;
+          }
+        }
+      } finally {
+        busy = false;
+        render();
+      }
+    }
+
+    function stageCard([k, name, sub]: readonly [string, string, string]) {
+      const s = data.job.stages[k];
+      const running = busy && nextRunnable(data.job) === k;
+      const state = running && s.state === "pending" ? "running" : s.state;
+      const canRetry = ["done", "failed", "skipped"].includes(s.state) && !busy;
+      return `<div class="wr-stage">
+        <b>${name}</b>
+        <span class="st ${STATE_TONE[state] ?? ""}">${state === "running" ? "running…" : state === "waiting" ? "generating…" : state}</span>
+        ${s.attempts > 1 ? `<span class="wr-hint" style="display:inline;"> · try ${s.attempts}</span>` : ""}
+        <div class="nt">${esc(s.error ? s.error : s.note || sub)}${s.costUsd ? ` · ${money(s.costUsd)}` : ""}</div>
+        ${canRetry ? `<button class="wr-btn wr-btn-sm" data-retry="${k}" style="margin-top:6px;">${s.state === "failed" ? "Retry" : "Run again"}</button>` : ""}
+      </div>`;
+    }
+
+    function issuesHtml(issues: any[]) {
+      if (!issues?.length) return `<p class="wr-muted" style="color:var(--pd-mint);">No problems found.</p>`;
+      const sorted = [...issues].sort((a, b) => (a.level === b.level ? 0 : a.level === "error" ? -1 : 1));
+      return sorted.map((i) => `<div class="wr-issue"><span class="wr-pill ${i.level === "error" ? "wr-tone-bad" : "wr-tone-warn"}" style="flex:none;height:fit-content;">${i.level === "error" ? "fix" : "check"}</span>
+        <span>${esc(i.message)}${i.where ? ` <span class="wr-mono wr-tone-dim">${esc(i.where)}</span>` : ""}</span></div>`).join("");
+    }
+
+    function field(key: string, label: string, value: string, opts: { area?: boolean; max?: number; min?: number; hint?: string } = {}) {
+      const n = value.length;
+      const bad = (opts.max && n > opts.max) || (opts.min && n < opts.min);
+      const count = opts.max ? `<span class="wr-count ${bad ? "bad" : ""}">${n}${opts.max ? ` / ${opts.max}` : ""}</span>` : "";
+      const input = opts.area
+        ? `<textarea class="wr-textarea" data-edit="${key}" rows="3">${esc(value)}</textarea>`
+        : `<input class="wr-input" data-edit="${key}" value="${esc(value)}" />`;
+      return `<div style="margin-bottom:10px;"><label class="wr-label">${label} ${count}</label>${input}${opts.hint ? `<div class="wr-hint">${opts.hint}</div>` : ""}</div>`;
+    }
+
+    function render() {
+      if (!data) return;
+      const { job, review } = data;
+      const d = job.draft;
+      const e = job.edits || {};
+      const statusTone = { review: "wr-tone-warn", saved: "wr-tone-ok", stalled: "wr-tone-bad", cancelled: "wr-tone-dim", running: "wr-tone-run", queued: "wr-tone-dim" }[job.status as string] ?? "wr-tone-dim";
+      const statusLabel = { review: "ready to review", saved: "saved as draft", stalled: "needs attention", cancelled: "cancelled", running: "in progress", queued: "queued" }[job.status as string] ?? job.status;
+      const errors = (review?.issues ?? []).filter((i: any) => i.level === "error").length;
+      const canSave = !!d && ["done", "skipped"].includes(job.stages.audit.state) && !busy && job.status !== "cancelled";
+
+      const head = `<div class="wr-card" style="margin-bottom:12px;">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0" style="flex:1 1 380px;">
+            <div class="flex flex-wrap items-center gap-2"><span class="wr-pill ${statusTone}">${esc(statusLabel)}</span>
+              ${job.itemId ? `<a class="wr-pill wr-tone-ok" style="text-decoration:none;" href="/admin/items/edit/${job.itemId}">draft item #${job.itemId}</a>` : ""}
+              <span class="wr-hint" style="margin:0;">${esc(job.brief.articleType)} · keyword “${esc(job.brief.primaryKeyword)}” · section ${esc(job.brief.section)}</span></div>
+            <div class="text-ink" style="font-size:17px;font-weight:600;margin-top:8px;letter-spacing:-0.2px;">${esc(e.title ?? d?.title ?? job.brief.topic)}</div>
+            <div class="wr-muted" style="margin-top:2px;">${esc(job.brief.topic)}</div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="wr-muted wr-mono">spent ${money(job.costActual)} · est ${money(job.costEstimate)}</span>
+            ${nextRunnable(job) && !busy && job.status !== "cancelled" ? `<button class="wr-btn" data-act="resume">Continue</button>` : ""}
+            ${busy ? `<button class="wr-btn" data-act="pause">Pause</button>` : ""}
+            ${job.itemId ? `<a class="wr-btn" href="/admin/items/edit/${job.itemId}">Open draft in editor</a>` : ""}
+            <button class="wr-btn wr-btn-primary" data-act="save" ${canSave ? "" : "disabled"}>${job.itemId ? "Update the draft" : "Save as draft"}</button>
+            ${job.status !== "cancelled" ? `<button class="wr-btn wr-btn-sm wr-btn-danger" data-act="cancel" ${busy ? "disabled" : ""}>Cancel job</button>` : ""}
+          </div>
+        </div>
+        <div class="wr-stages" style="margin-top:12px;">${STAGES.map(stageCard).join("")}</div>
+        ${job.overlap?.length ? `<div class="wr-hint" style="margin-top:10px;color:var(--pd-amber);">Overlaps: ${job.overlap.map((o: any) => `<a href="/admin/items/edit/${o.id}" style="color:inherit;">${esc(o.title)}</a> (${esc(o.status)}, ${Math.round(o.score * 100)}%)`).join("; ")}</div>` : ""}
+        ${errors ? `<div class="wr-hint" style="margin-top:6px;color:var(--pd-pink);">${errors} problem(s) to fix before saving. See Validation.</div>` : ""}
+      </div>`;
+
+      if (!d) {
+        app.innerHTML = head + `<div class="wr-card wr-muted">${job.stages.write.state === "failed" ? "Writing failed. Retry the Write stage above." : "The draft appears here once the Write stage finishes. That usually takes one to three minutes."}</div>`;
+        bind();
+        return;
+      }
+
+      const img = job.image;
+      const imgUrl = img?.url || "";
+      const article = `<div class="wr-article">
+        ${imgUrl ? `<img class="hero" src="${esc(imgUrl)}?width=900" alt="${esc(e.alt ?? img?.alt ?? "")}" />` : ""}
+        <h1>${esc(e.title ?? d.title)}</h1>
+        ${review?.html ?? ""}
+      </div>`;
+
+      const fields = `<div class="wr-card"><h2 class="wr-h">Search and listing fields</h2>
+        ${field("title", "Title (the page's H1)", e.title ?? d.title, { max: 65 })}
+        ${field("seo_title", "SEO title", e.seo_title ?? d.seo_title, { max: 60 })}
+        ${field("meta_description", "Meta description", e.meta_description ?? d.meta_description, { area: true, max: 160, min: 120 })}
+        ${field("slug", "Slug", e.slug ?? d.slug, { hint: review?.finalSlug && review.finalSlug !== (e.slug ?? d.slug) ? `Saves as <span class="wr-mono">${esc(review.finalSlug)}</span>: that slug is taken.` : `URL: /${esc(job.brief.section === "blog" ? "blog" : job.brief.section)}/${esc(review?.finalSlug ?? d.slug)}. The writer never changes the slug of a published item.` })}
+        ${field("excerpt", "Excerpt", e.excerpt ?? d.excerpt, { area: true, max: 200 })}
+        ${field("tags", "Tags", (e.tags ?? d.tags).join(", "), { hint: "Comma separated." })}
+        <div style="margin-bottom:10px;"><label class="wr-label">Sub-category</label>
+          <select class="wr-select" data-edit="category"><option value="">None</option>${SUBS.map((s) => `<option value="${esc(s.id)}" ${s.id === (review?.category ?? "") ? "selected" : ""}>${esc(s.title)}</option>`).join("")}</select>
+          <div class="wr-hint">Writer suggested: ${esc(SUBS.find((s) => s.id === d.category_hint)?.title || "none")}.</div></div>
+        <div class="flex gap-2"><button class="wr-btn wr-btn-sm wr-btn-primary" data-act="save-edits">Save field edits</button>
+          ${Object.keys(e).length ? `<button class="wr-btn wr-btn-sm" data-act="reset-edits">Use the AI's values</button>` : ""}</div>
+        <div class="wr-hint">Field edits are kept apart from the AI draft. Re-running a stage never replaces them.</div>
+      </div>`;
+
+      const imageCard = `<div class="wr-card"><h2 class="wr-h">Header image</h2>
+        ${imgUrl ? `<img src="${esc(imgUrl)}?width=600" style="width:100%;border-radius:10px;aspect-ratio:1200/630;object-fit:cover;" alt="" />
+          <div class="wr-hint wr-mono" style="margin-top:6px;">${esc(img.filename)} · 1200×630 JPEG · ${Math.round((img.bytes || 0) / 1024)} KB${img.moderation ? ` · moderation ${img.moderation.safe ? "passed" : "flagged"}` : ""}</div>`
+        : `<p class="wr-muted">${job.stages.image.state === "waiting" ? "Generating…" : job.stages.image.state === "failed" ? esc(job.stages.image.error) : "Not generated yet."}</p>`}
+        ${field("alt", "Alt text", e.alt ?? img?.alt ?? d.image.alt, { max: 125, hint: "Describe what the picture actually shows." })}
+        ${field("concept", "Image description", e.concept ?? d.image.concept, { area: true, hint: "Used for the next generated image, with the visual guidelines from Settings. Save field edits, then Generate a new image." })}
+        <details class="wr-more" style="margin:6px 0 10px;"><summary>Prompt and provenance</summary>
+          <div class="wr-hint" style="margin-top:6px;">${img ? `${esc(img.kind === "upload" ? "Uploaded screenshot" : `${img.provider} · ${img.model}`)}${img.providerJobId ? ` · job ${esc(img.providerJobId)}` : ""}<br/>Created ${esc(img.createdAt)}<br/>${img.originalUrl ? `Original: <a href="${esc(img.originalUrl)}" target="_blank" style="color:var(--pd-lilac);">file</a><br/>` : ""}Prompt: ${esc(img.prompt || "(none)")}` : `Concept: ${esc(d.image.concept)}`}
+          ${img?.previous?.length ? `<br/>Earlier images: ${img.previous.map((p: any, i: number) => p.url ? `<a href="${esc(p.url)}" target="_blank" style="color:var(--pd-lilac);">#${i + 1}</a>` : "").join(" ")}` : ""}</div></details>
+        <div class="flex flex-wrap gap-2">
+          <button class="wr-btn wr-btn-sm" data-retry="image" ${busy ? "disabled" : ""}>Generate a new image</button>
+          <label class="wr-btn wr-btn-sm" style="cursor:pointer;">Use a screenshot instead<input type="file" accept="image/png,image/jpeg,image/webp" data-act="upload" hidden /></label>
+        </div>
+        <div class="wr-hint">A screenshot is cropped to 1200×630 from the center and compressed, like a generated image.</div>
+      </div>`;
+
+      const inv = review?.inventory ?? [];
+      const links = review?.links ?? [];
+      const linkRows = links.map((l: any, i: number) => `<tr>
+        <td class="wr-mono">${esc(l.where)}</td>
+        <td>“${esc(l.anchor)}”<div class="wr-hint">${esc(l.reason)}</div></td>
+        <td>${l.url ? `<a href="https://pixydust.com${esc(l.url)}" target="_blank" style="color:var(--pd-lilac);">${esc(l.title)}</a><div class="wr-hint wr-mono">${esc(l.url)}</div>` : `<span class="wr-tone-bad">${esc(l.target)}</span>`}
+          ${l.problem ? `<div class="wr-hint wr-tone-bad">${esc(l.problem)}</div>` : l.weak ? `<div class="wr-hint wr-tone-warn">The link text may not tell a reader where it goes.</div>` : ""}
+          <select class="wr-select" data-link-target="${i}" style="margin-top:4px;font-size:11px;padding:4px 6px;"><option value="">Replace with…</option>${inv.map((t: any) => `<option value="${esc(t.id)}">${esc(t.title)}</option>`).join("")}</select></td>
+        <td><span class="wr-pill ${l.state === "accepted" ? "wr-tone-ok" : l.state === "removed" ? "wr-tone-dim" : "wr-tone-warn"}">${esc(l.state)}</span>
+          <div class="flex gap-1" style="margin-top:5px;">
+            ${l.state !== "accepted" && !l.problem ? `<button class="wr-btn wr-btn-sm" data-link="${i}" data-state="accepted">Accept</button>` : ""}
+            ${l.state !== "removed" ? `<button class="wr-btn wr-btn-sm" data-link="${i}" data-state="removed">Remove</button>` : ""}
+          </div></td></tr>`).join("");
+      const linksCard = `<div class="wr-card"><div class="flex items-center justify-between"><h2 class="wr-h">Internal links</h2>
+          <div class="flex gap-2">${links.some((l: any) => l.state === "suggested" && !l.problem) ? `<button class="wr-btn wr-btn-sm" data-act="accept-all">Accept all valid</button>` : ""}
+          <button class="wr-btn wr-btn-sm" data-retry="links" ${busy ? "disabled" : ""}>Suggest again</button></div></div>
+        <p class="wr-hint" style="margin-top:0;">Only pages that are live right now. Links are stored by id and resolved to their current URL when saved. Only accepted links go into the draft.</p>
+        ${links.length ? `<table class="wr-table"><thead><tr><th>Where</th><th>Link text</th><th>Goes to</th><th>State</th></tr></thead><tbody>${linkRows}</tbody></table>` : `<p class="wr-muted">${job.stages.links.state === "done" ? "No links suggested." : "Suggestions appear after the fact check."}</p>`}
+        <div class="wr-hint" style="margin-top:8px;">Next step links to: ${review?.nextStep?.url ? `<a href="https://pixydust.com${esc(review.nextStep.url)}" target="_blank" style="color:var(--pd-lilac);">${esc(review.nextStep.title)}</a>` : `<span class="wr-tone-bad">${esc(d.next_step.link_id)} (not a live page)</span>`} · “${esc(d.next_step.anchor)}”</div>
+      </div>`;
+
+      const claims = job.audit?.model?.claims ?? [];
+      const claimRows = claims.map((c: any) => `<tr><td class="wr-mono">${esc(c.where)}</td><td>“${esc(c.quote)}”${c.note ? `<div class="wr-hint">${esc(c.note)}</div>` : ""}</td>
+        <td><span class="wr-pill ${c.verdict === "supported" ? "wr-tone-ok" : "wr-tone-bad"}">${esc(c.verdict)}</span></td><td class="wr-mono">${esc((c.evidence || []).join(", "))}</td></tr>`).join("");
+      const r = job.research;
+      const sources = (r?.sources ?? []).map((s: any) => `<tr><td class="wr-mono">${esc(s.id)}</td><td><a href="${esc(s.url)}" target="_blank" style="color:var(--pd-lilac);">${esc(s.title || s.url)}</a><div class="wr-hint wr-mono">${esc(s.url)}</div></td>
+        <td>${s.ok ? `<span class="wr-tone-ok">read</span> · ${s.chars} chars` : `<span class="wr-tone-bad">${esc(s.error)}</span>`}<div class="wr-hint wr-mono">${esc(String(s.fetchedAt).slice(0, 16))}${s.sha256 ? ` · sha256 ${esc(s.sha256.slice(0, 12))}…` : ""}</div></td></tr>`).join("");
+      const evidenceCard = `<div class="wr-card"><h2 class="wr-h">Claims and evidence</h2>
+        <p class="wr-hint" style="margin-top:0;">The fact check lists every product claim with the evidence behind it. Fact check round ${job.audit?.round ?? "-"}${job.audit?.model?.summary ? `: ${esc(job.audit.model.summary)}` : ""}</p>
+        ${claims.length ? `<table class="wr-table"><thead><tr><th>Where</th><th>Claim</th><th>Verdict</th><th>Evidence</th></tr></thead><tbody>${claimRows}</tbody></table>` : `<p class="wr-muted">No claims checked yet.</p>`}
+        <h3 class="wr-h" style="margin-top:16px;font-size:13px;">Sources</h3>
+        ${sources ? `<table class="wr-table"><tbody>${sources}</tbody></table>` : `<p class="wr-muted">No sources.</p>`}
+        <div class="wr-hint">Fact sheet: ${(r?.facts ?? []).filter((f: any) => f.status === "approved").length} approved facts given to the writer, ${(r?.facts ?? []).filter((f: any) => f.status === "needs_review").length} marked do-not-state. <a href="/admin/writer/facts" style="color:var(--pd-lilac);">Edit the fact sheet</a>.</div>
+        ${(r?.gaps ?? []).length || (d.missing_evidence ?? []).length ? `<h3 class="wr-h" style="margin-top:14px;font-size:13px;color:var(--pd-amber);">Missing evidence</h3><ul style="margin:0;padding-left:18px;" class="wr-muted">${[...(r?.gaps ?? []), ...(d.missing_evidence ?? []).map((m: string) => `Writer: ${m}`)].map((g: string) => `<li>${esc(g)}</li>`).join("")}</ul>` : ""}
+      </div>`;
+
+      const usage = log?.usage ?? [];
+      const costCard = `<div class="wr-card"><div class="flex items-center justify-between"><h2 class="wr-h">Cost, versions and log</h2>
+        <button class="wr-btn wr-btn-sm" data-act="toggle-log">${showLog ? "Hide" : "Show"}</button></div>
+        <p class="wr-muted">Spent ${money(job.costActual)} against an estimate of ${money(job.costEstimate)}. ${STAGES.map(([k, n]) => job.stages[k].costUsd ? `${n} ${money(job.stages[k].costUsd)}` : "").filter(Boolean).join(" · ")}</p>
+        ${showLog && log ? `
+          <h3 class="wr-h" style="font-size:13px;margin-top:10px;">Provider calls</h3>
+          <table class="wr-table"><thead><tr><th>Stage</th><th>Model</th><th>Tokens in/out</th><th>Cost</th><th>Time</th></tr></thead><tbody>
+          ${usage.map((u: any) => `<tr><td>${esc(u.stage)}${u.ok ? "" : ` <span class="wr-tone-bad">failed</span>`}</td><td class="wr-mono">${esc(u.model)}</td><td class="wr-mono">${u.prompt_tokens ?? "-"} / ${u.completion_tokens ?? "-"}</td><td class="wr-mono">${money(u.cost_usd + u.gateway_usd)}</td><td class="wr-mono">${u.ms ? `${Math.round(u.ms / 1000)}s` : ""}</td></tr>`).join("")}
+          </tbody></table>
+          <h3 class="wr-h" style="font-size:13px;margin-top:14px;">Versions</h3>
+          <table class="wr-table"><tbody>${log.versions.map((v: any) => `<tr><td class="wr-mono">#${v.id}</td><td>${esc(v.kind)}</td><td class="wr-mono">${esc(v.created_at)}</td><td><a href="/api/admin/writer?job=${JOB_ID}&version=${v.id}" target="_blank" style="color:var(--pd-lilac);">view JSON</a></td></tr>`).join("")}</tbody></table>
+          <h3 class="wr-h" style="font-size:13px;margin-top:14px;">Log</h3>
+          <table class="wr-table"><tbody>${log.events.map((ev: any) => `<tr><td class="wr-mono">${esc(ev.created_at)}</td><td>${esc(ev.stage || "job")}</td><td class="${ev.level === "error" ? "wr-tone-bad" : ev.level === "warn" ? "wr-tone-warn" : ""}">${esc(ev.message)}</td></tr>`).join("")}</tbody></table>` : ""}
+      </div>`;
+
+      app.innerHTML = head + `<div class="wr-layout">
+        <div class="flex flex-col gap-3">${article}${evidenceCard}${costCard}</div>
+        <div class="flex flex-col gap-3"><div class="wr-card"><h2 class="wr-h">Validation</h2>${issuesHtml(review?.issues ?? [])}</div>${fields}${imageCard}${linksCard}</div>
+      </div>`;
+      bind();
+    }
+
+    function collectEdits() {
+      const out: any = {};
+      app.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[data-edit]").forEach((el) => {
+        const k = el.dataset.edit!;
+        out[k] = k === "tags" ? el.value.split(",").map((t) => t.trim()).filter(Boolean) : el.value;
+      });
+      out.category = out.category || null;
+      return out;
+    }
+
+    async function act(fn: () => Promise<any>) {
+      try {
+        const r = await fn();
+        if (r?.job) data = { job: r.job, review: r.review };
+        if (showLog) log = (await get(true)).log;
+        render();
+        return r;
+      } catch (e: any) {
+        toast(e.message);
+        throw e;
+      }
+    }
+
+    function bind() {
+      app.querySelectorAll<HTMLButtonElement>("[data-retry]").forEach((b) => b.addEventListener("click", async () => {
+        const stage = b.dataset.retry!;
+        if (stage === "write" && !confirm("Write the article again? The fact check, revision and links are redone on the new text (about $0.40). Your field edits are kept.")) return;
+        await act(() => post({ action: "retry", stage }));
+        auto = true;
+        drive();
+      }));
+      app.querySelector<HTMLButtonElement>('[data-act="resume"]')?.addEventListener("click", () => { auto = true; drive(); });
+      app.querySelector<HTMLButtonElement>('[data-act="pause"]')?.addEventListener("click", () => { auto = false; toast("Pausing after the current stage."); });
+      app.querySelector<HTMLButtonElement>('[data-act="cancel"]')?.addEventListener("click", async () => {
+        if (!confirm("Cancel this job? A draft already saved from it is kept.")) return;
+        auto = false;
+        await act(() => post({ action: "cancel" }));
+      });
+      app.querySelector<HTMLButtonElement>('[data-act="save-edits"]')?.addEventListener("click", async () => {
+        await act(() => post({ action: "edit", fields: collectEdits() }));
+        toast("Field edits saved.");
+      });
+      app.querySelector<HTMLButtonElement>('[data-act="reset-edits"]')?.addEventListener("click", async () => {
+        if (!confirm("Discard your field edits and use the AI's values?")) return;
+        await act(() => post({ action: "edit", fields: { reset: true } }));
+      });
+      app.querySelector<HTMLButtonElement>('[data-act="toggle-log"]')?.addEventListener("click", async () => {
+        showLog = !showLog;
+        if (showLog) log = (await get(true)).log;
+        render();
+      });
+      app.querySelector<HTMLButtonElement>('[data-act="accept-all"]')?.addEventListener("click", async () => {
+        const updates = (data.review?.links ?? []).map((l: any, index: number) => ({ index, state: l.state === "suggested" && !l.problem ? "accepted" : l.state }));
+        await act(() => post({ action: "links", updates }));
+      });
+      app.querySelectorAll<HTMLButtonElement>("[data-link]").forEach((b) => b.addEventListener("click", async () => {
+        await act(() => post({ action: "links", updates: [{ index: Number(b.dataset.link), state: b.dataset.state }] }));
+      }));
+      app.querySelectorAll<HTMLSelectElement>("[data-link-target]").forEach((s) => s.addEventListener("change", async () => {
+        if (!s.value) return;
+        await act(() => post({ action: "links", updates: [{ index: Number(s.dataset.linkTarget), target: s.value, state: "accepted" }] }));
+      }));
+      app.querySelector<HTMLInputElement>('[data-act="upload"]')?.addEventListener("change", async (ev) => {
+        const f = (ev.target as HTMLInputElement).files?.[0];
+        if (!f) return;
+        const fd = new FormData();
+        fd.append("file", f);
+        const up = await fetch("/api/upload", { method: "POST", body: fd }).then((r) => r.json()).catch(() => ({}));
+        if (!up.url) return toast(up.error || "Upload failed.");
+        const alt = prompt("Describe the screenshot for alt text", data.job.edits?.alt || "") || "";
+        await act(() => post({ action: "use-upload", url: up.url, alt }));
+        toast("Screenshot set as the header image.");
+      });
+      app.querySelector<HTMLButtonElement>('[data-act="save"]')?.addEventListener("click", async () => {
+        // Unsaved field edits go first, so what is saved is what is on screen.
+        const edits = collectEdits();
+        await act(() => post({ action: "edit", fields: edits }));
+        const attempt = async (opts: any) => post({ action: "save-draft", ...opts });
+        try {
+          const r = await act(() => attempt({}));
+          toast(`Saved as draft item #${r.itemId}. It is not published.`);
+        } catch (e: any) {
+          if (e.status === 422) {
+            const n = (e.detail?.issues ?? []).filter((i: any) => i.level === "error").length;
+            if (confirm(`${n} problem(s) are unresolved (see Validation). Save the draft anyway? It stays unpublished.`)) {
+              const r = await act(() => attempt({ force: true }));
+              toast(`Saved as draft item #${r.itemId} with open problems. It is not published.`);
+            }
+          } else if (e.status === 409 && e.detail?.conflict) {
+            if (confirm(`${e.message} Replace them? The current draft is kept in version history.`)) {
+              const r = await act(() => attempt({ overwrite: true }));
+              toast(`Draft item #${r.itemId} updated.`);
+            }
+          }
+        }
+      });
+    }
+
+    (async () => {
+      try {
+        data = await get();
+        render();
+        if (data.job.status !== "cancelled") drive();
+      } catch (e: any) {
+        app.innerHTML = `<div class="wr-card wr-tone-bad">${esc(e.message)}</div>`;
+      }
+    })();
+  </script>
+</AdminShell>

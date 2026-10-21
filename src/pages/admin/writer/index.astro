@@ -1,0 +1,259 @@
+---
+// AI Writer hub: write a brief, keep a queue of approved topics, see jobs.
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import WriterNav from "../../../components/admin/WriterNav.astro";
+import { isAdmin } from "../../../lib/admin";
+import { adminListAll } from "../../../lib/sections";
+import { listJobs, listTopics, monthSpend } from "../../../lib/writer/jobs";
+import { getWriterSettings } from "../../../lib/writer/settings";
+import { ARTICLE_TYPES } from "../../../lib/writer/prompts";
+import { STAGE_ORDER } from "../../../lib/writer/types";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const tab = Astro.url.searchParams.get("tab") || "new";
+const [all, jobs, topics, settings, spent, toolFacts] = await Promise.all([
+  adminListAll(db),
+  listJobs(db, 60),
+  listTopics(db),
+  getWriterSettings(db),
+  monthSpend(db),
+  db.prepare("SELECT id, statement FROM ai_facts WHERE status = 'approved' AND id LIKE 'tool.%' AND id NOT LIKE 'tool.%.%' ORDER BY sort_order").all<{ id: string; statement: string }>().then((r) => r.results ?? []),
+]);
+const sections = all.filter((s) => !s.parent_id);
+const toolName = (f: { id: string; statement: string }) => (f.id === "tool.models" ? "AI model pages" : f.statement.split(/[(:]/)[0].trim().slice(0, 40));
+const STATUS_TONE: Record<string, string> = { review: "wr-tone-warn", saved: "wr-tone-ok", stalled: "wr-tone-bad", cancelled: "wr-tone-dim", running: "wr-tone-run", queued: "wr-tone-dim" };
+const STATUS_LABEL: Record<string, string> = { review: "ready to review", saved: "saved as draft", stalled: "needs attention", cancelled: "cancelled", running: "in progress", queued: "queued" };
+---
+
+<AdminShell title="AI Writer — PixyDust Admin" tab="writer">
+  <div class="mx-auto w-full" style="max-width:1100px;padding:28px;">
+    <WriterNav active={tab === "queue" ? "queue" : tab === "jobs" ? "jobs" : "new"} />
+
+    {tab === "new" && (
+      <form id="wr-brief" class="flex flex-col gap-4" autocomplete="off">
+        <div class="wr-card">
+          <h2 class="wr-h">Brief</h2>
+          <div class="flex flex-col gap-3.5">
+            <div>
+              <label class="wr-label" for="f-topic">Topic or search intent</label>
+              <textarea id="f-topic" name="topic" rows="2" class="wr-textarea" required
+                placeholder="What is the reader trying to find out or do? e.g. How to choose reference photos for an AI photoshoot"></textarea>
+            </div>
+            <div class="wr-grid2">
+              <div>
+                <label class="wr-label" for="f-kw">Target keyword</label>
+                <input id="f-kw" name="primaryKeyword" class="wr-input" required placeholder="ai photoshoot" />
+              </div>
+              <div>
+                <label class="wr-label" for="f-kws">Supporting keywords</label>
+                <input id="f-kws" name="keywords" class="wr-input" placeholder="comma separated" />
+                <div class="wr-hint">Used where they read naturally. Never repeated to hit a count.</div>
+              </div>
+              <div>
+                <label class="wr-label" for="f-type">Article type</label>
+                <select id="f-type" name="articleType" class="wr-select">
+                  {ARTICLE_TYPES.map((t) => <option value={t.id} selected={t.id === "tutorial"}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label class="wr-label" for="f-section">Section</label>
+                <select id="f-section" name="section" class="wr-select">
+                  {sections.map((s) => <option value={s.id} selected={s.id === "blog"}>{s.title}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="wr-label" for="f-aud">Audience</label>
+              <input id="f-aud" name="audience" class="wr-input" placeholder="Who is this for, and what do they already know?" />
+            </div>
+            <div>
+              <span class="wr-label">PixyDust tools the article covers</span>
+              <div class="flex flex-wrap gap-2">
+                {toolFacts.map((f) => (
+                  <label class="inline-flex items-center gap-1.5 rounded-lg text-ink-2" style="padding:5px 10px;font-size:12px;border:0.5px solid var(--pd-hairline2);cursor:pointer;">
+                    <input type="checkbox" name="tools" value={f.id} /> {toolName(f)}
+                  </label>
+                ))}
+              </div>
+              <div class="wr-hint">Their approved facts are marked as the focus, and each tool's page is fetched as a source.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wr-card">
+          <h2 class="wr-h">Evidence and direction <span class="wr-muted" style="font-weight:400;">· optional</span></h2>
+          <div class="flex flex-col gap-3.5">
+            <div>
+              <label class="wr-label" for="f-facts">Required facts</label>
+              <textarea id="f-facts" name="requiredFacts" rows="3" class="wr-textarea" placeholder="One per line. Stated as given: you are the source."></textarea>
+            </div>
+            <div>
+              <label class="wr-label" for="f-urls">Source URLs</label>
+              <textarea id="f-urls" name="sourceUrls" rows="2" class="wr-textarea" placeholder="One per line"></textarea>
+              <div class="wr-hint">Fetched on the server and recorded with the article. Only these domains are used: {settings.sourceDomains.join(", ")} (change in Settings). Page text is treated as information, never as instructions.</div>
+            </div>
+            <div>
+              <label class="wr-label" for="f-outline">Outline</label>
+              <textarea id="f-outline" name="outline" rows="3" class="wr-textarea" placeholder="Headings or points to follow, if you have them"></textarea>
+            </div>
+            <div>
+              <label class="wr-label" for="f-ins">Instructions</label>
+              <textarea id="f-ins" name="instructions" rows="2" class="wr-textarea" placeholder="Angle, things to avoid, articles not to repeat"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div id="wr-preview" class="wr-card" hidden></div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" id="wr-check" class="wr-btn">Check overlap and cost</button>
+          <button type="submit" id="wr-start" class="wr-btn wr-btn-primary">Write the draft</button>
+          <button type="button" id="wr-queue" class="wr-btn">Add to topic queue instead</button>
+          <span class="wr-muted" style="margin-left:6px;">This month: ${spent.toFixed(2)} of ${settings.limits.monthlyUsd.toFixed(2)} · per article limit ${settings.limits.perArticleUsd.toFixed(2)}</span>
+        </div>
+      </form>
+    )}
+
+    {tab === "queue" && (
+      <div class="flex flex-col gap-3">
+        <p class="wr-muted">Topics wait here until an admin approves them. Only an approved topic can be written. Add topics from <a href="/admin/writer" style="color:var(--pd-lilac);">New article</a>.</p>
+        {topics.length === 0 && <div class="wr-card wr-muted">No topics in the queue.</div>}
+        {topics.map((t: any) => (
+          <div class="wr-card flex flex-wrap items-center gap-3" data-topic={t.id}>
+            <div class="min-w-0 flex-1">
+              <div class="text-ink" style="font-size:14px;font-weight:600;">{t.topic}</div>
+              <div class="wr-muted" style="font-size:11.5px;">
+                {t.brief?.articleType} · keyword “{t.brief?.primaryKeyword}” · added {String(t.created_at).slice(0, 10)}
+                {t.job_id && <> · <a href={`/admin/writer/${t.job_id}`} style="color:var(--pd-lilac);">job</a></>}
+              </div>
+            </div>
+            <span class={`wr-pill ${t.status === "approved" ? "wr-tone-ok" : t.status === "rejected" ? "wr-tone-bad" : t.status === "used" ? "wr-tone-dim" : "wr-tone-warn"}`}>{t.status}</span>
+            {t.status === "proposed" && <button class="wr-btn wr-btn-sm" data-act="approved">Approve</button>}
+            {t.status === "proposed" && <button class="wr-btn wr-btn-sm wr-btn-danger" data-act="rejected">Reject</button>}
+            {t.status === "approved" && <button class="wr-btn wr-btn-sm wr-btn-primary" data-act="generate">Write it</button>}
+            {t.status === "approved" && <button class="wr-btn wr-btn-sm" data-act="proposed">Un-approve</button>}
+          </div>
+        ))}
+      </div>
+    )}
+
+    {tab === "jobs" && (
+      <div class="wr-card" style="padding:6px 8px;">
+        <table class="wr-table">
+          <thead><tr><th>Article</th><th>Status</th><th>Progress</th><th>Cost</th><th>Started</th></tr></thead>
+          <tbody>
+            {jobs.length === 0 && <tr><td colspan="5" class="wr-muted">No jobs yet.</td></tr>}
+            {jobs.map((j) => (
+              <tr>
+                <td><a href={`/admin/writer/${j.id}`} style="color:var(--pd-ink);text-decoration:none;font-weight:600;">{j.edits.title ?? j.draft?.title ?? j.brief.topic}</a>
+                  {j.itemId && <div class="wr-hint">Draft item #{j.itemId}</div>}</td>
+                <td><span class={`wr-pill ${STATUS_TONE[j.status] ?? "wr-tone-dim"}`}>{STATUS_LABEL[j.status] ?? j.status}</span></td>
+                <td class="wr-mono">{STAGE_ORDER.filter((k) => ["done", "skipped"].includes(j.stages[k].state)).length}/{STAGE_ORDER.length}</td>
+                <td class="wr-mono">${j.costActual.toFixed(2)} <span class="wr-tone-dim">/ est ${j.costEstimate.toFixed(2)}</span></td>
+                <td class="wr-mono">{j.createdAt.slice(0, 16)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+
+  <script>
+    const toast = (m: string) => (window as any).pdToast?.(m) ?? alert(m);
+    const api = async (payload: any) => {
+      const res = await fetch("/api/admin/writer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j.ok === false) throw new Error(j.error || `Request failed (${res.status})`);
+      return j;
+    };
+    const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+    const form = document.getElementById("wr-brief") as HTMLFormElement | null;
+    const brief = () => {
+      const fd = new FormData(form!);
+      const lines = (k: string) => String(fd.get(k) || "").split("\n").map((s) => s.trim()).filter(Boolean);
+      return {
+        topic: String(fd.get("topic") || ""),
+        primaryKeyword: String(fd.get("primaryKeyword") || ""),
+        keywords: String(fd.get("keywords") || "").split(",").map((s) => s.trim()).filter(Boolean),
+        articleType: String(fd.get("articleType") || "tutorial"),
+        section: String(fd.get("section") || "blog"),
+        audience: String(fd.get("audience") || ""),
+        tools: fd.getAll("tools").map(String),
+        requiredFacts: lines("requiredFacts"),
+        sourceUrls: lines("sourceUrls"),
+        outline: String(fd.get("outline") || ""),
+        instructions: String(fd.get("instructions") || ""),
+      };
+    };
+    let checkedOverlap: any[] | null = null;
+    async function check() {
+      const r = await api({ action: "preview", brief: brief() });
+      checkedOverlap = r.overlap;
+      const box = document.getElementById("wr-preview")!;
+      box.hidden = false;
+      const rows = (r.overlap as any[]).map((o) =>
+        `<li style="margin:4px 0;"><a href="/admin/items/edit/${o.id}" target="_blank" style="color:var(--pd-ink);">${esc(o.title)}</a>
+          <span class="wr-pill ${o.status === "published" ? "wr-tone-ok" : "wr-tone-dim"}" style="margin-left:6px;">${esc(o.status)}</span>
+          <span class="wr-hint" style="display:inline;margin-left:6px;">${esc(o.reason)} · overlap ${Math.round(o.score * 100)}%</span></li>`).join("");
+      const est = r.estimate;
+      box.innerHTML = `<h2 class="wr-h">Before you start</h2>
+        ${r.overlap.length
+          ? `<p class="wr-muted" style="color:var(--pd-amber);">This may repeat existing articles. Pick a different angle, or say in Instructions how this one differs.</p><ul style="margin:6px 0 12px;padding-left:18px;">${rows}</ul>`
+          : `<p class="wr-muted">No overlapping articles found.</p>`}
+        <p class="wr-muted">Estimated cost about <b>$${est.total.toFixed(2)}</b>: writing $${est.byStage.write.toFixed(2)}, fact check $${est.byStage.audit.toFixed(2)}, revision $${est.byStage.revise.toFixed(2)}, links $${est.byStage.links.toFixed(2)}, image $${est.byStage.image.toFixed(2)}. Actual cost is recorded per call.</p>`;
+      return r;
+    }
+    document.getElementById("wr-check")?.addEventListener("click", () => check().catch((e) => toast(e.message)));
+    form?.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const btn = document.getElementById("wr-start") as HTMLButtonElement;
+      btn.disabled = true;
+      try {
+        if (checkedOverlap === null) {
+          const r = await check();
+          if (r.overlap.length && !confirm(`This overlaps ${r.overlap.length} existing article(s). Write it anyway?`)) return;
+        }
+        const r = await api({ action: "create", brief: brief() });
+        if (r.duplicate) toast("A job for this brief already exists. Opening it.");
+        location.href = `/admin/writer/${r.id}`;
+      } catch (e: any) {
+        toast(e.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    document.getElementById("wr-queue")?.addEventListener("click", async () => {
+      try {
+        const r = await api({ action: "topic-add", brief: brief() });
+        toast(r.overlap?.length ? `Queued. Note: overlaps ${r.overlap.length} existing article(s).` : "Added to the topic queue.");
+        location.href = "/admin/writer?tab=queue";
+      } catch (e: any) {
+        toast(e.message);
+      }
+    });
+
+    document.querySelectorAll<HTMLElement>("[data-topic]").forEach((row) => {
+      row.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((b) => {
+        b.addEventListener("click", async () => {
+          const topicId = Number(row.dataset.topic);
+          try {
+            if (b.dataset.act === "generate") {
+              const r = await api({ action: "topic-generate", topicId });
+              location.href = `/admin/writer/${r.id}`;
+            } else {
+              await api({ action: "topic-status", topicId, status: b.dataset.act });
+              location.reload();
+            }
+          } catch (e: any) {
+            toast(e.message);
+          }
+        });
+      });
+    });
+  </script>
+</AdminShell>

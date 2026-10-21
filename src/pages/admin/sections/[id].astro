@@ -1,0 +1,254 @@
+---
+// One section's settings: its URL, copy, templates and sub-categories.
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+import { adminGet, adminListAll, itemCounts, subKey, INDEX_TEMPLATES, ITEM_TEMPLATES } from "../../../lib/sections";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const s = await adminGet(db, Astro.params.id!);
+if (!s || s.parent_id) return Astro.redirect("/admin/sections");
+
+const [all, counts] = await Promise.all([adminListAll(db), itemCounts(db)]);
+const subs = all.filter((c) => c.parent_id === s.id);
+const itemTotal = counts.bySection.get(s.id)?.total ?? 0;
+const field = "padding:9px 11px;font-size:13px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;";
+---
+
+<AdminShell title={`${s.title} — Item Sections — PixyDust Admin`} tab="sections">
+  <script type="application/json" id="pd-sec-data" set:html={JSON.stringify({ id: s.id, itemTotal })} />
+
+  <div class="mx-auto w-full" style="max-width:780px;padding:28px 28px 80px;">
+    <div class="mb-5 flex flex-wrap items-center gap-3">
+      <a href="/admin/sections" class="text-ink-3" style="font-size:12px;text-decoration:none;">← Item Sections</a>
+      <span id="pd-save-state" class="text-ink-4" style="font-size:11.5px;"></span>
+      <div class="ml-auto flex items-center gap-2">
+        <a href={`/admin/items?section=${s.id}`} class="rounded-xl text-ink-2"
+          style="padding:8px 13px;font-size:12.5px;border:0.5px solid var(--pd-hairline2);text-decoration:none;">{itemTotal} items</a>
+        <a id="pd-view" href={`/${s.slug}`} target="_blank" rel="noopener" class="rounded-xl text-ink-2"
+          style="padding:8px 13px;font-size:12.5px;border:0.5px solid var(--pd-hairline2);text-decoration:none;">View ↗</a>
+        <button type="button" id="pd-save" class="rounded-xl font-bold"
+          style="padding:8px 16px;font-size:12.5px;background:var(--pd-ink);color:var(--pd-bg);border:0;cursor:pointer;">Save</button>
+      </div>
+    </div>
+
+    <section class="rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+      <h2 class="mb-3 font-display font-semibold text-ink" style="font-size:15px;">Section</h2>
+
+      <label class="block text-ink-3" style="font-size:11px;">Name</label>
+      <input id="pd-title" type="text" value={s.title} class="mt-1 w-full rounded-lg text-ink" style={field} />
+
+      <label class="mt-3 block text-ink-3" style="font-size:11px;">URL</label>
+      <div class="mt-1 flex items-center rounded-lg" style={`${field}padding:0 0 0 11px;`}>
+        <span class="font-mono text-ink-4" style="font-size:12px;">pixydust.com/</span>
+        <input id="pd-slug" type="text" value={s.slug} class="flex-1 font-mono text-ink-2"
+          style="padding:9px 11px 9px 0;font-size:12px;background:transparent;border:0;outline:none;min-width:0;" />
+      </div>
+      {itemTotal > 0 && (
+        <p class="mt-1" style="font-size:10.5px;color:var(--pd-amber);line-height:1.4;">
+          Changing this moves all {itemTotal} items to the new URL. Links to the old address will stop working.
+        </p>
+      )}
+
+      <label class="mt-3 block text-ink-3" style="font-size:11px;">Description — shown under the page heading</label>
+      <textarea id="pd-blurb" rows="2" class="mt-1 w-full rounded-lg text-ink-2" style={`${field}line-height:1.5;resize:vertical;`}>{s.blurb}</textarea>
+
+      <div class="mt-3 grid gap-3" style="grid-template-columns:1fr 1fr;">
+        <div>
+          <label class="block text-ink-3" style="font-size:11px;">Noun for counts</label>
+          <input id="pd-noun" type="text" value={s.noun} placeholder="articles" class="mt-1 w-full rounded-lg text-ink-2" style={field} />
+          <p class="mt-1 text-ink-4" style="font-size:10.5px;">“1–12 of 40 <span id="pd-noun-echo">{s.noun}</span>”</p>
+        </div>
+        <div>
+          <label class="block text-ink-3" style="font-size:11px;">Visibility</label>
+          <select id="pd-status" class="mt-1 w-full rounded-lg text-ink" style={field}>
+            <option value="published" selected={s.status === "published"}>Live on the site</option>
+            <option value="draft" selected={s.status === "draft"}>Hidden — page and items not reachable</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Templates are data, so a section can change layout without a deploy.
+         Default is the Blog look for both. -->
+    <section class="mt-4 rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+      <h2 class="font-display font-semibold text-ink" style="font-size:15px;">Templates</h2>
+      <p class="mt-1 text-ink-4" style="font-size:11.5px;line-height:1.45;">
+        How this section's page and its items look. “Default” matches the Blog.
+      </p>
+      <div class="mt-3 grid gap-3" style="grid-template-columns:1fr 1fr;">
+        <div>
+          <label class="block text-ink-3" style="font-size:11px;">Section page</label>
+          <select id="pd-index-template" class="mt-1 w-full rounded-lg text-ink" style={field}>
+            {INDEX_TEMPLATES.map((t) => <option value={t.id} selected={t.id === s.index_template}>{t.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label class="block text-ink-3" style="font-size:11px;">Item pages</label>
+          <select id="pd-item-template" class="mt-1 w-full rounded-lg text-ink" style={field}>
+            {ITEM_TEMPLATES.map((t) => <option value={t.id} selected={t.id === s.item_template}>{t.label}</option>)}
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4 rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+      <div class="flex items-center justify-between">
+        <h2 class="font-display font-semibold text-ink" style="font-size:15px;">Sub-categories</h2>
+        <button type="button" id="pd-add-sub" class="rounded-lg font-semibold text-ink"
+          style="padding:6px 11px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">+ Add</button>
+      </div>
+      <p class="mt-1 text-ink-4" style="font-size:11.5px;line-height:1.45;">
+        Optional groupings inside this section. They appear as filters on the section page
+        (<span class="font-mono">/{s.slug}?category=…</span>) and don't change any item's URL.
+      </p>
+
+      {subs.length === 0 ? (
+        <p class="mt-4 text-ink-4" style="font-size:12px;">None yet.</p>
+      ) : (
+        <ul id="pd-subs" class="mt-3" style="list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;">
+          {subs.map((sub) => (
+            <li data-id={sub.id} class="flex flex-wrap items-center gap-2 rounded-xl"
+              style="padding:8px 10px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline);">
+              <span class="pd-grip" title="Drag to reorder" style="cursor:grab;color:var(--pd-ink4);font-size:12px;user-select:none;">⠿</span>
+              <input class="pd-sub-title text-ink" value={sub.title} aria-label="Name"
+                style="flex:1 1 160px;min-width:0;padding:6px 8px;font-size:12.5px;background:transparent;border:0.5px solid transparent;border-radius:7px;outline:none;" />
+              <span class="font-mono text-ink-4" style="font-size:10.5px;">?category=</span>
+              <input class="pd-sub-key font-mono text-ink-2" value={subKey(sub)} aria-label="URL key"
+                style="width:130px;padding:6px 8px;font-size:11.5px;background:transparent;border:0.5px solid var(--pd-hairline2);border-radius:7px;outline:none;" />
+              <span class="font-mono text-ink-4" style="font-size:10px;min-width:52px;text-align:right;">
+                {counts.bySub.get(sub.id) ?? 0} items
+              </span>
+              <button type="button" class="pd-sub-save rounded-md text-ink-3"
+                style="padding:4px 8px;font-size:10.5px;border:0.5px solid var(--pd-hairline2);background:transparent;cursor:pointer;">Save</button>
+              <button type="button" class="pd-sub-del" aria-label="Delete"
+                data-count={counts.bySub.get(sub.id) ?? 0}
+                style="padding:0 4px;font-size:14px;color:var(--pd-pink);background:none;border:0;cursor:pointer;">×</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="mt-4 rounded-2xl" style="padding:20px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+      <label class="flex items-center gap-2 text-ink-2" style="font-size:12.5px;cursor:pointer;">
+        <input id="pd-footer" type="checkbox" checked={s.in_footer === 1} />
+        Include in lists of sections
+      </label>
+      {s.id !== "blog" && (
+        <button type="button" id="pd-delete" class="mt-4 w-full rounded-lg"
+          style="padding:8px;font-size:11.5px;border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);background:transparent;color:var(--pd-pink);cursor:pointer;">
+          Delete section
+        </button>
+      )}
+    </section>
+  </div>
+
+  <style is:global>
+    .pd-sub-title:hover, .pd-sub-title:focus { border-color: var(--pd-hairline2) !important; }
+    #pd-subs li.pd-dragging { opacity: 0.45; }
+  </style>
+
+  <script>
+    const data = JSON.parse(document.getElementById("pd-sec-data")!.textContent || "{}");
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const toast = (m: string) => (window as any).pdToast?.(m);
+    const stateEl = $("pd-save-state");
+    const post = async (payload: any) => {
+      const res = await fetch("/api/admin/sections", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!j.ok) toast(j.error || "Request failed.");
+      return j;
+    };
+
+    $<HTMLInputElement>("pd-noun").addEventListener("input", (e) => {
+      $("pd-noun-echo").textContent = (e.target as HTMLInputElement).value || "items";
+    });
+
+    $("pd-save").addEventListener("click", async () => {
+      stateEl.textContent = "Saving…";
+      const j = await post({
+        action: "save-section",
+        id: data.id,
+        title: $<HTMLInputElement>("pd-title").value,
+        slug: $<HTMLInputElement>("pd-slug").value,
+        blurb: $<HTMLTextAreaElement>("pd-blurb").value,
+        noun: $<HTMLInputElement>("pd-noun").value,
+        status: $<HTMLSelectElement>("pd-status").value,
+        indexTemplate: $<HTMLSelectElement>("pd-index-template").value,
+        itemTemplate: $<HTMLSelectElement>("pd-item-template").value,
+        inFooter: $<HTMLInputElement>("pd-footer").checked,
+      });
+      if (!j.ok) { stateEl.textContent = "Save failed"; return; }
+      $<HTMLInputElement>("pd-slug").value = j.slug;
+      $<HTMLAnchorElement>("pd-view").href = `/${j.slug}`;
+      stateEl.textContent = `Saved ${new Date().toLocaleTimeString()}`;
+    });
+
+    $("pd-add-sub").addEventListener("click", async () => {
+      const title = prompt("Sub-category name");
+      if (!title) return;
+      const j = await post({ action: "create-sub", sectionId: data.id, title });
+      if (j.ok) location.reload();
+    });
+
+    document.querySelectorAll<HTMLLIElement>("#pd-subs > li").forEach((li) => {
+      const id = li.dataset.id!;
+      li.querySelector<HTMLButtonElement>(".pd-sub-save")!.addEventListener("click", async () => {
+        const j = await post({
+          action: "save-sub", id,
+          title: li.querySelector<HTMLInputElement>(".pd-sub-title")!.value,
+          key: li.querySelector<HTMLInputElement>(".pd-sub-key")!.value,
+        });
+        if (j.ok) { li.querySelector<HTMLInputElement>(".pd-sub-key")!.value = j.key; toast("Saved."); }
+      });
+      li.querySelector<HTMLButtonElement>(".pd-sub-del")!.addEventListener("click", async (e) => {
+        const n = Number((e.currentTarget as HTMLElement).dataset.count || "0");
+        const msg = n > 0
+          ? `Delete this sub-category? Its ${n} item(s) stay in the section, just without a sub-category. No URLs change.`
+          : "Delete this sub-category?";
+        if (!confirm(msg)) return;
+        const j = await post({ action: "delete-sub", id });
+        if (j.ok) location.reload();
+      });
+    });
+
+    // Drag sub-categories to reorder — the order of the filter chips.
+    const subList = document.getElementById("pd-subs");
+    if (subList) {
+      let dragging: HTMLLIElement | null = null;
+      subList.querySelectorAll<HTMLLIElement>(":scope > li").forEach((li) => {
+        li.querySelector<HTMLElement>(".pd-grip")?.addEventListener("mousedown", () => (li.draggable = true));
+        li.addEventListener("dragstart", () => { dragging = li; li.classList.add("pd-dragging"); });
+        li.addEventListener("dragend", async () => {
+          li.classList.remove("pd-dragging");
+          li.draggable = false;
+          dragging = null;
+          const order = [...subList.querySelectorAll<HTMLLIElement>(":scope > li")].map((x) => x.dataset.id!);
+          const j = await post({ action: "reorder", order });
+          if (j.ok) toast("Order saved.");
+        });
+        li.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          if (!dragging || dragging === li) return;
+          const r = li.getBoundingClientRect();
+          subList.insertBefore(dragging, (e as DragEvent).clientY > r.top + r.height / 2 ? li.nextSibling : li);
+        });
+      });
+    }
+
+    document.getElementById("pd-delete")?.addEventListener("click", async () => {
+      if (data.itemTotal > 0) {
+        toast(`Move or delete its ${data.itemTotal} item(s) first — deleting the section would break their URLs.`);
+        return;
+      }
+      if (!confirm("Delete this section permanently?")) return;
+      const j = await post({ action: "delete-section", id: data.id });
+      if (j.ok) location.href = "/admin/sections";
+    });
+  </script>
+</AdminShell>

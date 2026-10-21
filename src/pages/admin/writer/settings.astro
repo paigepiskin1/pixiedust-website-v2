@@ -1,0 +1,135 @@
+---
+// AI Writer settings (providers, limits, source domains, image look) and the
+// usage report. Keys are not here: SyncNode's key is a server secret, and the
+// OpenRouter and Replicate keys live in the SyncNode dashboard.
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import WriterNav from "../../../components/admin/WriterNav.astro";
+import { isAdmin } from "../../../lib/admin";
+import { getWriterSettings } from "../../../lib/writer/settings";
+import { usageReport, estimateJob } from "../../../lib/writer/jobs";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+const db = Astro.locals.runtime.env.DB;
+const [s, usage] = await Promise.all([getWriterSettings(db), usageReport(db)]);
+const est = estimateJob(s);
+const keySet = !!Astro.locals.runtime.env.SYNCNODE_API_KEY;
+const money = (n: number) => `$${(Number(n) || 0).toFixed(2)}`;
+const STAGES = [
+  { k: "write", name: "Writing and revision" },
+  { k: "audit", name: "Fact check" },
+  { k: "links", name: "Link suggestions" },
+] as const;
+---
+
+<AdminShell title="AI Writer settings — PixyDust Admin" tab="writer">
+  <div class="mx-auto w-full" style="max-width:1100px;padding:28px;">
+    <WriterNav active="settings" />
+
+    <div class="wr-grid2" style="margin-bottom:14px;">
+      <div class="wr-card">
+        <h2 class="wr-h">This month</h2>
+        <div class="text-ink" style="font-size:24px;font-weight:650;letter-spacing:-0.5px;">{money(usage.monthToDate)} <span class="wr-muted" style="font-size:13px;font-weight:400;">of {money(s.limits.monthlyUsd)}</span></div>
+        <p class="wr-muted" style="margin-top:6px;">An article is estimated at about {money(est.total)} with these settings. Spend counts the provider cost each response reports plus SyncNode's per-call fee.</p>
+      </div>
+      <div class="wr-card">
+        <h2 class="wr-h">Connection</h2>
+        <p class="wr-muted">SyncNode key on the server: <b class={keySet ? "wr-tone-ok" : "wr-tone-bad"}>{keySet ? "set" : "missing"}</b>. Chat goes to SyncNode <span class="wr-mono">/chat-completion</span> (OpenRouter); images to <span class="wr-mono">/{s.image.provider === "fal" ? "fal/generate" : "generate"}</span>. Provider keys are held by SyncNode, not this site.</p>
+      </div>
+    </div>
+
+    <form id="wr-settings" class="flex flex-col gap-3">
+      <div class="wr-card">
+        <h2 class="wr-h">Models</h2>
+        <p class="wr-hint" style="margin-top:0;">OpenRouter model ids. Effort is the reasoning level; max tokens caps each response, thinking included.</p>
+        <table class="wr-table">
+          <thead><tr><th>Stage</th><th>Model</th><th>Effort</th><th>Max tokens</th></tr></thead>
+          <tbody>
+            {STAGES.map((st) => (
+              <tr>
+                <td>{st.name}</td>
+                <td><input class="wr-input" name={`${st.k}.model`} value={s[st.k].model} /></td>
+                <td><select class="wr-select" name={`${st.k}.effort`}>{["low", "medium", "high"].map((e) => <option value={e} selected={s[st.k].effort === e}>{e}</option>)}</select></td>
+                <td><input class="wr-input" type="number" name={`${st.k}.maxTokens`} value={s[st.k].maxTokens} min="500" max="64000" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <label class="flex items-center gap-2 wr-muted" style="margin-top:10px;"><input type="checkbox" name="autoRevise" checked={s.autoRevise} /> Revise once automatically when the fact check finds problems, then check again</label>
+      </div>
+
+      <div class="wr-card">
+        <h2 class="wr-h">Header image</h2>
+        <div class="wr-grid2">
+          <div><label class="wr-label">Provider</label><select class="wr-select" name="image.provider"><option value="replicate" selected={s.image.provider === "replicate"}>Replicate (via SyncNode)</option><option value="fal" selected={s.image.provider === "fal"}>FAL (via SyncNode)</option></select></div>
+          <div><label class="wr-label">Model</label><input class="wr-input" name="image.model" value={s.image.model} /></div>
+          <div><label class="wr-label">Model input (JSON, merged under the prompt)</label><textarea class="wr-textarea wr-mono" name="image.input" rows="3">{JSON.stringify(s.image.input)}</textarea></div>
+          <div><label class="wr-label">Price per image (USD, for estimates)</label><input class="wr-input" type="number" step="0.01" name="image.costUsd" value={s.image.costUsd} /></div>
+        </div>
+        <label class="wr-label" style="margin-top:10px;">Visual guidelines (added to every image prompt)</label>
+        <textarea class="wr-textarea" name="image.guidelines" rows="4">{s.image.guidelines}</textarea>
+      </div>
+
+      <div class="wr-grid2">
+        <div class="wr-card">
+          <h2 class="wr-h">Spending limits</h2>
+          <label class="wr-label">Per article (USD)</label><input class="wr-input" type="number" step="0.5" name="limits.perArticleUsd" value={s.limits.perArticleUsd} />
+          <label class="wr-label" style="margin-top:8px;">Per month (USD)</label><input class="wr-input" type="number" step="1" name="limits.monthlyUsd" value={s.limits.monthlyUsd} />
+          <div class="wr-hint">A stage that would go over either limit doesn't start.</div>
+        </div>
+        <div class="wr-card">
+          <h2 class="wr-h">Approved source domains</h2>
+          <textarea class="wr-textarea" name="sourceDomains" rows="4">{s.sourceDomains.join("\n")}</textarea>
+          <div class="wr-hint">One per line; subdomains included. Source URLs on other domains are not fetched, and the review lists them as missing evidence.</div>
+        </div>
+      </div>
+      <div><button class="wr-btn wr-btn-primary" type="submit">Save settings</button></div>
+    </form>
+
+    <div class="wr-card" style="margin-top:18px;">
+      <h2 class="wr-h">Usage by month</h2>
+      <table class="wr-table">
+        <thead><tr><th>Month</th><th>Calls</th><th>Failed</th><th>Provider</th><th>SyncNode fees</th><th>Total</th></tr></thead>
+        <tbody>
+          {usage.months.length === 0 && <tr><td colspan="6" class="wr-muted">No usage yet.</td></tr>}
+          {usage.months.map((m: any) => <tr><td class="wr-mono">{m.month}</td><td>{m.calls}</td><td>{m.failed}</td><td class="wr-mono">{money(m.provider)}</td><td class="wr-mono">{money(m.gateway)}</td><td class="wr-mono">{money(Number(m.provider) + Number(m.gateway))}</td></tr>)}
+        </tbody>
+      </table>
+      <h3 class="wr-h" style="margin-top:16px;font-size:13px;">Last 30 days by stage</h3>
+      <table class="wr-table">
+        <thead><tr><th>Stage</th><th>Model</th><th>Calls</th><th>Tokens in / out</th><th>Avg time</th><th>Cost</th></tr></thead>
+        <tbody>
+          {usage.stages.map((r: any) => <tr><td>{r.stage}</td><td class="wr-mono">{r.model}</td><td>{r.calls}</td><td class="wr-mono">{r.pin ?? "-"} / {r.pout ?? "-"}</td><td class="wr-mono">{r.ms ? `${Math.round(r.ms / 1000)}s` : "-"}</td><td class="wr-mono">{money(r.usd)}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const toast = (m: string) => (window as any).pdToast?.(m) ?? alert(m);
+    document.getElementById("wr-settings")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target as HTMLFormElement;
+      const v = (n: string) => (f.elements.namedItem(n) as HTMLInputElement | null)?.value ?? "";
+      let input: any;
+      try {
+        input = JSON.parse(v("image.input") || "{}");
+      } catch {
+        return toast("Model input must be valid JSON.");
+      }
+      const stage = (k: string) => ({ model: v(`${k}.model`), effort: v(`${k}.effort`), maxTokens: Number(v(`${k}.maxTokens`)) });
+      const settings = {
+        write: stage("write"), audit: stage("audit"), links: stage("links"),
+        autoRevise: (f.elements.namedItem("autoRevise") as HTMLInputElement).checked,
+        image: { provider: v("image.provider"), model: v("image.model"), input, costUsd: Number(v("image.costUsd")), guidelines: v("image.guidelines") },
+        limits: { perArticleUsd: Number(v("limits.perArticleUsd")), monthlyUsd: Number(v("limits.monthlyUsd")) },
+        sourceDomains: v("sourceDomains").split("\n").map((s) => s.trim()).filter(Boolean),
+      };
+      const res = await fetch("/api/admin/writer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "settings", settings }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) return toast(j.error || "Save failed");
+      toast("Settings saved.");
+      location.reload();
+    });
+  </script>
+</AdminShell>

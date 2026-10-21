@@ -29,8 +29,8 @@ export async function POST({ request, locals }: APIContext) {
   }
 
   const template = body.templateId ? await getTemplate(db, body.templateId) : null;
-  // Hidden templates are runnable by admins (for testing before publish).
-  if (!template || (template.isHidden && !user.isAdmin)) return json({ error: "Template not found." }, 404);
+  // Hidden and admin-only templates are runnable only by admins (for testing before publish).
+  if (!template || ((template.isHidden || template.isAdminOnly) && !user.isAdmin)) return json({ error: "Template not found." }, 404);
   // Apply field defaults before validation/resolve so optional prompts with a
   // baked-in `default` still reach the model when the user leaves them blank.
   // Omni templates: also split mixed image/video/audio uploads into typed lists.

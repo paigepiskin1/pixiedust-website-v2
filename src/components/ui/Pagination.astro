@@ -1,0 +1,204 @@
+---
+// Paginator. Every control is a real <a href>, server-rendered, so crawlers
+// follow pages and the keyboard works without JavaScript — the motion is
+// decoration layered on top, never the mechanism.
+interface Props {
+  page: number;
+  pages: number;
+  total: number;
+  perPage: number;
+  /** Base path, e.g. "/blog". Page 1 links here with no query. */
+  base: string;
+  /** Label for the count line, e.g. "articles". */
+  noun?: string;
+}
+const { page, pages, total, perPage, base, noun = "articles" } = Astro.props;
+
+// `base` may already carry a query (a sub-category filter), so join with "&"
+// in that case. The parameter order must match the page's canonical form, or
+// every paginated link would 302 once before landing.
+const href = (n: number) => (n <= 1 ? base : `${base}${base.includes("?") ? "&" : "?"}page=${n}`);
+
+/** Page numbers with gaps: 1 … 4 5 6 … 12. Always shows first, last, current
+ *  and its neighbours, so the control keeps a stable width however many pages
+ *  there are. -1 marks an ellipsis. */
+function windowed(current: number, last: number): number[] {
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+  const out = new Set<number>([1, last, current]);
+  if (current - 1 > 1) out.add(current - 1);
+  if (current + 1 < last) out.add(current + 1);
+  // Keep the row a consistent length near the ends, where the window is
+  // lopsided and would otherwise collapse to four entries.
+  if (current <= 3) [2, 3, 4].forEach((n) => n < last && out.add(n));
+  if (current >= last - 2) [last - 3, last - 2, last - 1].forEach((n) => n > 1 && out.add(n));
+  const sorted = [...out].filter((n) => n >= 1 && n <= last).sort((a, b) => a - b);
+  const withGaps: number[] = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) withGaps.push(-1);
+    withGaps.push(n);
+  });
+  return withGaps;
+}
+
+const items = windowed(page, pages);
+const from = total === 0 ? 0 : (page - 1) * perPage + 1;
+const to = Math.min(page * perPage, total);
+const pct = pages <= 1 ? 100 : Math.round((page / pages) * 100);
+
+const Arrow = (dir: "prev" | "next") =>
+  dir === "prev"
+    ? '<svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 6h-7M5.5 3l-3 3 3 3"/></svg>'
+    : '<svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h7M6.5 3l3 3-3 3"/></svg>';
+---
+
+{pages > 1 && (
+  <nav class="pd-pager mt-12" aria-label="Pagination">
+    <!-- How far through the archive this page sits. Decorative, so hidden from
+         screen readers — the count line below says the same thing in words. -->
+    <div class="pd-pager-rail" aria-hidden="true">
+      <span class="pd-pager-fill" style={`width:${pct}%;`} />
+    </div>
+
+    <div class="pd-pager-row">
+      {page > 1 ? (
+        <a href={href(page - 1)} class="pd-pager-btn pd-pager-edge" rel="prev" aria-label="Previous page">
+          <Fragment set:html={Arrow("prev")} />
+          <span class="pd-pager-edge-label">Prev</span>
+        </a>
+      ) : (
+        <span class="pd-pager-btn pd-pager-edge is-off" aria-disabled="true">
+          <Fragment set:html={Arrow("prev")} />
+          <span class="pd-pager-edge-label">Prev</span>
+        </span>
+      )}
+
+      <div class="pd-pager-nums">
+        {items.map((n) =>
+          n === -1 ? (
+            <span class="pd-pager-gap" aria-hidden="true">···</span>
+          ) : n === page ? (
+            <span class="pd-pager-num is-on" aria-current="page">{n}</span>
+          ) : (
+            <a href={href(n)} class="pd-pager-num" aria-label={`Page ${n}`}>{n}</a>
+          )
+        )}
+      </div>
+
+      {page < pages ? (
+        <a href={href(page + 1)} class="pd-pager-btn pd-pager-edge" rel="next" aria-label="Next page">
+          <span class="pd-pager-edge-label">Next</span>
+          <Fragment set:html={Arrow("next")} />
+        </a>
+      ) : (
+        <span class="pd-pager-btn pd-pager-edge is-off" aria-disabled="true">
+          <span class="pd-pager-edge-label">Next</span>
+          <Fragment set:html={Arrow("next")} />
+        </span>
+      )}
+    </div>
+
+    <!-- Built as one expression: adjacent {…} expressions lose the literal
+         space between them, which rendered "30articles". -->
+    <p class="pd-pager-count">
+      {`${from}–${to} of ${total} ${noun} · page ${page} of ${pages}`}
+      <span class="pd-pager-hint">{" · use ← → to move between pages"}</span>
+    </p>
+  </nav>
+)}
+
+<style is:global>
+  .pd-pager { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+  .pd-pager-rail {
+    width: min(260px, 60%); height: 2px; border-radius: 999px;
+    background: var(--pd-hairline2); overflow: hidden;
+  }
+  .pd-pager-fill {
+    display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #7C3AED, #EC4899);
+    transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .pd-pager-row {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
+    padding: 6px; border-radius: 999px;
+    background: var(--pd-bg2); border: 0.5px solid var(--pd-hairline);
+  }
+
+  .pd-pager-nums { display: flex; align-items: center; gap: 3px; }
+
+  .pd-pager-num,
+  .pd-pager-btn {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-width: 34px; height: 34px; padding: 0 10px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600; letter-spacing: -0.1px;
+    color: var(--pd-ink2); text-decoration: none; border: 0.5px solid transparent;
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), color 0.18s ease,
+                background 0.18s ease, border-color 0.18s ease;
+  }
+  .pd-pager-num { font-variant-numeric: tabular-nums; }
+
+  .pd-pager-num:hover,
+  .pd-pager-btn:not(.is-off):hover {
+    color: var(--pd-ink);
+    background: var(--pd-raised);
+    border-color: var(--pd-hairline2);
+    /* The small lift is the whole "magnetic" idea: enough to feel responsive,
+       not enough to shift the row's layout. */
+    transform: translateY(-2px);
+  }
+  .pd-pager-num:active,
+  .pd-pager-btn:not(.is-off):active { transform: translateY(0); }
+
+  .pd-pager-num.is-on {
+    color: #fff;
+    background: linear-gradient(115deg, #7C3AED, #EC4899);
+    box-shadow: 0 4px 14px -4px color-mix(in srgb, #EC4899 55%, transparent);
+  }
+
+  .pd-pager-gap { color: var(--pd-ink4); font-size: 12px; padding: 0 2px; letter-spacing: 1px; }
+
+  .pd-pager-edge-label { font-size: 12px; }
+  .pd-pager-btn.is-off { color: var(--pd-ink4); cursor: not-allowed; }
+
+  .pd-pager-count { font-size: 11.5px; color: var(--pd-ink4); text-align: center; }
+  .pd-pager-hint { opacity: 0.75; }
+  @media (max-width: 560px) {
+    .pd-pager-edge-label { display: none; }
+    .pd-pager-hint { display: none; }
+  }
+
+  /* Staggered reveal for the cards this paginator belongs to. Index is set
+     inline per card; capped so a full page never ends on a long delay. */
+  .pd-reveal {
+    opacity: 0;
+    animation: pd-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+  @keyframes pd-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pd-pager-num, .pd-pager-btn, .pd-pager-fill { transition: none; }
+    .pd-pager-num:hover, .pd-pager-btn:hover { transform: none; }
+    .pd-reveal { opacity: 1; animation: none; }
+  }
+</style>
+
+<script>
+  // ← / → move between pages, mirroring the rel=prev/next links already in the
+  // markup. Ignored while typing so it cannot hijack the search field.
+  const prev = document.querySelector<HTMLAnchorElement>('.pd-pager a[rel="prev"]');
+  const next = document.querySelector<HTMLAnchorElement>('.pd-pager a[rel="next"]');
+  if (prev || next) {
+    document.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (e.key === "ArrowLeft" && prev) { e.preventDefault(); location.href = prev.href; }
+      if (e.key === "ArrowRight" && next) { e.preventDefault(); location.href = next.href; }
+    });
+  }
+</script>

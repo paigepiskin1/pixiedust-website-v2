@@ -1,0 +1,96 @@
+---
+// The approved fact sheet. The writer may state a product fact only if it is
+// here and approved; "needs review" rows are passed as do-not-state.
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import WriterNav from "../../../components/admin/WriterNav.astro";
+import { isAdmin } from "../../../lib/admin";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+const db = Astro.locals.runtime.env.DB;
+const facts = ((await db.prepare("SELECT * FROM ai_facts ORDER BY CASE status WHEN 'needs_review' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, topic, sort_order, id").all<any>()).results ?? []);
+const TOPICS = ["brand", "surfaces", "tools", "pricing", "policy"];
+const byTopic = TOPICS.map((t) => ({ topic: t, rows: facts.filter((f) => f.topic === t) })).concat([{ topic: "other", rows: facts.filter((f) => !TOPICS.includes(f.topic)) }]).filter((g) => g.rows.length);
+const counts = { approved: facts.filter((f) => f.status === "approved").length, review: facts.filter((f) => f.status === "needs_review").length };
+const TOPIC_LABEL: Record<string, string> = { brand: "Brand and history", surfaces: "Web and mobile", tools: "Tools", pricing: "Pricing and credits", policy: "Policies", other: "Other" };
+---
+
+<AdminShell title="AI Writer fact sheet — PixyDust Admin" tab="writer">
+  <div class="mx-auto w-full" style="max-width:1100px;padding:28px;">
+    <WriterNav active="facts" />
+    <p class="wr-muted" style="margin-bottom:14px;max-width:760px;">
+      {counts.approved} approved facts, {counts.review} waiting for review. The writer may only state product facts that are approved here.
+      Anything marked <b>needs review</b> is passed to it as "do not state", so a known conflict can't reach an article. Fix the conflict on the
+      site, update the statement, then approve it.
+    </p>
+
+    <details class="wr-card" style="margin-bottom:14px;">
+      <summary style="cursor:pointer;font-weight:600;color:var(--pd-ink);font-size:13.5px;">Add a fact</summary>
+      <form id="fact-new" class="flex flex-col gap-3" style="margin-top:12px;">
+        <div class="wr-grid2">
+          <div><label class="wr-label">Id</label><input name="id" class="wr-input" placeholder="tool.shoots.turnaround" required />
+            <div class="wr-hint">topic.name. Start with brand, surfaces, tool, pricing or policy.</div></div>
+          <div><label class="wr-label">Source</label><input name="source" class="wr-input" placeholder="Where it can be checked: a URL or page" /></div>
+        </div>
+        <div><label class="wr-label">Statement</label><textarea name="statement" rows="2" class="wr-textarea" required placeholder="A full sentence the writer may state as written."></textarea></div>
+        <div class="flex items-center gap-2">
+          <select name="status" class="wr-select" style="width:auto;"><option value="approved">Approved</option><option value="needs_review">Needs review</option></select>
+          <button class="wr-btn wr-btn-primary" type="submit">Add</button>
+        </div>
+      </form>
+    </details>
+
+    {byTopic.map((g) => (
+      <section style="margin-bottom:18px;">
+        <h2 class="wr-h">{TOPIC_LABEL[g.topic] ?? g.topic}</h2>
+        <div class="flex flex-col gap-2">
+          {g.rows.map((f) => (
+            <form class="wr-card fact-row" data-id={f.id} style="padding:12px 14px;">
+              <div class="flex flex-wrap items-center gap-2" style="margin-bottom:6px;">
+                <span class="wr-mono text-ink-3">{f.id}</span>
+                <span class={`wr-pill ${f.status === "approved" ? "wr-tone-ok" : f.status === "needs_review" ? "wr-tone-warn" : "wr-tone-dim"}`}>{f.status.replace("_", " ")}</span>
+                <span class="wr-hint" style="margin:0;">{f.updated_by ? `updated ${String(f.updated_at).slice(0, 10)}` : `seeded ${String(f.updated_at).slice(0, 10)}`}</span>
+              </div>
+              <textarea name="statement" rows="2" class="wr-textarea">{f.statement}</textarea>
+              <div class="flex flex-wrap items-center gap-2" style="margin-top:6px;">
+                <input name="source" class="wr-input" style="flex:1 1 240px;" value={f.source ?? ""} placeholder="Source" />
+                <select name="status" class="wr-select" style="width:auto;">
+                  <option value="approved" selected={f.status === "approved"}>Approved</option>
+                  <option value="needs_review" selected={f.status === "needs_review"}>Needs review</option>
+                  <option value="retired" selected={f.status === "retired"}>Retired</option>
+                </select>
+                <input type="hidden" name="topic" value={f.topic} />
+                <button class="wr-btn wr-btn-sm" type="submit">Save</button>
+              </div>
+            </form>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+
+  <script>
+    const toast = (m: string) => (window as any).pdToast?.(m) ?? alert(m);
+    async function save(fact: any) {
+      const res = await fetch("/api/admin/writer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "fact-save", fact }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "Save failed");
+    }
+    document.querySelectorAll<HTMLFormElement>(".fact-row").forEach((f) => f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(f);
+      try {
+        await save({ id: f.dataset.id, statement: fd.get("statement"), source: fd.get("source"), status: fd.get("status"), topic: fd.get("topic") });
+        toast("Fact saved.");
+      } catch (err: any) { toast(err.message); }
+    }));
+    document.getElementById("fact-new")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target as HTMLFormElement);
+      try {
+        await save({ id: fd.get("id"), statement: fd.get("statement"), source: fd.get("source"), status: fd.get("status") });
+        location.reload();
+      } catch (err: any) { toast(err.message); }
+    });
+  </script>
+</AdminShell>

@@ -1,0 +1,308 @@
+---
+export const prerender = false;
+import AdminShell from "../../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../../lib/admin";
+import { adminGetArticle, adminListCategories, bodyOf, articleHref } from "../../../../lib/help-db";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const id = Number(Astro.params.id);
+const article = Number.isFinite(id) ? await adminGetArticle(db, id) : null;
+if (!article) return Astro.redirect("/admin/help");
+
+const categories = await adminListCategories(db);
+
+const initial = {
+  id: article.id,
+  categoryId: article.category_id,
+  slug: article.slug,
+  title: article.title,
+  summary: article.summary ?? "",
+  body: bodyOf(article),
+  status: article.status,
+  popular: article.popular === 1,
+};
+---
+
+<AdminShell title={`${article.title} — Help Center — PixyDust Admin`} tab="help">
+  <script type="application/json" id="pd-article-data" set:html={JSON.stringify(initial)} />
+
+  <div class="mx-auto w-full" style="max-width:1100px;padding:24px 28px 80px;">
+    <div class="mb-5 flex flex-wrap items-center gap-3">
+      <a href="/admin/help" class="text-ink-3" style="font-size:12px;text-decoration:none;">← Help Center</a>
+      <span id="pd-save-state" class="text-ink-4" style="font-size:11.5px;"></span>
+      <div class="ml-auto flex items-center gap-2">
+        <a id="pd-view" href={articleHref(article.category_id, article.slug)} target="_blank" rel="noopener"
+          class="rounded-xl text-ink-2" style="padding:8px 13px;font-size:12.5px;border:0.5px solid var(--pd-hairline2);text-decoration:none;">View ↗</a>
+        <button type="button" id="pd-save" class="rounded-xl font-semibold text-ink"
+          style="padding:8px 14px;font-size:12.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg2);cursor:pointer;">Save</button>
+        <button type="button" id="pd-publish" class="rounded-xl font-bold"
+          style="padding:8px 16px;font-size:12.5px;background:var(--pd-ink);color:var(--pd-bg);border:0;cursor:pointer;">Publish</button>
+      </div>
+    </div>
+
+    <div class="grid gap-6" style="grid-template-columns:minmax(0,1fr) 300px;">
+      <div>
+        <input id="pd-title" type="text" value={article.title} placeholder="Article title"
+          class="w-full rounded-xl font-display font-medium text-ink"
+          style="padding:12px 14px;font-size:22px;letter-spacing:-0.5px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);outline:none;" />
+
+        <label class="mt-3 block text-ink-3" style="font-size:11px;">Summary — shown on category and search listings</label>
+        <textarea id="pd-summary" rows="2" placeholder="One sentence describing the article."
+          class="mt-1 w-full rounded-xl text-ink-2"
+          style="padding:10px 12px;font-size:13px;line-height:1.5;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);outline:none;resize:vertical;">{initial.summary}</textarea>
+
+        <div class="mt-5 flex flex-wrap items-center gap-1.5">
+          <span class="text-ink-3" style="font-size:11px;margin-right:4px;">Add block:</span>
+          <button type="button" class="pd-add" data-kind="text">Paragraph</button>
+          <button type="button" class="pd-add" data-kind="h">Subheading</button>
+          <button type="button" class="pd-add" data-kind="list">Bullets</button>
+          <button type="button" class="pd-add" data-kind="steps">Steps</button>
+          <button type="button" class="pd-add" data-kind="note">Callout</button>
+        </div>
+
+        <!-- Body is a list of typed blocks rather than a rich-text field: the
+             public layout styles each node kind itself, and keeping editors out
+             of raw HTML is what stops arbitrary markup reaching the page. -->
+        <div id="pd-blocks" class="mt-3 flex flex-col gap-2"></div>
+      </div>
+
+      <div>
+        <section class="rounded-2xl" style="padding:16px;background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+          <label class="block text-ink-3" style="font-size:11px;">Category</label>
+          <select id="pd-category" class="mt-1 w-full rounded-lg text-ink"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;">
+            {categories.map((c) => <option value={c.id} selected={c.id === article.category_id}>{c.title}</option>)}
+          </select>
+
+          <label class="mt-3 block text-ink-3" style="font-size:11px;">Permalink</label>
+          <input id="pd-slug" type="text" value={article.slug}
+            class="mt-1 w-full rounded-lg font-mono text-ink-2"
+            style="padding:7px 9px;font-size:11.5px;background:var(--pd-bg);border:0.5px solid var(--pd-hairline2);outline:none;" />
+          <div id="pd-url" class="mt-1 font-mono text-ink-4" style="font-size:10px;word-break:break-all;"></div>
+
+          <label class="mt-3 flex items-center gap-2 text-ink-2" style="font-size:11.5px;cursor:pointer;">
+            <input id="pd-popular" type="checkbox" checked={initial.popular} />
+            Show under “Popular topics”
+          </label>
+
+          <div class="mt-3 flex items-center justify-between">
+            <span class="text-ink-3" style="font-size:11px;">Status</span>
+            <span id="pd-status-pill" class="font-mono uppercase"
+              style="font-size:9.5px;letter-spacing:1px;border-radius:999px;padding:3px 9px;"></span>
+          </div>
+          <button type="button" id="pd-unpublish" class="mt-2 w-full rounded-lg text-ink-3"
+            style="padding:7px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);cursor:pointer;">Revert to draft</button>
+          <button type="button" id="pd-delete" class="mt-2 w-full rounded-lg"
+            style="padding:7px;font-size:11.5px;border:0.5px solid color-mix(in srgb,var(--pd-pink) 40%,transparent);background:transparent;color:var(--pd-pink);cursor:pointer;">Delete article</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <style is:global>
+    .pd-add {
+      background: var(--pd-bg2); color: var(--pd-ink2); border: 0.5px solid var(--pd-hairline2);
+      border-radius: 7px; padding: 5px 10px; font-size: 11.5px; cursor: pointer; line-height: 1;
+    }
+    .pd-add:hover { color: var(--pd-ink); border-color: var(--pd-lilac); }
+    .pd-block { border-radius: 12px; background: var(--pd-bg2); border: 0.5px solid var(--pd-hairline); padding: 10px 12px; }
+    .pd-block textarea {
+      width: 100%; background: transparent; border: 0; outline: none; color: var(--pd-ink2);
+      font-size: 13.5px; line-height: 1.6; resize: vertical; font-family: inherit;
+    }
+    .pd-block.is-h textarea { font-weight: 600; color: var(--pd-ink); font-size: 15px; }
+    .pd-block.is-note { border-left: 2px solid var(--pd-lilac); }
+    .pd-block-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .pd-block-kind { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--pd-ink4); }
+    .pd-block-bar button { background: none; border: 0; color: var(--pd-ink4); cursor: pointer; font-size: 12px; padding: 0 3px; }
+    .pd-block-bar button:hover { color: var(--pd-ink2); }
+  </style>
+
+  <script>
+    const data = JSON.parse(document.getElementById("pd-article-data")!.textContent || "{}");
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const toast = (m: string) => (window as any).pdToast?.(m);
+
+    const titleEl = $<HTMLInputElement>("pd-title");
+    const summaryEl = $<HTMLTextAreaElement>("pd-summary");
+    const slugEl = $<HTMLInputElement>("pd-slug");
+    const categoryEl = $<HTMLSelectElement>("pd-category");
+    const popularEl = $<HTMLInputElement>("pd-popular");
+    const blocksEl = $<HTMLDivElement>("pd-blocks");
+    const stateEl = $<HTMLSpanElement>("pd-save-state");
+
+    let status: string = data.status || "draft";
+    let dirty = false;
+    const markDirty = () => { dirty = true; stateEl.textContent = "Unsaved changes"; };
+
+    // ── blocks ────────────────────────────────────────────────────────────
+    // Each stored node becomes one editable block. list/steps are edited as one
+    // line per item, which is far quicker than a row of inputs and round-trips
+    // losslessly because blank lines are dropped on save.
+    type Kind = "text" | "h" | "list" | "steps" | "note";
+    const KIND_LABEL: Record<Kind, string> = {
+      text: "Paragraph", h: "Subheading", list: "Bullets", steps: "Steps", note: "Callout",
+    };
+
+    function nodeToBlock(n: any): { kind: Kind; value: string } {
+      if (typeof n === "string") return { kind: "text", value: n };
+      if (n && typeof n.h === "string") return { kind: "h", value: n.h };
+      if (n && typeof n.note === "string") return { kind: "note", value: n.note };
+      if (n && Array.isArray(n.list)) return { kind: "list", value: n.list.join("\n") };
+      if (n && Array.isArray(n.steps)) return { kind: "steps", value: n.steps.join("\n") };
+      return { kind: "text", value: "" };
+    }
+
+    function blockToNode(kind: Kind, value: string): any {
+      const v = value.trim();
+      if (!v) return null;
+      if (kind === "h") return { h: v };
+      if (kind === "note") return { note: v };
+      if (kind === "list") return { list: v.split("\n").map((s) => s.trim()).filter(Boolean) };
+      if (kind === "steps") return { steps: v.split("\n").map((s) => s.trim()).filter(Boolean) };
+      return v;
+    }
+
+    function addBlock(kind: Kind, value = "", focus = false) {
+      const wrap = document.createElement("div");
+      wrap.className = `pd-block is-${kind}`;
+      wrap.dataset.kind = kind;
+
+      const bar = document.createElement("div");
+      bar.className = "pd-block-bar";
+      const label = document.createElement("span");
+      label.className = "pd-block-kind";
+      label.textContent = KIND_LABEL[kind] + (kind === "list" || kind === "steps" ? " — one per line" : "");
+      const spacer = document.createElement("span");
+      spacer.style.flex = "1";
+      const up = document.createElement("button"); up.type = "button"; up.textContent = "↑"; up.title = "Move up";
+      const down = document.createElement("button"); down.type = "button"; down.textContent = "↓"; down.title = "Move down";
+      const del = document.createElement("button"); del.type = "button"; del.textContent = "×"; del.title = "Remove";
+      del.style.color = "var(--pd-pink)";
+      bar.append(label, spacer, up, down, del);
+
+      const ta = document.createElement("textarea");
+      ta.rows = kind === "h" ? 1 : kind === "list" || kind === "steps" ? 4 : 3;
+      ta.value = value;
+      ta.placeholder = KIND_LABEL[kind];
+      ta.addEventListener("input", markDirty);
+
+      up.addEventListener("click", () => {
+        const prev = wrap.previousElementSibling;
+        if (prev) { blocksEl.insertBefore(wrap, prev); markDirty(); }
+      });
+      down.addEventListener("click", () => {
+        const next = wrap.nextElementSibling;
+        if (next) { blocksEl.insertBefore(next, wrap); markDirty(); }
+      });
+      del.addEventListener("click", () => { wrap.remove(); markDirty(); });
+
+      wrap.append(bar, ta);
+      blocksEl.appendChild(wrap);
+      if (focus) ta.focus();
+    }
+
+    function collectBody(): any[] {
+      return [...blocksEl.querySelectorAll<HTMLDivElement>(".pd-block")]
+        .map((b) => blockToNode(b.dataset.kind as Kind, b.querySelector("textarea")!.value))
+        .filter((n) => n !== null);
+    }
+
+    (data.body || []).forEach((n: any) => {
+      const b = nodeToBlock(n);
+      addBlock(b.kind, b.value);
+    });
+
+    document.querySelectorAll<HTMLButtonElement>(".pd-add").forEach((b) => {
+      b.addEventListener("click", () => { addBlock(b.dataset.kind as Kind, "", true); markDirty(); });
+    });
+
+    // ── slug + url preview ────────────────────────────────────────────────
+    const slugify = (s: string) =>
+      (s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    let slugTouched = data.slug !== slugify(data.title);
+    function renderUrl() {
+      $("pd-url").textContent = `pixydust.com/support/${categoryEl.value}/${slugEl.value || "…"}`;
+    }
+    titleEl.addEventListener("input", () => {
+      if (!slugTouched) slugEl.value = slugify(titleEl.value);
+      markDirty(); renderUrl();
+    });
+    slugEl.addEventListener("input", () => { slugTouched = true; markDirty(); renderUrl(); });
+    categoryEl.addEventListener("change", () => { markDirty(); renderUrl(); });
+    [summaryEl, popularEl].forEach((el) => el.addEventListener("input", markDirty));
+
+    function renderStatus() {
+      const pill = $("pd-status-pill");
+      pill.textContent = status;
+      pill.style.cssText = pill.style.cssText.replace(/color:[^;]+;|border:[^;]+;/g, "");
+      pill.style.cssText += status === "published"
+        ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
+        : "color:var(--pd-amber);border:0.5px solid color-mix(in srgb,var(--pd-amber) 40%,transparent);";
+      $("pd-unpublish").style.display = status === "published" ? "" : "none";
+      $<HTMLButtonElement>("pd-publish").textContent = status === "published" ? "Update" : "Publish";
+    }
+
+    async function save(nextStatus?: string) {
+      stateEl.textContent = "Saving…";
+      try {
+        const res = await fetch("/api/admin/help", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save-article",
+            id: data.id,
+            categoryId: categoryEl.value,
+            slug: slugEl.value,
+            title: titleEl.value,
+            summary: summaryEl.value,
+            body: collectBody(),
+            status: nextStatus ?? status,
+            popular: popularEl.checked,
+          }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!j.ok) { stateEl.textContent = "Save failed"; toast(j.error || "Could not save."); return false; }
+        if (nextStatus) status = nextStatus;
+        // The server normalises the slug, so mirror its answer back.
+        slugEl.value = j.slug;
+        $<HTMLAnchorElement>("pd-view").href = `/support/${j.categoryId}/${j.slug}`;
+        dirty = false;
+        stateEl.textContent = `Saved ${new Date().toLocaleTimeString()}`;
+        renderStatus(); renderUrl();
+        return true;
+      } catch {
+        stateEl.textContent = "Save failed";
+        toast("Network error.");
+        return false;
+      }
+    }
+
+    $("pd-save").addEventListener("click", () => save());
+    $("pd-publish").addEventListener("click", async () => {
+      if (await save("published")) toast("Published — live in the Help Center.");
+    });
+    $("pd-unpublish").addEventListener("click", async () => {
+      if (await save("draft")) toast("Reverted to draft — hidden from /support and the sitemap.");
+    });
+    $("pd-delete").addEventListener("click", async () => {
+      if (!confirm("Delete this article permanently? This cannot be undone.")) return;
+      const res = await fetch("/api/admin/help", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete-article", id: data.id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (j.ok) location.href = "/admin/help";
+      else toast(j.error || "Could not delete.");
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); }
+    });
+    window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+    renderStatus(); renderUrl();
+  </script>
+</AdminShell>

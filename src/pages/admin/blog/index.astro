@@ -1,0 +1,6 @@
+---
+// The admin "Blog" list is now "Items" — Blog is one section among several.
+// Kept so existing bookmarks still land somewhere useful.
+export const prerender = false;
+return Astro.redirect("/admin/items?section=blog", 301);
+---

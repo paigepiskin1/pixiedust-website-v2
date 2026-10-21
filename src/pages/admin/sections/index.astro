@@ -1,0 +1,151 @@
+---
+// Item Sections — the top-level homes items are filed under (Blog, Made with
+// PixyDust, AR Effects …) and the sub-categories inside each. Items themselves
+// are written in Admin → Items.
+export const prerender = false;
+import AdminShell from "../../../layouts/AdminShell.astro";
+import { isAdmin } from "../../../lib/admin";
+import { adminListAll, itemCounts, INDEX_TEMPLATES, ITEM_TEMPLATES } from "../../../lib/sections";
+
+if (!isAdmin(Astro.locals)) return Astro.redirect("/");
+
+const db = Astro.locals.runtime.env.DB;
+const [all, counts] = await Promise.all([adminListAll(db), itemCounts(db)]);
+const sections = all.filter((s) => !s.parent_id);
+const subsOf = (id: string) => all.filter((s) => s.parent_id === id);
+const label = (list: readonly { id: string; label: string }[], id: string) =>
+  (list.find((t) => t.id === id)?.label ?? id).split(" — ")[0];
+---
+
+<AdminShell title="Item Sections — PixyDust Admin" tab="sections">
+  <div class="mx-auto w-full" style="max-width:1100px;padding:28px;">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 class="font-display font-semibold text-ink" style="font-size:26px;letter-spacing:-0.6px;">Item Sections</h1>
+        <p class="mt-1 text-ink-3" style="font-size:13px;max-width:620px;line-height:1.5;">
+          Each section is its own page on the site, and its items live under it —
+          <span class="font-mono" style="font-size:12px;">/blog/…</span>,
+          <span class="font-mono" style="font-size:12px;">/made-with-pixydust/…</span>.
+          Sub-categories organise items inside a section. Write items in
+          <a href="/admin/items" style="color:var(--pd-lilac);">Items</a>.
+        </p>
+      </div>
+      <button type="button" id="pd-new-section" class="rounded-xl font-bold"
+        style="padding:11px 18px;background:var(--pd-lilac);color:#0A0A0B;font-size:13px;border:none;cursor:pointer;">New section</button>
+    </div>
+
+    <ul id="pd-sections" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;">
+      {sections.map((s) => {
+        const c = counts.bySection.get(s.id) ?? { total: 0, live: 0, scheduled: 0, draft: 0 };
+        const subs = subsOf(s.id);
+        return (
+          <li data-id={s.id} class="overflow-hidden rounded-2xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
+            <div class="flex flex-wrap items-center gap-3" style="padding:14px 16px;">
+              <span class="pd-grip" title="Drag to reorder" style="cursor:grab;color:var(--pd-ink4);font-size:13px;user-select:none;">⠿</span>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-display font-semibold text-ink" style="font-size:15.5px;letter-spacing:-0.3px;">{s.title}</span>
+                  <span class="font-mono uppercase"
+                    style={`font-size:9px;letter-spacing:1px;border-radius:999px;padding:2px 7px;${
+                      s.status === "published"
+                        ? "color:var(--pd-mint);border:0.5px solid color-mix(in srgb,var(--pd-mint) 40%,transparent);"
+                        : "color:var(--pd-amber);border:0.5px solid color-mix(in srgb,var(--pd-amber) 40%,transparent);"
+                    }`}>{s.status === "published" ? "live" : "hidden"}</span>
+                </div>
+                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ink-4" style="font-size:11px;">
+                  <a href={`/${s.slug}`} target="_blank" rel="noopener" class="font-mono" style="color:var(--pd-lilac);text-decoration:none;">/{s.slug}</a>
+                  <span>
+                    <a href={`/admin/items?section=${s.id}&status=live`} style="color:var(--pd-mint);text-decoration:none;">{c.live} live</a>
+                    {c.scheduled > 0 && <> · <a href={`/admin/items?section=${s.id}&status=scheduled`} style="color:var(--pd-amber);text-decoration:none;">{c.scheduled} scheduled</a></>}
+                    {c.draft > 0 && <> · <a href={`/admin/items?section=${s.id}&status=draft`} style="color:inherit;text-decoration:none;">{c.draft} draft</a></>}
+                  </span>
+                  <span>{label(INDEX_TEMPLATES, s.index_template)} page · {label(ITEM_TEMPLATES, s.item_template)} items</span>
+                </div>
+              </div>
+              <a href={`/admin/items?section=${s.id}`} class="rounded-lg text-ink-2"
+                style="padding:6px 11px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);text-decoration:none;">Items</a>
+              <a href={`/admin/sections/${s.id}`} class="rounded-lg font-semibold text-ink"
+                style="padding:6px 11px;font-size:11.5px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);text-decoration:none;">Settings</a>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5" style="padding:10px 16px 13px;border-top:0.5px solid var(--pd-hairline);">
+              <span class="text-ink-4" style="font-size:10.5px;margin-right:4px;">Sub-categories</span>
+              {subs.length === 0 && <span class="text-ink-4" style="font-size:11px;">none</span>}
+              {subs.map((sub) => (
+                <span class="inline-flex items-center gap-1.5 rounded-full text-ink-2"
+                  style="padding:3px 10px;font-size:11px;border:0.5px solid var(--pd-hairline2);background:var(--pd-bg);">
+                  {sub.title}
+                  <span class="font-mono text-ink-4" style="font-size:9.5px;">{counts.bySub.get(sub.id) ?? 0}</span>
+                </span>
+              ))}
+              <button type="button" class="pd-add-sub rounded-full text-ink-3" data-id={s.id} data-title={s.title}
+                style="padding:3px 10px;font-size:11px;border:0.5px dashed var(--pd-hairline3);background:transparent;cursor:pointer;">+ Add</button>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+
+  <style is:global>
+    #pd-sections li.pd-dragging { opacity: 0.45; }
+    #pd-sections li.pd-over { outline: 2px solid var(--pd-lilac); }
+  </style>
+
+  <script>
+    const toast = (m: string) => (window as any).pdToast?.(m);
+    const post = async (payload: any) => {
+      const res = await fetch("/api/admin/sections", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!j.ok) toast(j.error || "Request failed.");
+      return j;
+    };
+
+    document.getElementById("pd-new-section")?.addEventListener("click", async () => {
+      const title = prompt("Section name — it becomes a page, e.g. “Tutorials” → /tutorials");
+      if (!title) return;
+      const j = await post({ action: "create-section", title });
+      // New sections start hidden, so the settings page is the next step.
+      if (j.ok) location.href = `/admin/sections/${j.id}`;
+    });
+
+    document.querySelectorAll<HTMLButtonElement>(".pd-add-sub").forEach((b) => {
+      b.addEventListener("click", async () => {
+        const title = prompt(`New sub-category in ${b.dataset.title}`);
+        if (!title) return;
+        const j = await post({ action: "create-sub", sectionId: b.dataset.id, title });
+        if (j.ok) location.reload();
+      });
+    });
+
+    // Drag sections to reorder. Order drives the admin and any list of
+    // sections, so it saves immediately.
+    const list = document.getElementById("pd-sections") as HTMLUListElement | null;
+    if (list) {
+      let dragging: HTMLLIElement | null = null;
+      list.querySelectorAll<HTMLLIElement>(":scope > li").forEach((li) => {
+        li.querySelector<HTMLElement>(".pd-grip")?.addEventListener("mousedown", () => (li.draggable = true));
+        li.addEventListener("dragstart", () => { dragging = li; li.classList.add("pd-dragging"); });
+        li.addEventListener("dragend", async () => {
+          li.classList.remove("pd-dragging");
+          li.draggable = false;
+          list.querySelectorAll("li").forEach((x) => x.classList.remove("pd-over"));
+          dragging = null;
+          const order = [...list.querySelectorAll<HTMLLIElement>(":scope > li")].map((x) => x.dataset.id!);
+          const j = await post({ action: "reorder", order });
+          if (j.ok) toast("Order saved.");
+        });
+        li.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          if (!dragging || dragging === li) return;
+          const r = li.getBoundingClientRect();
+          li.classList.add("pd-over");
+          list.insertBefore(dragging, (e as DragEvent).clientY > r.top + r.height / 2 ? li.nextSibling : li);
+        });
+        li.addEventListener("dragleave", () => li.classList.remove("pd-over"));
+      });
+    }
+  </script>
+</AdminShell>

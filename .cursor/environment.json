@@ -1,0 +1,17 @@
+{
+  "name": "PixieDust (Astro + Cloudflare)",
+  "install": "npm ci && bash scripts/setup-local-db.sh",
+  "terminals": [
+    {
+      "name": "astro-dev",
+      "command": "npm run dev",
+      "description": "Astro + Cloudflare dev server on http://localhost:4321 (local D1/KV via miniflare platformProxy)."
+    }
+  ],
+  "ports": [
+    {
+      "name": "astro-dev",
+      "port": 4321
+    }
+  ]
+}

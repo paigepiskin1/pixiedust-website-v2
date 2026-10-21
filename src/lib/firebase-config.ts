@@ -4,7 +4,7 @@
 // from the existing "pixie-dust-apps" project.
 export const firebaseConfig = {
   apiKey: "AIzaSyDd_K8qbm6MOiTlXpFiH4OwqTnUNoKIjrA",
-  authDomain: "auth.pixiedustapp.com",
+  authDomain: "auth.pixydust.com",
   projectId: "pixie-dust-apps",
   storageBucket: "pixie-dust-apps.firebasestorage.app",
   messagingSenderId: "676166394107",

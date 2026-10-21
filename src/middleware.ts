@@ -2,9 +2,73 @@ import type { MiddlewareHandler } from "astro";
 import { readSession, SESSION_COOKIE } from "./lib/session";
 import { getUserByUid, toPublicUser } from "./lib/users";
 
+// Migration flag, cached ~30s per isolate so old-domain requests don't read D1
+// every time (and new-domain traffic never checks it at all). Activate with the
+// MIGRATE_PIXYDUST env var OR: app_settings key `migrate_pixydust` = "1".
+let _mig = { on: false, at: 0 };
+async function migrateOn(env: any): Promise<boolean> {
+  if (env?.MIGRATE_PIXYDUST === "1") return true;
+  const now = Date.now();
+  if (now - _mig.at < 30000) return _mig.on;
+  let on = _mig.on;
+  try {
+    const row = await env?.DB?.prepare("SELECT value FROM app_settings WHERE key='migrate_pixydust'").first();
+    on = row?.value === "1";
+  } catch { /* keep last known on transient error */ }
+  _mig = { on, at: now };
+  return on;
+}
+
 // Populates locals.user from the session cookie for SSR routes. Static
 // (prerendered) routes run this at build time only and hydrate auth client-side.
 export const onRequest: MiddlewareHandler = async (context, next) => {
+  // ── Canonical path: no trailing slash ────────────────────────────────────
+  // Astro's default is `trailingSlash: "ignore"`, which served /legal/terms and
+  // /legal/terms/ as two 200s that each declared THEMSELVES canonical — so every
+  // page was indexable twice and split its own ranking signals.
+  //
+  // "/" keeps its slash: a URL always has at least a root path, and stripping it
+  // would loop. /__/* is Firebase's proxied auth namespace and is passed through
+  // byte-for-byte, since the upstream decides those shapes, not us.
+  const reqUrl = new URL(context.request.url);
+  // Splitting on "/" and dropping empties collapses repeated separators and the
+  // trailing slash in one pass: "/a//b/" and "//a/b" both become "/a/b", and "/"
+  // stays "/". Repeated slashes matter beyond tidiness — "//trending" served a
+  // 200 whose canonical resolved to the host "trending", because new URL() reads
+  // a leading "//" as protocol-relative.
+  const cleanPath = reqUrl.pathname.startsWith("/__/")
+    ? reqUrl.pathname
+    : "/" + reqUrl.pathname.split("/").filter(Boolean).join("/");
+
+  // ── Domain migration → pixydust.com ──────────────────────────────────────
+  // Permanently forward the old domain (and the www of both) to the new apex,
+  // preserving path + query, so e.g. pixiedustapp.com/login → pixydust.com/login.
+  // web.pixiedustapp.com and auth.pixiedustapp.com are different hosts that never
+  // hit this worker, so they are untouched.
+  //
+  // GATED (see migrateOn) so this is a no-op until the flag is flipped —
+  // otherwise we'd 301 the whole live site to a dead domain. Only old-domain
+  // hosts consult the flag; reversible instantly with no code deploy.
+  {
+    const h = reqUrl.hostname;
+    if (h === "pixiedustapp.com" || h === "www.pixiedustapp.com" || h === "www.pixydust.com") {
+      if (await migrateOn(context.locals.runtime?.env)) {
+        // cleanPath, not pathname: one hop from old-domain-with-slash to the
+        // final URL rather than a 301 into a second 301.
+        return Response.redirect(`https://pixydust.com${cleanPath}${reqUrl.search}`, 301);
+      }
+    }
+  }
+
+  // Same-origin trailing-slash redirect. 308 for anything that isn't GET/HEAD:
+  // a 301 makes clients re-issue a POST as a GET and drop the body, which would
+  // quietly break form and webhook posts to a slashed URL. 308 preserves both.
+  if (cleanPath !== reqUrl.pathname) {
+    const method = context.request.method;
+    const code = method === "GET" || method === "HEAD" ? 301 : 308;
+    return Response.redirect(`${reqUrl.origin}${cleanPath}${reqUrl.search}`, code);
+  }
+
   // Same-origin Firebase auth: proxy the reserved /__/* paths (auth handler,
   // iframe, init.json) to the project's Firebase Hosting so OAuth redirects
   // complete on OUR origin. Mobile browsers partition third-party storage,
@@ -35,12 +99,31 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   } catch {
     // never block a request on auth resolution
   }
-  const response = await next();
+  // Anything that escapes a route lands on Cloudflare's generic error page,
+  // which carries no diagnostics — and for an API route the client then fails
+  // parsing HTML as JSON, so a server fault reads as a client-side network
+  // problem. Catch it here: /api/* gets the real message as JSON, everything
+  // else re-throws so page rendering behaves as before.
+  let response: Response;
+  try {
+    response = await next();
+  } catch (err) {
+    const msg = (err as Error)?.message || String(err);
+    const stack = (err as Error)?.stack || "";
+    console.error("[unhandled]", context.request.method, reqUrl.pathname, msg, stack);
+    if (reqUrl.pathname.startsWith("/api/")) {
+      return new Response(JSON.stringify({ error: `Server error: ${msg}` }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    throw err;
+  }
   // Staging hosts (sys.*, *.pages.dev, localhost) must never be indexed — only
   // the production apex. Canonical tags already point to the apex; this header
   // is the reliable belt (survives Cloudflare's managed robots.txt).
   const host = context.url.hostname;
-  if (host !== "pixiedustapp.com" && host !== "www.pixiedustapp.com") {
+  if (host !== "pixydust.com") {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   response.headers.set("X-Frame-Options", "DENY");

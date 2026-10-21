@@ -7,7 +7,20 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
 
-export async function POST({ request, locals, url }: APIContext) {
+export async function POST(ctx: APIContext) {
+  // An API route must never fall through to the HTML error page. The client
+  // calls res.json(), so an HTML body throws there and surfaces as a bogus
+  // "Network error" that hides the real cause. Anything thrown below —
+  // including getUserByUid, which runs before the inner try — comes back as
+  // JSON with the actual message.
+  try {
+    return await handleCheckout(ctx);
+  } catch (err) {
+    return json({ error: `Checkout failed: ${(err as Error)?.message || String(err)}` }, 500);
+  }
+}
+
+async function handleCheckout({ request, locals, url }: APIContext) {
   const user = locals.user;
   if (!user) return json({ error: "Sign in to purchase." }, 401);
   const env = locals.runtime.env;
@@ -124,7 +137,7 @@ export async function POST({ request, locals, url }: APIContext) {
               currency: "usd",
               unit_amount: tier.price_cents,
               recurring: { interval: "month" },
-              product_data: { name: `PixieDust ${tier.name}` },
+              product_data: { name: `PixyDust ${tier.name}` },
             },
           },
         ],
@@ -133,9 +146,26 @@ export async function POST({ request, locals, url }: APIContext) {
       };
     }
 
-    const session = await createCheckoutSession(env.STRIPE_SECRET_KEY, params);
+    let session;
+    try {
+      session = await createCheckoutSession(env.STRIPE_SECRET_KEY, params);
+    } catch (err) {
+      // Stripe customer ids are per-mode: one minted against the test key does
+      // not exist under the live key, so a user who first transacted in test
+      // mode is permanently unable to check out in production. Same shape if a
+      // customer is deleted in the dashboard. Drop the stale id and mint a new
+      // one rather than leaving that account bricked.
+      const msg = (err as Error)?.message || String(err);
+      if (!/no such customer/i.test(msg)) throw err;
+      await db.prepare("UPDATE users SET stripe_customer_id = NULL WHERE id = ?").bind(dbUser.id).run();
+      const fresh = await getOrCreateCustomer(env.STRIPE_SECRET_KEY, db, { ...dbUser, stripe_customer_id: null });
+      session = await createCheckoutSession(env.STRIPE_SECRET_KEY, { ...params, customer: fresh });
+    }
     return json({ url: session.url });
   } catch (err) {
-    return json({ error: "Could not create checkout session. Please try again." }, 502);
+    // 500, not 502: Cloudflare replaces a 502 body with its own Bad Gateway
+    // page, so the real Stripe message never reached the client — which is what
+    // made this fault look like a network error for so long.
+    return json({ error: `Could not start checkout: ${(err as Error)?.message || String(err)}` }, 500);
   }
 }

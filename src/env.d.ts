@@ -22,8 +22,6 @@ interface Env {
   MAILGUN_DOMAIN: string;
   MAILGUN_FROM: string;
   MAILGUN_FEEDBACK_TO: string;
-  CLICKY_SITE_ID: string;
-  CLICKY_SITEKEY: string;
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
   KLIPY_API_KEY: string;

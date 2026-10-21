@@ -47,10 +47,32 @@ export function toPublicUser(u: DbUser): PublicUser {
 }
 
 export async function getUserByUid(db: D1Database, uid: string): Promise<DbUser | null> {
-  return await db
+  const user = await db
     .prepare("SELECT * FROM users WHERE uid = ? AND deleted_at IS NULL")
     .bind(uid)
     .first<DbUser>();
+  if (!user) return null;
+
+  // Retire expired credits before the balance is shown, otherwise the header
+  // would advertise credits that Generate then refuses to spend. Guarded by one
+  // cheap indexed lookup so the common case (nothing due) adds a single query.
+  try {
+    const due = await db
+      .prepare(
+        `SELECT 1 FROM credit_lots
+         WHERE user_id = ? AND remaining > 0 AND expires_at IS NOT NULL AND expires_at <= datetime('now')
+         LIMIT 1`
+      )
+      .bind(user.id)
+      .first();
+    if (due) {
+      const { sweepExpired } = await import("./credit-lots");
+      user.balance = await sweepExpired(db, user.id);
+    }
+  } catch {
+    /* expiry bookkeeping must never block auth */
+  }
+  return user;
 }
 
 /**
