@@ -31,6 +31,12 @@ export interface TemplateField {
   multiple?: boolean;
   /** For select fields: "buttons" (default) or "dropdown". */
   ui?: "buttons" | "dropdown";
+  /**
+   * Optional file fields placed in an image array: prompt text emitted via
+   * {{key_note}} only when the user uploaded this file. "{n}" becomes the
+   * file's 1-based position in the array after empty slots are removed.
+   */
+  note?: string;
 }
 
 export interface TemplateStep {
@@ -221,6 +227,33 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
     }
   }
 
+  // Optional uploads left blank are dropped from image arrays (models reject
+  // empty URLs); record where each present upload lands for {{key_note}}.
+  const position = new Map<string, number>();
+  const isBlank = (key: string) => {
+    const val = inputs[key] ?? byKey.get(key)?.default;
+    return val == null || val === "" || (Array.isArray(val) && val.length === 0);
+  };
+  const scanArrays = (v: unknown): void => {
+    if (Array.isArray(v)) {
+      let n = 0;
+      for (const el of v) {
+        const m = typeof el === "string" ? el.match(/^\{\{(\w+)\*?\}\}$/) : null;
+        if (m && isBlank(m[1])) continue;
+        n++;
+        if (m) position.set(m[1], n);
+      }
+    } else if (v && typeof v === "object") for (const val of Object.values(v as Record<string, unknown>)) scanArrays(val);
+  };
+  scanArrays(t.input);
+  const note = (key: string): string | null => {
+    if (!key.endsWith("_note")) return null;
+    const f = byKey.get(key.slice(0, -5));
+    if (!f?.note) return null;
+    const n = position.get(f.key);
+    return n ? f.note.replace(/\{n\}/g, String(n)) : "";
+  };
+
   const TOKEN = /\{\{(\w+)\*?\}\}/g;
   const subst = (v: unknown): unknown => {
     if (typeof v === "string") {
@@ -234,11 +267,17 @@ export function resolveInput(t: Template, inputs: Record<string, unknown>): Reso
         return resolved;
       }
       return v.replace(TOKEN, (_, key) => {
+        const nt = note(key);
+        if (nt != null) return nt;
         const val = inputs[key];
         return val != null ? String(val) : String(byKey.get(key)?.default ?? "");
       });
     }
-    if (Array.isArray(v)) return v.map(subst);
+    if (Array.isArray(v))
+      return v.filter((el) => {
+        const m = typeof el === "string" ? el.match(/^\{\{(\w+)\*?\}\}$/) : null;
+        return !(m && isBlank(m[1]));
+      }).map(subst);
     if (v && typeof v === "object") {
       const out: Record<string, unknown> = {};
       for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = subst(val);
