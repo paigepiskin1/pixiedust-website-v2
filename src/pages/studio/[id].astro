@@ -11,7 +11,8 @@ import { getTemplate, allFields, computeCost, listTemplates } from "../../lib/te
 const { id } = Astro.params;
 const db = Astro.locals.runtime.env.DB;
 const template = id ? await getTemplate(db, id) : null;
-if (!template) return new Response(null, { status: 302, headers: { Location: "/" } });
+// Admin-only templates (e.g. ones with preloaded likeness refs) are invisible to non-admins.
+if (!template || (template.isAdminOnly && !Astro.locals.user?.isAdmin)) return new Response(null, { status: 302, headers: { Location: "/" } });
 
 // Other templates the user can jump to without leaving the studio.
 const switchList = await listTemplates(db, { isAdmin: false });
