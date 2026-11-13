@@ -19,6 +19,14 @@ export interface DbUser {
   stripe_customer_id: string | null;
   welcome_sent_at: string | null;
   disabled_at: string | null;
+  /** Acquisition channel; "pixydust_ar_app" for accounts created in the iPhone app. */
+  signup_source?: string | null;
+  /** 'web' | 'ios'; null for accounts created before it was recorded. */
+  signup_platform?: string | null;
+  /** iPhone (AR) app use, for any account. */
+  app_first_seen_at?: string | null;
+  app_last_seen_at?: string | null;
+  app_version?: string | null;
 }
 
 /** Shape exposed to the client (no internal-only fields leak meaningfully). */

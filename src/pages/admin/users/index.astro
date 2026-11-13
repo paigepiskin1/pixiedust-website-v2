@@ -2,6 +2,7 @@
 export const prerender = false;
 import AdminShell from "../../../layouts/AdminShell.astro";
 import { isAdmin } from "../../../lib/admin";
+import { APP_SIGNUP_SOURCE } from "../../../lib/signin";
 
 if (!isAdmin(Astro.locals)) return Astro.redirect("/");
 
@@ -10,10 +11,12 @@ interface Row {
   uid: string; email: string | null; name: string | null; username: string | null;
   balance: number; is_admin: number; created: string;
   plan: string | null; sub_status: string | null; renewal: string | null;
+  signup_source: string | null; app_last_seen_at: string | null;
 }
 const { results } = await db
   .prepare(
     `SELECT u.uid, u.email, u.name, u.username, u.balance, u.is_admin, datetime(u.created_at) AS created,
+            u.signup_source, u.app_last_seen_at,
             s.tier_id AS plan, s.status AS sub_status, s.current_period_end AS renewal
      FROM users u
      LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
@@ -21,8 +24,15 @@ const { results } = await db
      ORDER BY u.created_at DESC`
   )
   .all<Row>();
-const rows = results ?? [];
+const allRows = results ?? [];
+// ?app=1 narrows the list to people using the PixyDust iPhone (AR) app.
+const appOnly = Astro.url.searchParams.get("app") === "1";
+const isAppSignup = (r: Row) => r.signup_source === APP_SIGNUP_SOURCE;
+const usesApp = (r: Row) => isAppSignup(r) || !!r.app_last_seen_at;
+const rows = appOnly ? allRows.filter(usesApp) : allRows;
 const subCount = rows.filter((r) => r.plan).length;
+const appCount = allRows.filter(usesApp).length;
+const appSignups = allRows.filter(isAppSignup).length;
 const planLabel = (p: string | null) => (p ? p.charAt(0).toUpperCase() + p.slice(1) : null);
 const cell = "padding:11px 12px;font-size:12.5px;color:var(--pd-ink);border-bottom:0.5px solid var(--pd-hairline);vertical-align:middle;";
 const head = "padding:8px 12px;font-family:var(--font-mono);font-size:9.5px;color:var(--pd-ink3);letter-spacing:0.7px;text-transform:uppercase;text-align:left;border-bottom:0.5px solid var(--pd-hairline2);";
@@ -31,7 +41,7 @@ const mini = "padding:6px 9px;border-radius:8px;background:var(--pd-bg);border:0
 
 <AdminShell title="Admin · Users" tab="users">
   <h1 class="font-display font-medium text-ink" style="font-size:30px;letter-spacing:-0.7px;">Users</h1>
-  <p class="mt-1 text-ink-3" style="font-size:13.5px;">{rows.length} accounts · <span style="color:var(--pd-mint);">{subCount} subscribed</span>. Adjust credits (logged to the ledger) or toggle admin.</p>
+  <p class="mt-1 text-ink-3" style="font-size:13.5px;">{rows.length} accounts · <span style="color:var(--pd-mint);">{subCount} subscribed</span> · <a href={appOnly ? "/admin/users" : "/admin/users?app=1"} style="color:var(--pd-teal);">{appOnly ? "Show everyone" : `${appCount} use the iPhone app (${appSignups} signed up there)`}</a>. Adjust credits (logged to the ledger) or toggle admin.</p>
 
   <div class="mt-6 overflow-x-auto rounded-2xl" style="background:var(--pd-bg2);border:0.5px solid var(--pd-hairline);">
     <table style="width:100%;border-collapse:collapse;min-width:980px;">
@@ -46,6 +56,12 @@ const mini = "padding:6px 9px;border-radius:8px;background:var(--pd-bg);border:0
                 <a href={`/admin/users/${r.uid}`} class="pd-user-link" style="text-decoration:none;">
                   <div class="font-semibold" style="color:var(--pd-ink);">{r.name ?? "—"} <span style="font-size:10px;color:var(--pd-lilac);">View →</span></div>
                   <div class="font-mono" style="font-size:10px;color:var(--pd-ink3);">{r.email}{r.username ? ` · @${r.username}` : ""}</div>
+                  {usesApp(r) && (
+                    <span class="font-mono uppercase" title={r.app_last_seen_at ? `Last used the app ${r.app_last_seen_at} UTC` : undefined}
+                      style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;font-size:9px;letter-spacing:0.5px;color:var(--pd-teal);border:0.5px solid color-mix(in srgb,var(--pd-teal) 45%,transparent);">
+                      {isAppSignup(r) ? "AR app signup" : "uses AR app"}
+                    </span>
+                  )}
                 </a>
               </td>
               <td style={cell}>

@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "astro";
 import { readSession, SESSION_COOKIE } from "./lib/session";
 import { getUserByUid, toPublicUser } from "./lib/users";
+import { bearerClaims } from "./lib/bearer";
 
 // Migration flag, cached ~30s per isolate so old-domain requests don't read D1
 // every time (and new-domain traffic never checks it at all). Activate with the
@@ -89,7 +90,16 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
     const env = context.locals.runtime?.env;
     if (env?.SESSIONS && env?.DB) {
       const sid = context.cookies.get(SESSION_COOKIE)?.value;
-      const uid = await readSession(env.SESSIONS, sid);
+      let uid = await readSession(env.SESSIONS, sid);
+      // The iPhone app signs in with its Firebase ID token as a Bearer token
+      // instead of a cookie. API routes only, and never the admin API: admin
+      // stays website-only, and /api/admin/* already reads Bearer as the
+      // ADMIN_API_TOKEN. The account must exist (registered through
+      // /api/app/v1/session) and not be deleted.
+      if (!uid && reqUrl.pathname.startsWith("/api/") && !reqUrl.pathname.startsWith("/api/admin/")) {
+        const claims = await bearerClaims(context.request);
+        if (claims && !(await env.SESSIONS.get(`deleted_uid:${claims.uid}`))) uid = claims.uid;
+      }
       if (uid) {
         const u = await getUserByUid(env.DB, uid);
         // Disabled accounts are treated as logged-out everywhere (abuse control).

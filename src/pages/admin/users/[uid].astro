@@ -13,7 +13,7 @@ if (!u) return Astro.redirect("/admin/users");
 
 const [ledger, logins, gens, sub, agg] = await Promise.all([
   db.prepare("SELECT delta, balance_after, reason, note, actor, datetime(created_at) AS ts FROM credit_ledger WHERE user_id = ? ORDER BY id DESC LIMIT 40").bind(u.id).all<any>(),
-  db.prepare("SELECT ip, country, user_agent, datetime(created_at) AS ts FROM login_events WHERE user_id = ? ORDER BY id DESC LIMIT 30").bind(u.id).all<any>(),
+  db.prepare("SELECT ip, country, user_agent, client, datetime(created_at) AS ts FROM login_events WHERE user_id = ? ORDER BY id DESC LIMIT 30").bind(u.id).all<any>(),
   db.prepare("SELECT id, type, status, output_url, thumbnail_url, model, credits_charged, datetime(created_at) AS ts FROM generations WHERE user_id = ? ORDER BY created_at DESC LIMIT 30").bind(u.id).all<any>(),
   db.prepare("SELECT s.tier_id, s.status, s.stripe_customer_id, s.stripe_subscription_id, datetime(s.current_period_end) AS period_end FROM subscriptions s WHERE s.user_id = ?").bind(u.id).first<any>(),
   db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed, IFNULL(SUM(credits_charged),0) AS spent FROM generations WHERE user_id = ?").bind(u.id).first<any>(),
@@ -52,6 +52,10 @@ const stats = [
       <div class="mt-1 font-mono" style="font-size:11px;color:var(--pd-ink3);">{u.email}{u.username ? ` · @${u.username}` : ""}</div>
       <div class="mt-0.5 font-mono" style="font-size:10px;color:var(--pd-ink4);">{u.uid}</div>
       <div class="mt-1 font-mono" style="font-size:10px;color:var(--pd-ink4);">Joined {u.created_at?.slice(0, 10)} · last login {u.last_login?.slice(0, 16)?.replace("T", " ") ?? "—"}</div>
+      <div class="mt-1 font-mono" style="font-size:10px;color:var(--pd-ink4);">
+        Signed up {u.signup_platform === "ios" ? "in the iPhone app" : u.signup_platform === "web" ? "on the website" : "(platform not recorded)"}{u.signup_source ? ` · source ${u.signup_source}` : ""}
+        {u.app_last_seen_at && <span style="color:var(--pd-teal);"> · AR app last used {String(u.app_last_seen_at).slice(0, 16)}{u.app_version ? ` (v${u.app_version})` : ""}</span>}
+      </div>
     </div>
     <div class="flex flex-wrap items-center gap-2" data-uid={u.uid} data-self={u.uid === Astro.locals.user!.uid ? "1" : "0"}>
       <button id="pd-role" type="button" data-on={u.is_admin} class="font-semibold" style="padding:8px 13px;border-radius:10px;font-size:12px;cursor:pointer;border:0.5px solid var(--pd-hairline2);background:transparent;color:var(--pd-ink2);">{u.is_admin ? "Revoke admin" : "Make admin"}</button>
@@ -129,7 +133,7 @@ const stats = [
                 <td style={cell}><span class="font-mono" style="font-size:10px;color:var(--pd-ink3);">{e.ts?.slice(5, 16)}</span></td>
                 <td style={cell}><span class="font-mono" style="font-size:10.5px;">{e.ip ?? "—"}</span></td>
                 <td style={cell}><span class="font-mono" style="font-size:10.5px;">{e.country ?? "—"}</span></td>
-                <td style={cell}><span class="truncate" style="font-size:10.5px;color:var(--pd-ink3);display:block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title={e.user_agent}>{e.user_agent ?? "—"}</span></td>
+                <td style={cell}><span class="truncate" style="font-size:10.5px;color:var(--pd-ink3);display:block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title={e.user_agent}>{e.client === "ios" ? "iPhone app · " : ""}{e.user_agent ?? "—"}</span></td>
               </tr>
             ))}
           </tbody>

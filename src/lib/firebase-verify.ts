@@ -14,6 +14,10 @@ export interface FirebaseClaims {
   emailVerified: boolean;
   /** "password" | "google.com" | "apple.com" | ... */
   signInProvider?: string;
+  /** When the user last actually signed in (seconds since epoch). Refreshing
+   *  the ID token doesn't change it; signing in again does. Used to require a
+   *  recent sign-in before destructive actions such as deleting the account. */
+  authTime?: number;
 }
 
 interface JwkCache {
@@ -100,5 +104,6 @@ export async function verifyIdToken(token: string): Promise<FirebaseClaims> {
     picture: p.picture,
     emailVerified: !!p.email_verified,
     signInProvider: p.firebase?.sign_in_provider,
+    authTime: typeof p.auth_time === "number" ? p.auth_time : undefined,
   };
 }
