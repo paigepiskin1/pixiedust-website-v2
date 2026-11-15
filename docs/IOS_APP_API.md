@@ -14,14 +14,18 @@ The app uses the same Firebase project as the website, so one account works on b
 | Auth domain (web) | `auth.pixydust.com` |
 | Messaging sender ID | `676166394107` |
 
-**iOS configuration file.** In the [Firebase console](https://console.firebase.google.com/project/pixie-dust-apps/settings/general), go to Project settings → Your apps:
+**iOS configuration file.** Two iOS apps are already registered in the project. Use the `GoogleService-Info.plist` whose bundle ID matches the app's bundle ID in Xcode:
 
-- If an iOS app with your bundle ID is already listed (the earlier PixieDust Creator Studio iOS app was in this project), download its `GoogleService-Info.plist`.
-- Otherwise click **Add app → iOS**, enter the app's bundle ID, and download the `GoogleService-Info.plist` it creates.
+| Firebase app | Bundle ID | Google App ID |
+| --- | --- | --- |
+| Pixie Dusst | `com.pixieDust` | `1:676166394107:ios:11059b55d0f82a1f5d505e` |
+| PixyDust | `org.reactjs.native.example.PixieDust` | `1:676166394107:ios:338fb3b112f4fe2e5d505e` |
+
+`org.reactjs.native.example.PixieDust` is React Native's template default and can't ship to the App Store under that name. If the app uses a different bundle ID, register it in the [Firebase console](https://console.firebase.google.com/project/pixie-dust-apps/settings/general) under Project settings → Your apps → **Add app → iOS**, and download the new plist.
 
 Add the plist to the Xcode project and call `FirebaseApp.configure()` at launch. Use the Firebase iOS SDK (`FirebaseAuth`) through Swift Package Manager.
 
-**Sign-in methods.** The website offers Google and email/password. App Store guideline 4.8 requires **Sign in with Apple** in any app that offers Google sign-in. Enable the Apple provider in Firebase → Authentication → Sign-in method; this needs an Apple Developer Services ID and key. For Google sign-in, add the `REVERSED_CLIENT_ID` from the plist as a URL scheme.
+**Sign-in methods.** Email/Password, Google and **Apple** are all enabled in Firebase Authentication. App Store guideline 4.8 requires Sign in with Apple in any app that offers Google sign-in. A native iOS app only needs the "Sign in with Apple" capability in Xcode; no Apple keys are needed in Firebase for that. For Google sign-in, add the plist's `REVERSED_CLIENT_ID` as a URL scheme.
 
 For reference only, the website's public web config is below. The iOS app uses its plist, not this.
 
