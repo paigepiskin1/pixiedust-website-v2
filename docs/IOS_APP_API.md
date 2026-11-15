@@ -42,6 +42,11 @@ messagingSenderId: "676166394107"
 
 There are no cookies and no PixyDust session token. The Firebase ID token is the only credential.
 
+**Two header rules, or the request is refused with `403 Cross-site … forbidden`.** The site blocks cross-site form posts, and a request with no Origin header looks like one:
+
+- Every `POST` and `DELETE` must send `Content-Type: application/json`, even with an empty body. The helper below always does.
+- Multipart uploads (`POST /api/upload`) must also send `Origin: https://pixydust.com`.
+
 ```swift
 func pixydust(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> (Int, [String: Any]) {
     guard let user = Auth.auth().currentUser else { throw URLError(.userAuthenticationRequired) }
@@ -136,7 +141,7 @@ The website's API routes accept the same `Authorization: Bearer <ID token>` head
 
 - `POST /api/generate`: start a generation, body `{ templateId, inputs, quality?, quantity?, aspect?, duration? }`
 - `GET /api/generate/status?id=…`: poll it
-- `POST /api/upload`: multipart `file` (images and videos)
+- `POST /api/upload`: multipart `file` (images and videos). Send `Origin: https://pixydust.com` with it; returns `{ "url": "https://…", "kind": "image" }`
 
 These were built for the website and aren't versioned for the app yet. If the app depends on one, ask for a `/api/app/v1/` version so it can't change underneath the app. Admin routes (`/api/admin/*`) never accept app tokens.
 
